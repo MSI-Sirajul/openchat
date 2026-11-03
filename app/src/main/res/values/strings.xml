@@ -1,0 +1,93 @@
+<resources>
+    <string name="app_name">OpenChat</string>
+    <string name="app_tagline">Online Messaging &amp; Calling app </string>
+
+    <!-- Auth & Registration -->
+    <string name="auth_welcome_back">Welcome Back</string>
+    <string name="auth_create_account">Create Account</string>
+    <string name="auth_email_or_username">Email, Username or Phone</string>
+    <string name="auth_email_hint">username, Phone or Email</string>
+    <string name="auth_email_address">Email Address</string>
+    <string name="auth_username">Username</string>
+    <string name="auth_display_name">Display Name</string>
+    <string name="auth_phone_number">Phone Number (Optional)</string>
+    <string name="auth_phone_hint">+880*****</string>
+    <string name="auth_password">Password</string>
+    <string name="auth_forgot_password">Forgot Password?</string>
+    <string name="auth_remember_me">Remember Me</string>
+    <string name="auth_offline_mode_active">Offline Mode Active</string>
+    <string name="auth_offline_mode_desc">You are currently offline.</string>
+    <string name="auth_offline_login_button">Continue Offline</string>
+    <string name="auth_sign_in_button">Sign In</string>
+    <string name="auth_sign_up_button">Sign Up</string>
+    <string name="auth_dont_have_account">Don\'t have an account?</string>
+    <string name="auth_already_have_account">Already have an account?</string>
+
+    <!-- Email Confirmation Dialog -->
+    <string name="email_confirm_title">Verify Your Email</string>
+    <string name="email_confirm_message">A verification email has been sent to %1$s. Please verify your email to activate your account.</string>
+    <string name="email_confirm_check_button">I Have Confirmed</string>
+    <string name="email_not_confirmed_title">Email Not Confirmed Yet</string>
+    <string name="email_not_confirmed_message">Your email address has not been confirmed yet. Please check your inbox or spam folder and click the confirmation link.</string>
+    <string name="email_confirm_retry">Check Again</string>
+    <string name="email_confirm_resend">Resend Email</string>
+    <string name="email_confirm_later">Confirm Later</string>
+
+    <!-- Home & Navigation -->
+    <string name="nav_chats">Chats</string>
+    <string name="nav_friends">Friends</string>
+    <string name="nav_calls">Calls</string>
+    <string name="nav_settings">Settings</string>
+    <string name="nav_add_friend">Find Friends</string>
+    <string name="nav_friend_requests">Friend Requests</string>
+    <string name="home_empty_chats">No conversations yet. Tap + to start chatting!</string>
+    <string name="home_offline_banner">You are currently in Offline</string>
+
+    <!-- Messaging & Chat -->
+    <string name="chat_type_message_hint">Type a message...</string>
+    <string name="chat_status_online">Online</string>
+    <string name="chat_status_offline">Offline</string>
+    <string name="chat_status_typing">typing...</string>
+    <string name="chat_status_seen">Seen</string>
+    <string name="chat_status_sent">Sent</string>
+    <string name="chat_status_delivered">Delivered</string>
+    <string name="chat_voice_note_title">Voice Message</string>
+    <string name="chat_uploading_media">Uploading attachment...</string>
+    <string name="chat_file_size_limit_exceeded">File exceeds maximum size of 10MB (Selected: %1$.1f MB). Please choose a file up to 10MB.</string>
+    <string name="chat_photo_preview">Photo Preview</string>
+    <string name="chat_video_preview">Video Preview</string>
+    <string name="chat_no_messages_yet">No messages yet. Send a message, photo, or voice note!</string>
+    <string name="chat_send_photo">Send Photo</string>
+    <string name="chat_send_video">Send Video</string>
+    <string name="chat_send_file">Send Document</string>
+
+    <!-- Friends & Directory -->
+    <string name="friends_search_hint">Search users by username, name, or phone</string>
+    <string name="friends_all_users_title">Discover Users</string>
+    <string name="friends_add_button">Add Friend</string>
+    <string name="friends_request_sent">Request Sent</string>
+    <string name="friends_request_pending">Pending</string>
+    <string name="friends_accept_button">Accept</string>
+    <string name="friends_decline_button">Decline</string>
+    <string name="friends_request_accepted">Friend request accepted!</string>
+    <string name="friends_no_requests">No pending friend requests</string>
+    <string name="friends_no_users_found">No users found</string>
+
+    <!-- Media Player Controls -->
+    <string name="media_play">Play</string>
+    <string name="media_pause">Pause</string>
+    <string name="media_rewind_10">Rewind 10s</string>
+    <string name="media_forward_10">Forward 10s</string>
+    <string name="media_close">Close</string>
+
+    <!-- WebRTC Calls -->
+    <string name="call_incoming_title">Incoming Voice Call</string>
+    <string name="call_calling_title">Calling…</string>
+    <string name="call_active_title">Connected</string>
+    <string name="call_ended_title">Call Ended</string>
+    <string name="call_accept">Accept</string>
+    <string name="call_decline">Decline</string>
+    <string name="call_end">End Call</string>
+    <string name="call_mute">Mute</string>
+    <string name="call_speaker">Speaker</string>
+</resources>

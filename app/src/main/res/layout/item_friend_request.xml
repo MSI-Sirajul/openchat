@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.card.MaterialCardView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginHorizontal="16dp"
+    android:layout_marginVertical="4dp"
+    app:cardCornerRadius="14dp"
+    app:cardElevation="0.5dp"
+    app:strokeWidth="1dp"
+    app:strokeColor="@color/color_divider"
+    app:cardBackgroundColor="@color/color_surface">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:padding="12dp">
+
+        <TextView
+            android:id="@+id/text_request_avatar"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="@drawable/bg_avatar_circle"
+            android:backgroundTint="@color/color_avatar_bg"
+            android:gravity="center"
+            android:text="U"
+            android:textColor="@color/color_avatar_text"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="14dp"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/text_request_name"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="User Name"
+                android:textColor="@color/color_primary_text"
+                android:textSize="15sp"
+                android:fontFamily="sans-serif-bold" />
+
+            <TextView
+                android:id="@+id/text_request_time"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="Just now"
+                android:textColor="@color/color_secondary_text"
+                android:textSize="12sp" />
+        </LinearLayout>
+
+        <!-- Action Buttons for Received Requests -->
+        <LinearLayout
+            android:id="@+id/layout_received_actions"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_accept_request"
+                android:layout_width="wrap_content"
+                android:layout_height="38dp"
+                android:text="@string/friends_accept_button"
+                android:textSize="12sp"
+                android:textColor="#FFFFFF"
+                app:cornerRadius="10dp"
+                app:backgroundTint="@color/color_status_online" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_decline_request"
+                android:layout_width="wrap_content"
+                android:layout_height="38dp"
+                android:layout_marginStart="6dp"
+                android:text="@string/friends_decline_button"
+                android:textSize="12sp"
+                android:textColor="@color/color_error"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                app:cornerRadius="10dp" />
+        </LinearLayout>
+
+        <!-- Action Button for Sent Requests -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_cancel_request"
+            android:layout_width="wrap_content"
+            android:layout_height="38dp"
+            android:text="Cancel"
+            android:textSize="12sp"
+            android:textColor="@color/color_error"
+            style="@style/Widget.Material3.Button.OutlinedButton"
+            app:cornerRadius="10dp"
+            android:visibility="gone" />
+
+    </LinearLayout>
+
+</com.google.android.material.card.MaterialCardView>

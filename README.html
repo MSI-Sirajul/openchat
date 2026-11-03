@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OpenChat — Next-Gen Android Communication Suite</title>
+  <style>
+    :root {
+      --primary: #4F46E5;
+      --primary-light: #6366F1;
+      --primary-dark: #3730A3;
+      --accent: #10B981;
+      --warning: #F59E0B;
+      --danger: #EF4444;
+      --bg: #0B0F19;
+      --surface: #111827;
+      --surface-card: #1F2937;
+      --surface-hover: #374151;
+      --text: #F9FAFB;
+      --text-muted: #9CA3AF;
+      --border: #374151;
+      --code-bg: #030712;
+      --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: var(--font-family);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 2.5rem 1.5rem;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 3.5rem;
+      padding: 3rem 1.5rem;
+      background: linear-gradient(180deg, rgba(79, 70, 229, 0.15) 0%, rgba(17, 24, 39, 0) 100%);
+      border-radius: 1.5rem;
+      border: 1px solid rgba(99, 102, 241, 0.2);
+    }
+
+    .logo-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 72px;
+      height: 72px;
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+      border-radius: 1.25rem;
+      box-shadow: 0 10px 25px -5px rgba(79, 70, 229, 0.5);
+      margin-bottom: 1.25rem;
+    }
+
+    .logo-badge svg {
+      width: 40px;
+      height: 40px;
+      fill: #FFFFFF;
+    }
+
+    h1 {
+      font-size: 2.75rem;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      margin-bottom: 0.75rem;
+      background: linear-gradient(135deg, #FFFFFF 30%, #A5B4FC 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .tagline {
+      font-size: 1.2rem;
+      color: var(--text-muted);
+      max-width: 680px;
+      margin: 0 auto 1.75rem auto;
+    }
+
+    .badges-container {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 0.65rem;
+      margin-top: 1.5rem;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.35rem 0.85rem;
+      border-radius: 9999px;
+      font-size: 0.825rem;
+      font-weight: 600;
+      text-decoration: none;
+      background-color: var(--surface-card);
+      color: var(--text);
+      border: 1px solid var(--border);
+      transition: all 0.2s ease;
+    }
+
+    .badge:hover {
+      background-color: var(--surface-hover);
+      border-color: var(--primary-light);
+      transform: translateY(-1px);
+    }
+
+    .badge-primary {
+      background-color: rgba(79, 70, 229, 0.25);
+      border-color: var(--primary);
+      color: #E0E7FF;
+    }
+
+    .badge-success {
+      background-color: rgba(16, 185, 129, 0.2);
+      border-color: var(--accent);
+      color: #A7F3D0;
+    }
+
+    .badge-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background-color: currentColor;
+    }
+
+    .download-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.25rem;
+      margin: 2.5rem 0;
+    }
+
+    .download-card {
+      background: linear-gradient(145deg, var(--surface) 0%, var(--surface-card) 100%);
+      border: 1px solid var(--border);
+      border-radius: 1rem;
+      padding: 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      text-decoration: none;
+      color: var(--text);
+      transition: all 0.25s ease;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+    }
+
+    .download-card:hover {
+      transform: translateY(-3px);
+      border-color: var(--primary-light);
+      box-shadow: 0 12px 20px -5px rgba(79, 70, 229, 0.3);
+    }
+
+    .download-card-info h3 {
+      font-size: 1.1rem;
+      font-weight: 700;
+      margin-bottom: 0.25rem;
+    }
+
+    .download-card-info p {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    .download-card-btn {
+      background-color: var(--primary);
+      color: white;
+      padding: 0.5rem 1rem;
+      border-radius: 0.5rem;
+      font-weight: 600;
+      font-size: 0.85rem;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    section {
+      margin-bottom: 3.5rem;
+    }
+
+    h2 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      margin-bottom: 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 0.75rem;
+    }
+
+    h2 svg {
+      color: var(--primary-light);
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 1.5rem;
+    }
+
+    .feature-card {
+      background-color: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 1rem;
+      padding: 1.5rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .feature-card::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 4px;
+      height: 100%;
+      background: var(--primary);
+    }
+
+    .feature-card h3 {
+      font-size: 1.2rem;
+      margin-bottom: 0.5rem;
+      color: #FFFFFF;
+    }
+
+    .feature-card p {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1rem;
+      background-color: var(--surface);
+      border-radius: 0.75rem;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+
+    th, td {
+      padding: 0.95rem 1.15rem;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.9rem;
+    }
+
+    th {
+      background-color: var(--surface-card);
+      font-weight: 600;
+      color: var(--text);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-size: 0.8rem;
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    .badge-perm {
+      background-color: rgba(239, 68, 68, 0.15);
+      color: #FCA5A5;
+      padding: 0.2rem 0.5rem;
+      border-radius: 0.25rem;
+      font-family: monospace;
+      font-size: 0.8rem;
+    }
+
+    .badge-normal {
+      background-color: rgba(16, 185, 129, 0.15);
+      color: #86EFAC;
+      padding: 0.2rem 0.5rem;
+      border-radius: 0.25rem;
+      font-family: monospace;
+      font-size: 0.8rem;
+    }
+
+    .step-list {
+      list-style: none;
+      counter-reset: step-counter;
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+
+    .step-item {
+      display: flex;
+      gap: 1.25rem;
+      background-color: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 0.75rem;
+      padding: 1.25rem;
+    }
+
+    .step-number {
+      counter-increment: step-counter;
+      width: 38px;
+      height: 38px;
+      background-color: var(--primary);
+      color: white;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    .step-number::before {
+      content: counter(step-counter);
+    }
+
+    .step-content h4 {
+      font-size: 1.1rem;
+      margin-bottom: 0.35rem;
+    }
+
+    .step-content p {
+      color: var(--text-muted);
+      font-size: 0.925rem;
+    }
+
+    pre {
+      background-color: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 0.5rem;
+      padding: 1rem;
+      overflow-x: auto;
+      font-family: "Courier New", Courier, monospace;
+      font-size: 0.85rem;
+      margin-top: 0.75rem;
+      color: #A5B4FC;
+    }
+
+    .callout {
+      background-color: rgba(79, 70, 229, 0.1);
+      border-left: 4px solid var(--primary);
+      padding: 1rem 1.25rem;
+      border-radius: 0.5rem;
+      margin: 1.25rem 0;
+      font-size: 0.95rem;
+      color: #C7D2FE;
+    }
+
+    footer {
+      text-align: center;
+      padding: 2.5rem 0;
+      color: var(--text-muted);
+      font-size: 0.875rem;
+      border-top: 1px solid var(--border);
+      margin-top: 4rem;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+
+    <!-- Header Section -->
+    <header>
+      <div class="logo-badge">
+        <svg viewBox="0 0 24 24">
+          <path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM6 9h12v2H6V9zm8 5H6v-2h8v2zm4-6H6V6h12v2z"/>
+        </svg>
+      </div>
+      <h1>OpenChat Android</h1>
+      <p class="tagline">
+        Ultra-lightweight, resilient, end-to-end communication platform featuring native WebRTC voice calls, real-time messaging, direct notification actions, and background keep-alive.
+      </p>
+
+      <!-- Badges -->
+      <div class="badges-container">
+        <span class="badge badge-success"><span class="badge-dot"></span> Version 1.0.0</span>
+        <span class="badge badge-primary"><span class="badge-dot"></span> WebRTC Native VoIP</span>
+        <span class="badge"><span class="badge-dot"></span> Android 8.0+ (API 26+)</span>
+        <span class="badge"><span class="badge-dot"></span> ABI: arm64-v8a &amp; armeabi-v7a</span>
+        <span class="badge"><span class="badge-dot"></span> R8 Minified &amp; Shrunk</span>
+        <span class="badge"><span class="badge-dot"></span> Signatures: V1, V2, V3, V4</span>
+      </div>
+
+      <!-- Download Badges / Cards -->
+      <div class="download-grid">
+        <a href="#download-arm64" class="download-card">
+          <div class="download-card-info">
+            <h3>ARM64-v8a Release APK</h3>
+            <p>Optimized for modern 64-bit Android devices (~18 MB)</p>
+          </div>
+          <div class="download-card-btn">
+            <svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+            Download
+          </div>
+        </a>
+
+        <a href="#download-armv7" class="download-card">
+          <div class="download-card-info">
+            <h3>ARMv7-a Release APK</h3>
+            <p>Compatible with legacy 32-bit hardware (~16 MB)</p>
+          </div>
+          <div class="download-card-btn">
+            <svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+            Download
+          </div>
+        </a>
+      </div>
+    </header>
+
+    <!-- Key App Capabilities -->
+    <section>
+      <h2>
+        <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+        Core Architectural Highlights
+      </h2>
+
+      <div class="feature-grid">
+        <div class="feature-card">
+          <h3>WebRTC Live Voice Calls</h3>
+          <p>
+            Hardware-accelerated peer-to-peer audio calling via <code>stream-webrtc-android</code>. Features progressive call states (<strong>Calling &rarr; Ringing &rarr; Connected Duration Timer</strong>), acoustic echo cancellation, noise suppression, and STUN/TURN trickle ICE negotiation.
+          </p>
+        </div>
+
+        <div class="feature-card">
+          <h3>Sticky Keep-Alive Background Service</h3>
+          <p>
+            24/7 background connectivity powered by <code>OpenChatKeepAliveService</code> running with <code>START_STICKY</code> and typed foreground channels. Auto-recovers after system low-memory pressure or network interruption.
+          </p>
+        </div>
+
+        <div class="feature-card">
+          <h3>Interactive Push Notifications</h3>
+          <p>
+            Direct Reply actions allow answering incoming chat messages right from the system notification shade. Incoming call channels provide 1-tap Accept/Decline and persistent in-call timer controls.
+          </p>
+        </div>
+
+        <div class="feature-card">
+          <h3>Global Connectivity Broadcast</h3>
+          <p>
+            Real-time <code>ConnectivityManager.NetworkCallback</code> listening broadcasts system-wide state changes. Instant Material 3 "No Internet Connection" animated banner appears across all screens when offline.
+          </p>
+        </div>
+
+        <div class="feature-card">
+          <h3>Battery Optimization Whitelisting</h3>
+          <p>
+            Integrated prompt and settings toggle requesting exemption from Android Doze mode (<code>ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS</code>), ensuring calls ring through uninhibited by aggressive OEM battery managers.
+          </p>
+        </div>
+
+        <div class="feature-card">
+          <h3>Extreme APK Optimization</h3>
+          <p>
+            Configured with R8 full-mode shrinking, ProGuard obfuscation, and strict ABI filtering (targeting <code>armeabi-v7a</code> and <code>arm64-v8a</code> only), eliminating unneeded multi-platform native binaries and slashing download size.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Permissions Breakdown -->
+    <section>
+      <h2>
+        <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
+        Permissions &amp; Security Rationale
+      </h2>
+      <p style="color: var(--text-muted); margin-bottom: 1rem;">
+        OpenChat employs the principle of least privilege. Every declared permission directly serves an indispensable communication function:
+      </p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Permission</th>
+            <th>Type</th>
+            <th>Functional Purpose &amp; Rationale</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>RECORD_AUDIO</code></td>
+            <td><span class="badge-perm">Runtime</span></td>
+            <td>Required for capturing outgoing WebRTC microphone audio and recording AAC high-definition voice memos in chats.</td>
+          </tr>
+          <tr>
+            <td><code>POST_NOTIFICATIONS</code></td>
+            <td><span class="badge-perm">Runtime (API 33+)</span></td>
+            <td>Enables system heads-up notifications for incoming voice calls, missed calls, and new messages with direct reply action.</td>
+          </tr>
+          <tr>
+            <td><code>REQUEST_IGNORE_BATTERY_OPTIMIZATIONS</code></td>
+            <td><span class="badge-perm">Special / Intent</span></td>
+            <td>Exempts the app from aggressive Android Doze kills, guaranteeing real-time delivery of VoIP signaling when the phone is locked.</td>
+          </tr>
+          <tr>
+            <td><code>FOREGROUND_SERVICE</code></td>
+            <td><span class="badge-normal">Normal</span></td>
+            <td>Keeps ongoing voice calls and the sticky keep-alive service running without being paused when the user switches apps.</td>
+          </tr>
+          <tr>
+            <td><code>FOREGROUND_SERVICE_MICROPHONE</code></td>
+            <td><span class="badge-normal">Normal (API 34+)</span></td>
+            <td>Declared foreground service sub-type for continuous microphone streaming during live VoIP calls.</td>
+          </tr>
+          <tr>
+            <td><code>FOREGROUND_SERVICE_PHONE_CALL</code></td>
+            <td><span class="badge-normal">Normal (API 34+)</span></td>
+            <td>Declared foreground service sub-type for VoIP call audio management and notification channel integration.</td>
+          </tr>
+          <tr>
+            <td><code>ACCESS_NETWORK_STATE</code></td>
+            <td><span class="badge-normal">Normal</span></td>
+            <td>Allows <code>NetworkMonitor</code> to evaluate Wi-Fi/Cellular connectivity and broadcast offline banners across screens.</td>
+          </tr>
+          <tr>
+            <td><code>INTERNET</code></td>
+            <td><span class="badge-normal">Normal</span></td>
+            <td>Enables WebRTC media traffic, Nhost GraphQL queries, real-time WebSockets, and Firebase Push Messaging.</td>
+          </tr>
+          <tr>
+            <td><code>RECEIVE_BOOT_COMPLETED</code></td>
+            <td><span class="badge-normal">Normal</span></td>
+            <td>Relaunches the sticky background call listener after the device is restarted.</td>
+          </tr>
+          <tr>
+            <td><code>VIBRATE</code> &amp; <code>WAKE_LOCK</code></td>
+            <td><span class="badge-normal">Normal</span></td>
+            <td>Provides incoming call haptic vibration patterns and prevents the CPU from deep-sleeping during active conversations.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- Usability & User Guide -->
+    <section>
+      <h2>
+        <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+        Usability &amp; Operation Guide
+      </h2>
+
+      <ol class="step-list">
+        <li class="step-item">
+          <div class="step-number"></div>
+          <div class="step-content">
+            <h4>Account Creation &amp; Authentication</h4>
+            <p>
+              Launch OpenChat and register with email and password or sign in to an existing account. Secure credentials are encrypted locally with EncryptedSharedPreferences for persistent session recovery.
+            </p>
+          </div>
+        </li>
+
+        <li class="step-item">
+          <div class="step-number"></div>
+          <div class="step-content">
+            <h4>Battery Optimization &amp; Permissions</h4>
+            <p>
+              Immediately after sign-in, accept the runtime audio and notification permissions. When prompted, tap <strong>"Grant Exemption"</strong> to whitelist OpenChat from battery optimization, ensuring you never miss a background call.
+            </p>
+          </div>
+        </li>
+
+        <li class="step-item">
+          <div class="step-number"></div>
+          <div class="step-content">
+            <h4>Initiating &amp; Receiving WebRTC Calls</h4>
+            <p>
+              Open any conversation or friend profile and tap the phone icon. The call indicator updates smoothly:
+            </p>
+            <div class="callout">
+              <strong>Calling:</strong> Creating local WebRTC offer and pinging recipient.<br>
+              <strong>Ringing:</strong> Recipient's device is vibrating and ringing.<br>
+              <strong>00:01+:</strong> Call connected! Live elapsed duration counter displayed.
+            </div>
+          </div>
+        </li>
+
+        <li class="step-item">
+          <div class="step-number"></div>
+          <div class="step-content">
+            <h4>Direct Notification Reply &amp; In-Call Controls</h4>
+            <p>
+              When a message arrives, pull down the Android notification shade and type your response in the <strong>"Reply"</strong> inline text box without interrupting your current task. For calls, accept or decline directly from the heads-up banner.
+            </p>
+          </div>
+        </li>
+
+        <li class="step-item">
+          <div class="step-number"></div>
+          <div class="step-content">
+            <h4>Network Offline Detection</h4>
+            <p>
+              If your cellular data or Wi-Fi drops, OpenChat will instantly show a top banner: <em>"No Internet Connection — Please check your network settings."</em> As soon as connectivity returns, all realtime channels reconnect automatically.
+            </p>
+          </div>
+        </li>
+      </ol>
+    </section>
+
+    <!-- Optimization & Build Details -->
+    <section>
+      <h2>
+        <svg width="24" height="24" fill="currentColor" viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
+        App Optimization &amp; Signature Specs
+      </h2>
+
+      <div style="background-color: var(--surface); border: 1px solid var(--border); border-radius: 0.75rem; padding: 1.5rem;">
+        <h4 style="margin-bottom: 0.5rem; color: #FFFFFF;">Gradle Shrinking &amp; Minification Setup:</h4>
+        <pre><code>android {
+    defaultConfig {
+        ndk {
+            // Keep APK lean by packaging only physical ARM architectures
+            abiFilters.addAll(listOf("armeabi-v7a", "arm64-v8a"))
+        }
+    }
+
+    buildFeatures {
+        viewBinding = true
+        compose = true
+    }
+
+    signingConfigs {
+        create("release") {
+            enableV1Signing = true
+            enableV2Signing = true
+            enableV3Signing = true
+            enableV4Signing = true
+        }
+    }
+
+    buildTypes {
+        release {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+        }
+    }
+}</code></pre>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+      <p>&copy; 2026 OpenChat Team. Built with Kotlin, Jetpack Compose, WebRTC, and Nhost.</p>
+      <p style="margin-top: 0.25rem;">All trademarks and logos are properties of their respective owners.</p>
+    </footer>
+
+  </div>
+
+</body>
+</html>

@@ -1,0 +1,256 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/color_background">
+
+    <!-- Top M3 Title Bar (72dp height like WhatsApp) -->
+    <com.google.android.material.appbar.MaterialToolbar
+        android:id="@+id/toolbar_new_chat"
+        android:layout_width="match_parent"
+        android:layout_height="72dp"
+        android:background="@color/color_surface"
+        app:navigationIcon="@drawable/ic_arrow_back_24"
+        app:navigationContentDescription="Back"
+        app:elevation="2dp"
+        app:contentInsetStartWithNavigation="0dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingEnd="12dp">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/text_new_chat_title"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Select Contact"
+                    android:textColor="@color/color_primary_text"
+                    android:textSize="19sp"
+                    android:fontFamily="sans-serif-bold" />
+
+                <TextView
+                    android:id="@+id/text_contact_count"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Loading contacts..."
+                    android:textColor="@color/color_secondary_text"
+                    android:textSize="13sp" />
+            </LinearLayout>
+
+            <ImageButton
+                android:id="@+id/btn_search_toggle"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:src="@drawable/ic_search_24"
+                android:contentDescription="Search contacts"
+                app:tint="@color/color_primary_text" />
+        </LinearLayout>
+    </com.google.android.material.appbar.MaterialToolbar>
+
+    <!-- Expandable Search Box -->
+    <FrameLayout
+        android:id="@+id/layout_search_box"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingHorizontal="16dp"
+        android:paddingVertical="10dp"
+        android:background="@color/color_surface"
+        android:visibility="gone">
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:startIconDrawable="@drawable/ic_search_24"
+            app:startIconTint="@color/color_primary"
+            app:endIconMode="clear_text"
+            app:boxCornerRadiusTopStart="28dp"
+            app:boxCornerRadiusTopEnd="28dp"
+            app:boxCornerRadiusBottomStart="28dp"
+            app:boxCornerRadiusBottomEnd="28dp"
+            style="@style/Widget.Material3.TextInputLayout.OutlinedBox.Dense">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/et_search_contacts"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Search contacts by name or username"
+                android:textSize="14sp" />
+        </com.google.android.material.textfield.TextInputLayout>
+    </FrameLayout>
+
+    <!-- Scrollable Contact Selection List -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical">
+
+            <!-- Quick Action 1: New Group -->
+            <LinearLayout
+                android:id="@+id/btn_action_new_group"
+                android:layout_width="match_parent"
+                android:layout_height="64dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingHorizontal="16dp"
+                android:background="?attr/selectableItemBackground"
+                android:clickable="true"
+                android:focusable="true">
+
+                <FrameLayout
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:background="@drawable/bg_avatar_circle"
+                    android:backgroundTint="@color/color_primary">
+
+                    <ImageView
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:layout_gravity="center"
+                        android:src="@drawable/ic_group_24"
+                        app:tint="#FFFFFF"
+                        android:contentDescription="New Group" />
+                </FrameLayout>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="16dp"
+                    android:text="New group"
+                    android:textColor="@color/color_primary_text"
+                    android:textSize="16sp"
+                    android:fontFamily="sans-serif-bold" />
+            </LinearLayout>
+
+            <!-- Quick Action 2: New Contact / Add Friend -->
+            <LinearLayout
+                android:id="@+id/btn_action_new_contact"
+                android:layout_width="match_parent"
+                android:layout_height="64dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingHorizontal="16dp"
+                android:background="?attr/selectableItemBackground"
+                android:clickable="true"
+                android:focusable="true">
+
+                <FrameLayout
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:background="@drawable/bg_avatar_circle"
+                    android:backgroundTint="@color/color_surface_variant">
+
+                    <ImageView
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:layout_gravity="center"
+                        android:src="@drawable/ic_person_add_24"
+                        app:tint="@color/color_primary"
+                        android:contentDescription="New Contact" />
+                </FrameLayout>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="16dp"
+                    android:text="New contact"
+                    android:textColor="@color/color_primary_text"
+                    android:textSize="16sp"
+                    android:fontFamily="sans-serif-bold" />
+            </LinearLayout>
+
+            <!-- Section Label: Contacts on OpenChat -->
+            <TextView
+                android:id="@+id/text_section_header"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingHorizontal="16dp"
+                android:paddingTop="16dp"
+                android:paddingBottom="8dp"
+                android:text="Contacts on OpenChat"
+                android:textColor="@color/color_secondary_text"
+                android:textSize="13sp"
+                android:fontFamily="sans-serif-medium"
+                android:textAllCaps="true" />
+
+            <!-- Friends / Contacts RecyclerView -->
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/recycler_new_chat_contacts"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:clipToPadding="false"
+                android:paddingBottom="24dp" />
+        </LinearLayout>
+
+        <!-- Empty State Container -->
+        <LinearLayout
+            android:id="@+id/layout_empty_contacts"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:padding="32dp"
+            android:visibility="gone">
+
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="72dp"
+                android:layout_height="72dp"
+                app:cardCornerRadius="36dp"
+                app:cardElevation="0dp"
+                app:cardBackgroundColor="@color/color_surface_variant">
+
+                <ImageView
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/ic_group_24"
+                    app:tint="@color/color_primary"
+                    android:contentDescription="Empty contacts" />
+            </com.google.android.material.card.MaterialCardView>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="No friends found"
+                android:textColor="@color/color_primary_text"
+                android:textSize="17sp"
+                android:fontFamily="sans-serif-bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="Add contacts on OpenChat to start chatting"
+                android:textColor="@color/color_secondary_text"
+                android:textSize="14sp"
+                android:gravity="center" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_empty_find_friends"
+                android:layout_width="wrap_content"
+                android:layout_height="48dp"
+                android:layout_marginTop="20dp"
+                android:text="Find Friends"
+                app:cornerRadius="24dp" />
+        </LinearLayout>
+    </FrameLayout>
+</LinearLayout>

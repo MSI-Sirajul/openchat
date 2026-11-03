@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="20dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Start a Conversation"
+        android:textColor="@color/color_primary_text"
+        android:textSize="18sp"
+        android:fontFamily="sans-serif-bold" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="Select a friend to message or call"
+        android:textColor="@color/color_secondary_text"
+        android:textSize="13sp" />
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/recycler_dialog_friends"
+        android:layout_width="match_parent"
+        android:layout_height="280dp"
+        android:layout_marginTop="16dp" />
+
+    <TextView
+        android:id="@+id/text_no_dialog_friends"
+        android:layout_width="match_parent"
+        android:layout_height="120dp"
+        android:gravity="center"
+        android:text="No friends yet. Add friends first!"
+        android:textColor="@color/color_secondary_text"
+        android:textSize="14sp"
+        android:visibility="gone" />
+
+</LinearLayout>

@@ -1,0 +1,373 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.coordinatorlayout.widget.CoordinatorLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/coordinator_home"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/color_background">
+
+    <com.google.android.material.appbar.AppBarLayout
+        android:id="@+id/app_bar_home"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/color_surface"
+        app:elevation="0dp">
+
+        <!-- Top M3 Title Bar (WhatsApp-style 72dp height) -->
+        <com.google.android.material.appbar.MaterialToolbar
+            android:id="@+id/toolbar_home"
+            android:layout_width="match_parent"
+            android:layout_height="72dp"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            app:contentInsetStart="0dp"
+            app:contentInsetEnd="0dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingHorizontal="8dp">
+
+                <!-- User Profile Avatar Icon (Top Left) -->
+                <FrameLayout
+                    android:id="@+id/btn_home_profile"
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:layout_marginEnd="8dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="My Profile">
+
+                    <TextView
+                        android:id="@+id/text_home_profile_avatar"
+                        android:layout_width="38dp"
+                        android:layout_height="38dp"
+                        android:layout_gravity="center"
+                        android:background="@drawable/bg_avatar_circle"
+                        android:backgroundTint="@color/color_avatar_bg"
+                        android:gravity="center"
+                        android:text="U"
+                        android:textColor="@color/color_primary"
+                        android:textSize="17sp"
+                        android:fontFamily="sans-serif-bold" />
+                </FrameLayout>
+
+                <!-- App Name Title -->
+                <TextView
+                    android:id="@+id/text_home_app_name"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/app_name"
+                    android:textColor="@color/color_primary_text"
+                    android:textSize="22sp"
+                    android:fontFamily="sans-serif-black" />
+
+                <!-- Action Icons: Search, Notifications/Requests, Settings -->
+                <ImageButton
+                    android:id="@+id/btn_home_search"
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:src="@drawable/ic_search_24"
+                    android:contentDescription="@string/friends_search_hint"
+                    app:tint="@color/color_primary_text" />
+
+                <FrameLayout
+                    android:id="@+id/btn_home_friend_requests"
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:background="?attr/selectableItemBackgroundBorderless">
+
+                    <ImageView
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:layout_gravity="center"
+                        android:src="@drawable/ic_group_24"
+                        android:contentDescription="@string/nav_friend_requests"
+                        app:tint="@color/color_primary_text" />
+
+                    <TextView
+                        android:id="@+id/badge_request_count"
+                        android:layout_width="18dp"
+                        android:layout_height="18dp"
+                        android:layout_gravity="top|end"
+                        android:layout_marginTop="5dp"
+                        android:layout_marginEnd="5dp"
+                        android:background="@drawable/bg_avatar_circle"
+                        android:backgroundTint="@color/color_error"
+                        android:textColor="#FFFFFF"
+                        android:textSize="10sp"
+                        android:textStyle="bold"
+                        android:gravity="center"
+                        android:visibility="gone" />
+                </FrameLayout>
+
+                <ImageButton
+                    android:id="@+id/btn_home_settings"
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:src="@drawable/ic_settings_24"
+                    android:contentDescription="@string/nav_settings"
+                    app:tint="@color/color_primary_text" />
+            </LinearLayout>
+        </com.google.android.material.appbar.MaterialToolbar>
+
+        <!-- Expandable Search Box -->
+        <FrameLayout
+            android:id="@+id/layout_search_box"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingHorizontal="16dp"
+            android:paddingBottom="10dp"
+            android:visibility="gone">
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:startIconDrawable="@drawable/ic_search_24"
+                app:startIconTint="@color/color_primary"
+                app:endIconMode="clear_text"
+                app:boxCornerRadiusTopStart="24dp"
+                app:boxCornerRadiusTopEnd="24dp"
+                app:boxCornerRadiusBottomStart="24dp"
+                app:boxCornerRadiusBottomEnd="24dp"
+                style="@style/Widget.Material3.TextInputLayout.OutlinedBox.Dense">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/et_search_filter"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="@string/friends_search_hint"
+                    android:textSize="14sp" />
+            </com.google.android.material.textfield.TextInputLayout>
+        </FrameLayout>
+
+        <!-- Hidden TabLayout kept for 100% backward compatibility with ViewModels -->
+        <com.google.android.material.tabs.TabLayout
+            android:id="@+id/tabs_home"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:visibility="gone" />
+
+    </com.google.android.material.appbar.AppBarLayout>
+
+    <!-- Tab Content Container -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        app:layout_behavior="@string/appbar_scrolling_view_behavior">
+
+        <!-- 1. Chats Tab View (Full Screen Recycler) -->
+        <FrameLayout
+            android:id="@+id/view_tab_chats"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
+
+            <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+                android:id="@+id/swipe_refresh_chats"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent">
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/recycler_conversations"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:clipToPadding="false"
+                    android:paddingTop="4dp"
+                    android:paddingBottom="120dp" />
+            </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+
+            <!-- Chats Empty State -->
+            <LinearLayout
+                android:id="@+id/layout_empty_chats_container"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:padding="32dp">
+
+                <com.google.android.material.card.MaterialCardView
+                    android:layout_width="72dp"
+                    android:layout_height="72dp"
+                    app:cardCornerRadius="36dp"
+                    app:cardElevation="0dp"
+                    app:cardBackgroundColor="@color/color_surface_variant">
+
+                    <ImageView
+                        android:layout_width="36dp"
+                        android:layout_height="36dp"
+                        android:layout_gravity="center"
+                        android:src="@drawable/ic_chat_24"
+                        app:tint="@color/color_primary"
+                        android:contentDescription="Empty chats" />
+                </com.google.android.material.card.MaterialCardView>
+
+                <TextView
+                    android:id="@+id/text_empty_chats"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:text="@string/home_empty_chats"
+                    android:textColor="@color/color_secondary_text"
+                    android:textSize="15sp"
+                    android:fontFamily="sans-serif-medium"
+                    android:gravity="center" />
+            </LinearLayout>
+        </FrameLayout>
+
+        <!-- 2. Calls Tab View -->
+        <FrameLayout
+            android:id="@+id/view_tab_calls"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:visibility="gone">
+
+            <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+                android:id="@+id/swipe_refresh_calls"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent">
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/recycler_calls"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:clipToPadding="false"
+                    android:paddingTop="4dp"
+                    android:paddingBottom="120dp" />
+            </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+
+            <!-- Calls Empty State -->
+            <LinearLayout
+                android:id="@+id/layout_empty_calls_container"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:padding="32dp">
+
+                <com.google.android.material.card.MaterialCardView
+                    android:layout_width="72dp"
+                    android:layout_height="72dp"
+                    app:cardCornerRadius="36dp"
+                    app:cardElevation="0dp"
+                    app:cardBackgroundColor="@color/color_surface_variant">
+
+                    <ImageView
+                        android:layout_width="36dp"
+                        android:layout_height="36dp"
+                        android:layout_gravity="center"
+                        android:src="@drawable/ic_call_24"
+                        app:tint="@color/color_status_online"
+                        android:contentDescription="Empty calls" />
+                </com.google.android.material.card.MaterialCardView>
+
+                <TextView
+                    android:id="@+id/text_empty_calls"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:text="No call history yet. Tap + to call a friend!"
+                    android:textColor="@color/color_secondary_text"
+                    android:textSize="15sp"
+                    android:fontFamily="sans-serif-medium"
+                    android:gravity="center" />
+            </LinearLayout>
+        </FrameLayout>
+
+        <!-- 3. Friends Tab View -->
+        <FrameLayout
+            android:id="@+id/view_tab_friends"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:visibility="gone">
+
+            <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+                android:id="@+id/swipe_refresh_friends"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent">
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/recycler_friends"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:clipToPadding="false"
+                    android:paddingTop="4dp"
+                    android:paddingBottom="120dp" />
+            </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+
+            <!-- Friends Empty State -->
+            <LinearLayout
+                android:id="@+id/layout_empty_friends_container"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:padding="32dp">
+
+                <com.google.android.material.card.MaterialCardView
+                    android:layout_width="72dp"
+                    android:layout_height="72dp"
+                    app:cardCornerRadius="36dp"
+                    app:cardElevation="0dp"
+                    app:cardBackgroundColor="@color/color_surface_variant">
+
+                    <ImageView
+                        android:layout_width="36dp"
+                        android:layout_height="36dp"
+                        android:layout_gravity="center"
+                        android:src="@drawable/ic_group_24"
+                        app:tint="@color/color_primary"
+                        android:contentDescription="Empty friends" />
+                </com.google.android.material.card.MaterialCardView>
+
+                <TextView
+                    android:id="@+id/text_empty_friends"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:text="No friends added yet. Tap Find Friends to connect!"
+                    android:textColor="@color/color_secondary_text"
+                    android:textSize="15sp"
+                    android:fontFamily="sans-serif-medium"
+                    android:gravity="center" />
+            </LinearLayout>
+        </FrameLayout>
+
+    </FrameLayout>
+
+    <!-- Floating Action Button for New Chat / Call / Add Friend -->
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fab_home_action"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|end"
+        android:layout_marginEnd="20dp"
+        android:layout_marginBottom="96dp"
+        android:src="@drawable/ic_chat_24"
+        android:contentDescription="New Action"
+        app:tint="#FFFFFF"
+        app:backgroundTint="@color/color_primary"
+        app:elevation="6dp" />
+
+    <!-- Material 3 Bottom Navigation Bar (Icon-Only, Clean Touch Targets) -->
+    <com.google.android.material.bottomnavigation.BottomNavigationView
+        android:id="@+id/bottom_nav_home"
+        android:layout_width="match_parent"
+        android:layout_height="64dp"
+        android:layout_gravity="bottom"
+        android:background="@color/color_surface"
+        app:elevation="8dp"
+        app:itemIconTint="@color/color_primary_text"
+        app:itemIconSize="28dp"
+        app:labelVisibilityMode="unlabeled"
+        app:menu="@menu/menu_bottom_nav" />
+
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

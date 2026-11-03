@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- OpenChat Premium Light Theme Colors -->
+    <color name="color_background">#F5F7FB</color>
+    <color name="color_surface">#FFFFFF</color>
+    <color name="color_surface_variant">#F1F5F9</color>
+    <color name="color_primary">#087EBA</color>
+    <color name="color_primary_accent">#229ED9</color>
+    <color name="color_primary_text">#17212B</color>
+    <color name="color_secondary_text">#64748B</color>
+    <color name="color_divider">#E3EAF2</color>
+    <color name="color_bubble_incoming">#DDF3E4</color>
+    <color name="color_bubble_outgoing">#D9F0FF</color>
+    <color name="color_bubble_incoming_text">#17212B</color>
+    <color name="color_bubble_outgoing_text">#17212B</color>
+    <color name="color_status_online">#16834A</color>
+    <color name="color_online">#16834A</color>
+    <color name="color_error">#BA1A1A</color>
+    <color name="color_warning">#8A5700</color>
+    <color name="color_avatar_bg">#E0EDF8</color>
+    <color name="color_avatar_text">#087EBA</color>
+
+    <!-- Generic palette aliases -->
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+    <color name="purple_500">#087EBA</color>
+    <color name="purple_700">#066191</color>
+    <color name="teal_200">#229ED9</color>
+    <color name="teal_700">#16834A</color>
+</resources>

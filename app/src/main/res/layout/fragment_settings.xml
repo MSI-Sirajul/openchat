@@ -1,0 +1,345 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true"
+    android:background="@color/color_background">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <!-- Top Toolbar -->
+        <com.google.android.material.appbar.MaterialToolbar
+            android:id="@+id/toolbar_settings"
+            android:layout_width="match_parent"
+            android:layout_height="64dp"
+            android:background="@color/color_surface"
+            app:title="@string/nav_settings"
+            app:titleTextColor="@color/color_primary_text"
+            app:titleTextAppearance="@style/TextAppearance.Material3.TitleLarge"
+            app:navigationIcon="@drawable/ic_arrow_back_24"
+            app:navigationIconTint="@color/color_primary_text"
+            app:elevation="0dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <!-- 1. Profile Card -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:cardCornerRadius="16dp"
+                app:cardElevation="0.5dp"
+                app:strokeWidth="1dp"
+                app:strokeColor="@color/color_divider"
+                app:cardBackgroundColor="@color/color_surface">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:padding="16dp">
+
+                    <TextView
+                        android:id="@+id/text_settings_avatar"
+                        android:layout_width="56dp"
+                        android:layout_height="56dp"
+                        android:background="@drawable/bg_avatar_circle"
+                        android:backgroundTint="@color/color_avatar_bg"
+                        android:gravity="center"
+                        android:text="U"
+                        android:textColor="@color/color_avatar_text"
+                        android:textSize="22sp"
+                        android:fontFamily="sans-serif-bold" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginStart="14dp"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:id="@+id/text_settings_name"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="User Name"
+                            android:textColor="@color/color_primary_text"
+                            android:textSize="17sp"
+                            android:fontFamily="sans-serif-bold" />
+
+                        <TextView
+                            android:id="@+id/text_settings_username"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="@username"
+                            android:textColor="@color/color_secondary_text"
+                            android:textSize="13sp" />
+                    </LinearLayout>
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_edit_profile"
+                        android:layout_width="wrap_content"
+                        android:layout_height="38dp"
+                        android:text="Edit"
+                        android:textSize="12sp"
+                        style="@style/Widget.Material3.Button.TonalButton"
+                        app:cornerRadius="10dp" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- 2. Appearance & Theme Card -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:layout_marginBottom="8dp"
+                android:text="Appearance"
+                android:textColor="@color/color_secondary_text"
+                android:textSize="13sp"
+                android:fontFamily="sans-serif-medium" />
+
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:cardCornerRadius="16dp"
+                app:cardElevation="0.5dp"
+                app:strokeWidth="1dp"
+                app:strokeColor="@color/color_divider"
+                app:cardBackgroundColor="@color/color_surface">
+
+                <RadioGroup
+                    android:id="@+id/radio_group_theme"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:padding="12dp">
+
+                    <RadioButton
+                        android:id="@+id/radio_theme_system"
+                        android:layout_width="match_parent"
+                        android:layout_height="44dp"
+                        android:text="System Default"
+                        android:textColor="@color/color_primary_text"
+                        android:textSize="14sp" />
+
+                    <RadioButton
+                        android:id="@+id/radio_theme_light"
+                        android:layout_width="match_parent"
+                        android:layout_height="44dp"
+                        android:text="Light Theme"
+                        android:textColor="@color/color_primary_text"
+                        android:textSize="14sp" />
+
+                    <RadioButton
+                        android:id="@+id/radio_theme_dark"
+                        android:layout_width="match_parent"
+                        android:layout_height="44dp"
+                        android:text="Dark Theme"
+                        android:textColor="@color/color_primary_text"
+                        android:textSize="14sp" />
+                </RadioGroup>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- 3. Security & Privacy Card -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:layout_marginBottom="8dp"
+                android:text="Security &amp; App Lock"
+                android:textColor="@color/color_secondary_text"
+                android:textSize="13sp"
+                android:fontFamily="sans-serif-medium" />
+
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:cardCornerRadius="16dp"
+                app:cardElevation="0.5dp"
+                app:strokeWidth="1dp"
+                app:strokeColor="@color/color_divider"
+                app:cardBackgroundColor="@color/color_surface">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <!-- App Lock Switch -->
+                    <RelativeLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content">
+
+                        <LinearLayout
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:orientation="vertical"
+                            android:layout_alignParentStart="true"
+                            android:layout_centerVertical="true">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Passcode Lock"
+                                android:textColor="@color/color_primary_text"
+                                android:textSize="15sp"
+                                android:fontFamily="sans-serif-medium" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Require 4-digit PIN to open OpenChat"
+                                android:textColor="@color/color_secondary_text"
+                                android:textSize="12sp" />
+                        </LinearLayout>
+
+                        <com.google.android.material.materialswitch.MaterialSwitch
+                            android:id="@+id/switch_app_lock"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_alignParentEnd="true"
+                            android:layout_centerVertical="true" />
+                    </RelativeLayout>
+
+                    <!-- Change PIN Button (visible if app lock enabled) -->
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_change_pin"
+                        android:layout_width="match_parent"
+                        android:layout_height="44dp"
+                        android:layout_marginTop="12dp"
+                        android:text="Change Passcode PIN"
+                        android:textSize="13sp"
+                        style="@style/Widget.Material3.Button.OutlinedButton"
+                        app:cornerRadius="10dp"
+                        android:visibility="gone" />
+
+                    <!-- Fingerprint Unlock Switch -->
+                    <RelativeLayout
+                        android:id="@+id/layout_biometric_toggle"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:visibility="gone">
+
+                        <LinearLayout
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:orientation="vertical"
+                            android:layout_alignParentStart="true"
+                            android:layout_centerVertical="true">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Fingerprint Unlock"
+                                android:textColor="@color/color_primary_text"
+                                android:textSize="15sp"
+                                android:fontFamily="sans-serif-medium" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Use biometric sensor to unlock"
+                                android:textColor="@color/color_secondary_text"
+                                android:textSize="12sp" />
+                        </LinearLayout>
+
+                        <com.google.android.material.materialswitch.MaterialSwitch
+                            android:id="@+id/switch_biometric"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_alignParentEnd="true"
+                            android:layout_centerVertical="true" />
+                    </RelativeLayout>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- 4. Storage & Cache Card -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:layout_marginBottom="8dp"
+                android:text="Storage &amp; Data"
+                android:textColor="@color/color_secondary_text"
+                android:textSize="13sp"
+                android:fontFamily="sans-serif-medium" />
+
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:cardCornerRadius="16dp"
+                app:cardElevation="0.5dp"
+                app:strokeWidth="1dp"
+                app:strokeColor="@color/color_divider"
+                app:cardBackgroundColor="@color/color_surface">
+
+                <RelativeLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:padding="16dp">
+
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:layout_alignParentStart="true"
+                        android:layout_centerVertical="true">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Offline Cache"
+                            android:textColor="@color/color_primary_text"
+                            android:textSize="15sp"
+                            android:fontFamily="sans-serif-medium" />
+
+                        <TextView
+                            android:id="@+id/text_cache_size"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Calculating..."
+                            android:textColor="@color/color_secondary_text"
+                            android:textSize="12sp" />
+                    </LinearLayout>
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_clear_cache"
+                        android:layout_width="wrap_content"
+                        android:layout_height="38dp"
+                        android:text="Clear Cache"
+                        android:textSize="12sp"
+                        style="@style/Widget.Material3.Button.TonalButton"
+                        app:cornerRadius="10dp"
+                        android:layout_alignParentEnd="true"
+                        android:layout_centerVertical="true" />
+                </RelativeLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- 5. Logout Button -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_settings_logout"
+                android:layout_width="match_parent"
+                android:layout_height="50dp"
+                android:layout_marginTop="28dp"
+                android:layout_marginBottom="32dp"
+                android:text="Log Out"
+                android:textColor="#FFFFFF"
+                android:textSize="15sp"
+                app:icon="@drawable/ic_logout_24"
+                app:cornerRadius="14dp"
+                app:backgroundTint="@color/color_error" />
+
+        </LinearLayout>
+    </LinearLayout>
+</ScrollView>

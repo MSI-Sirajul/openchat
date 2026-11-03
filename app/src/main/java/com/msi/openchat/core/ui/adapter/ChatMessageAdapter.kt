@@ -1,0 +1,375 @@
+package com.msi.openchat.core.ui.adapter
+
+import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
+import android.view.Gravity
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
+import android.widget.LinearLayout
+import androidx.recyclerview.widget.DiffUtil
+import androidx.recyclerview.widget.ListAdapter
+import androidx.recyclerview.widget.RecyclerView
+import coil.load
+import com.example.R
+import com.example.databinding.ItemChatMessageBinding
+import com.msi.openchat.core.common.DateTimeUtils
+import com.msi.openchat.data.model.Message
+
+class ChatMessageAdapter(
+    private val currentUserId: String?,
+    private val isDark: Boolean = false,
+    private val onPlayVoice: (Message) -> Unit,
+    private val onResolveUrl: (ref: String, callback: (String?) -> Unit) -> Unit,
+    private val onMediaClick: (message: Message, resolvedUrl: String) -> Unit = { _, _ -> },
+    private val onAttachmentClick: (message: Message) -> Unit = { _ -> }
+) : ListAdapter<Message, ChatMessageAdapter.ChatMessageViewHolder>(DiffCallback) {
+
+    private var currentlyPlayingId: String? = null
+    private var playbackProgress: Float = 0f
+
+    fun updatePlaybackState(playingId: String?, progress: Float) {
+        val previousId = currentlyPlayingId
+        currentlyPlayingId = playingId
+        playbackProgress = progress
+
+        if (previousId != null) {
+            val prevPos = currentList.indexOfFirst { it.id == previousId }
+            if (prevPos != -1) notifyItemChanged(prevPos)
+        }
+        if (playingId != null) {
+            val currPos = currentList.indexOfFirst { it.id == playingId }
+            if (currPos != -1) notifyItemChanged(currPos)
+        }
+    }
+
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ChatMessageViewHolder {
+        val binding = ItemChatMessageBinding.inflate(
+            LayoutInflater.from(parent.context),
+            parent,
+            false
+        )
+        return ChatMessageViewHolder(binding, currentUserId, isDark, onPlayVoice, onResolveUrl, onMediaClick, onAttachmentClick)
+    }
+
+    override fun onBindViewHolder(holder: ChatMessageViewHolder, position: Int) {
+        val message = getItem(position)
+        val showDateSeparator = position == 0 ||
+                DateTimeUtils.isDifferentDay(getItem(position - 1).createdAt, message.createdAt)
+        val isPlaying = currentlyPlayingId == message.id
+        holder.bind(message, showDateSeparator, isPlaying, if (isPlaying) playbackProgress else 0f)
+    }
+
+    class ChatMessageViewHolder(
+        private val binding: ItemChatMessageBinding,
+        private val currentUserId: String?,
+        private val isDark: Boolean,
+        private val onPlayVoice: (Message) -> Unit,
+        private val onResolveUrl: (ref: String, callback: (String?) -> Unit) -> Unit,
+        private val onMediaClick: (message: Message, resolvedUrl: String) -> Unit,
+        private val onAttachmentClick: (message: Message) -> Unit
+    ) : RecyclerView.ViewHolder(binding.root) {
+
+        fun bind(
+            message: Message,
+            showDateSeparator: Boolean,
+            isPlaying: Boolean,
+            progress: Float
+        ) {
+            val context = binding.root.context
+
+            // Pure text date separator with no background capsule
+            binding.textDateSeparator.background = null
+            if (showDateSeparator) {
+                binding.textDateSeparator.visibility = View.VISIBLE
+                binding.textDateSeparator.text = DateTimeUtils.formatDateSeparator(message.createdAt)
+            } else {
+                binding.textDateSeparator.visibility = View.GONE
+            }
+
+            val isOutgoing = message.senderId == currentUserId
+            val params = binding.layoutBubbleContainer.layoutParams as LinearLayout.LayoutParams
+
+            // High-contrast, theme-synchronized colors
+            val bubbleTextColor: Int
+            val bubbleTimeColor: Int
+            val bubbleBgColor: Int
+            val primaryAccentColor: Int
+
+            if (isDark) {
+                bubbleTextColor = Color.parseColor("#E8EEF5")
+                bubbleTimeColor = Color.parseColor("#A3B1BF")
+                primaryAccentColor = Color.parseColor("#54B9EA")
+                bubbleBgColor = if (isOutgoing) Color.parseColor("#203D52") else Color.parseColor("#244538")
+            } else {
+                bubbleTextColor = Color.parseColor("#17212B")
+                bubbleTimeColor = Color.parseColor("#64748B")
+                primaryAccentColor = Color.parseColor("#087EBA")
+                bubbleBgColor = if (isOutgoing) Color.parseColor("#D9F0FF") else Color.parseColor("#DDF3E4")
+            }
+
+            binding.textDateSeparator.setTextColor(bubbleTimeColor)
+
+            if (isOutgoing) {
+                params.gravity = Gravity.END
+                val bg = (context.getDrawable(R.drawable.bg_bubble_outgoing)?.mutate() as? GradientDrawable)
+                    ?: GradientDrawable()
+                bg.setColor(bubbleBgColor)
+                binding.layoutBubbleContainer.background = bg
+            } else {
+                params.gravity = Gravity.START
+                val bg = (context.getDrawable(R.drawable.bg_bubble_incoming)?.mutate() as? GradientDrawable)
+                    ?: GradientDrawable()
+                bg.setColor(bubbleBgColor)
+                binding.layoutBubbleContainer.background = bg
+            }
+            binding.layoutBubbleContainer.layoutParams = params
+
+            binding.textMessageBody.setTextColor(bubbleTextColor)
+            binding.textMessageTime.setTextColor(bubbleTimeColor)
+            binding.textVoiceDuration.setTextColor(bubbleTextColor)
+            binding.btnPlayVoice.setColorFilter(primaryAccentColor)
+
+            binding.textMessageTime.text = DateTimeUtils.formatMessageTime(context, message.createdAt)
+
+            // Message Status & Read Receipts (Seen status)
+            if (isOutgoing) {
+                binding.imageMessageStatus.visibility = View.VISIBLE
+                when (message.status) {
+                    "read" -> {
+                        binding.textSeenStatus.visibility = View.GONE
+                        binding.imageMessageStatus.setImageResource(R.drawable.ic_check_double_16)
+                        binding.imageMessageStatus.setColorFilter(Color.parseColor("#3897F0")) // 2 Blue ticks
+                    }
+                    "delivered" -> {
+                        binding.textSeenStatus.visibility = View.GONE
+                        binding.imageMessageStatus.setImageResource(R.drawable.ic_check_double_16)
+                        binding.imageMessageStatus.setColorFilter(bubbleTimeColor) // 2 Grey ticks
+                    }
+                    "sending" -> {
+                        binding.textSeenStatus.visibility = View.GONE
+                        binding.imageMessageStatus.setImageResource(R.drawable.ic_clock_16)
+                        binding.imageMessageStatus.setColorFilter(bubbleTimeColor)
+                    }
+                    else -> { // "sent"
+                        binding.textSeenStatus.visibility = View.GONE
+                        binding.imageMessageStatus.setImageResource(R.drawable.ic_check_single_16)
+                        binding.imageMessageStatus.setColorFilter(bubbleTimeColor) // 1 Grey tick
+                    }
+                }
+            } else {
+                binding.textSeenStatus.visibility = View.GONE
+                binding.imageMessageStatus.visibility = View.GONE
+            }
+
+            // Types: "text", "audio" (voice), "image", "video", "file"
+            when (message.type) {
+                "audio", "voice" -> {
+                    binding.layoutVoiceNote.visibility = View.VISIBLE
+                    binding.textMessageBody.visibility = View.GONE
+                    binding.layoutMediaContainer.visibility = View.GONE
+                    binding.layoutFileAttachment.visibility = View.GONE
+
+                    binding.btnPlayVoice.setImageResource(
+                        if (isPlaying) R.drawable.ic_pause_24 else R.drawable.ic_play_24
+                    )
+                    binding.progressVoice.progress = (progress * 100).toInt()
+
+                    val durationSec = message.mediaDurationSeconds
+                    binding.textVoiceDuration.text = if (durationSec > 0) "${durationSec}s" else "Voice"
+
+                    binding.btnPlayVoice.setOnClickListener {
+                        onPlayVoice(message)
+                    }
+                }
+                "image", "video" -> {
+                    binding.layoutVoiceNote.visibility = View.GONE
+                    binding.layoutMediaContainer.visibility = View.VISIBLE
+                    binding.layoutFileAttachment.visibility = View.GONE
+
+                    val isVideo = message.type == "video"
+                    binding.layoutVideoOverlay.visibility = if (isVideo) View.VISIBLE else View.GONE
+
+                    val contentText = message.content.orEmpty().trim()
+                    val isPlaceholder = contentText.isBlank() ||
+                        contentText.equals("Photo", ignoreCase = true) ||
+                        contentText.contains("Photo", ignoreCase = true) ||
+                        contentText.equals("Video", ignoreCase = true) ||
+                        contentText.contains("Video", ignoreCase = true) ||
+                        contentText.equals("Voice message", ignoreCase = true) ||
+                        contentText.contains("Voice", ignoreCase = true) ||
+                        contentText.equals("Attachment", ignoreCase = true) ||
+                        contentText.contains("Document", ignoreCase = true) ||
+                        contentText.startsWith("📷") ||
+                        contentText.startsWith("📹") ||
+                        contentText.startsWith("🎤") ||
+                        contentText.startsWith("📎")
+
+                    if (contentText.isNotBlank() && !isPlaceholder) {
+                        binding.textMessageBody.visibility = View.VISIBLE
+                        binding.textMessageBody.text = contentText
+                    } else {
+                        binding.textMessageBody.visibility = View.GONE
+                    }
+
+                    binding.layoutMediaContainer.clipToOutline = true
+
+                    var currentLoadedUrl: String? = message.localFilePath ?: message.mediaUrl
+
+                    // 1. Direct local file path check
+                    var localFile: java.io.File? = null
+                    if (!message.localFilePath.isNullOrBlank()) {
+                        val f = java.io.File(message.localFilePath.removePrefix("file://"))
+                        if (f.exists() && f.length() > 0) {
+                            localFile = f
+                        }
+                    }
+
+                    // 2. Resolve from offline storage / cache
+                    if (localFile == null) {
+                        localFile = com.msi.openchat.data.local.OfflineMediaManager.resolveMessageMediaFile(context, message) { cachedFile ->
+                            binding.imageAttachment.post {
+                                currentLoadedUrl = "file://${cachedFile.absolutePath}"
+                                loadImageFile(binding.imageAttachment, cachedFile, isVideo)
+                            }
+                        }
+                    }
+
+                    if (localFile != null && localFile.exists() && localFile.length() > 0) {
+                        currentLoadedUrl = "file://${localFile.absolutePath}"
+                        loadImageFile(binding.imageAttachment, localFile, isVideo)
+                    } else {
+                        val mediaUrl = message.mediaUrl
+                        if (!mediaUrl.isNullOrBlank()) {
+                            if (mediaUrl.startsWith("data:")) {
+                                try {
+                                    val rawBase64 = if (mediaUrl.contains(",")) mediaUrl.substringAfter(",") else mediaUrl
+                                    val bytes = android.util.Base64.decode(rawBase64, android.util.Base64.DEFAULT)
+                                    val opts = android.graphics.BitmapFactory.Options().apply {
+                                        inPreferredConfig = android.graphics.Bitmap.Config.RGB_565
+                                    }
+                                    val bitmap = android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size, opts)
+                                    if (bitmap != null) {
+                                        binding.imageAttachment.setImageBitmap(bitmap)
+                                        currentLoadedUrl = mediaUrl
+                                    }
+                                } catch (t: Throwable) {
+                                    android.util.Log.e("ChatMessageAdapter", "Error decoding base64 image: ${t.message}")
+                                }
+                            } else if (mediaUrl.startsWith("http://") || mediaUrl.startsWith("https://")) {
+                                currentLoadedUrl = mediaUrl
+                                binding.imageAttachment.load(mediaUrl) {
+                                    crossfade(true)
+                                }
+                            } else {
+                                onResolveUrl(mediaUrl) { resolved ->
+                                    if (resolved != null) {
+                                        currentLoadedUrl = resolved
+                                        if (resolved.startsWith("data:")) {
+                                            try {
+                                                val raw = if (resolved.contains(",")) resolved.substringAfter(",") else resolved
+                                                val b = android.util.Base64.decode(raw, android.util.Base64.DEFAULT)
+                                                val opts = android.graphics.BitmapFactory.Options().apply {
+                                                    inPreferredConfig = android.graphics.Bitmap.Config.RGB_565
+                                                }
+                                                val bmp = android.graphics.BitmapFactory.decodeByteArray(b, 0, b.size, opts)
+                                                if (bmp != null) {
+                                                    binding.imageAttachment.post { binding.imageAttachment.setImageBitmap(bmp) }
+                                                }
+                                            } catch (_: Throwable) {}
+                                        } else {
+                                            binding.imageAttachment.post {
+                                                binding.imageAttachment.load(resolved) {
+                                                    crossfade(true)
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    binding.layoutMediaContainer.setOnClickListener {
+                        val finalUrl = currentLoadedUrl ?: message.mediaUrl ?: localFile?.let { "file://${it.absolutePath}" }
+                        if (!finalUrl.isNullOrBlank()) {
+                            onMediaClick(message, finalUrl)
+                        }
+                    }
+                }
+                "file" -> {
+                    binding.layoutVoiceNote.visibility = View.GONE
+                    binding.layoutMediaContainer.visibility = View.GONE
+                    binding.layoutFileAttachment.visibility = View.VISIBLE
+
+                    val rawContent = message.content.orEmpty().trim()
+                    val displayFileName = if (rawContent.isNotBlank() && rawContent != "Attachment" && rawContent != "📎 Document") {
+                        rawContent
+                    } else {
+                        "Document_${message.id.take(6)}"
+                    }
+                    binding.textFileName.text = displayFileName
+                    binding.textMessageBody.visibility = View.GONE
+
+                    binding.layoutFileAttachment.setOnClickListener {
+                        onAttachmentClick(message)
+                    }
+                }
+                else -> {
+                    binding.layoutVoiceNote.visibility = View.GONE
+                    binding.layoutMediaContainer.visibility = View.GONE
+                    binding.layoutFileAttachment.visibility = View.GONE
+                    binding.textMessageBody.visibility = View.VISIBLE
+                    binding.textMessageBody.text = message.content.orEmpty()
+                }
+            }
+        }
+
+        private fun loadImageFile(imageView: android.widget.ImageView, file: java.io.File, isVideo: Boolean) {
+            if (isVideo) {
+                try {
+                    val retriever = android.media.MediaMetadataRetriever()
+                    retriever.setDataSource(file.absolutePath)
+                    val frame = retriever.getFrameAtTime(1000000)
+                    retriever.release()
+                    if (frame != null) {
+                        imageView.setImageBitmap(frame)
+                        return
+                    }
+                } catch (_: Throwable) {}
+            }
+            try {
+                val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                android.graphics.BitmapFactory.decodeFile(file.absolutePath, bounds)
+                var sample = 1
+                while (bounds.outWidth / sample > 1200 || bounds.outHeight / sample > 1200) {
+                    sample *= 2
+                }
+                val opts = android.graphics.BitmapFactory.Options().apply {
+                    inSampleSize = sample
+                    inPreferredConfig = android.graphics.Bitmap.Config.RGB_565
+                }
+                val bmp = android.graphics.BitmapFactory.decodeFile(file.absolutePath, opts)
+                if (bmp != null) {
+                    imageView.setImageBitmap(bmp)
+                    return
+                }
+            } catch (_: Throwable) {}
+            imageView.load(file) {
+                crossfade(true)
+            }
+        }
+    }
+
+    companion object DiffCallback : DiffUtil.ItemCallback<Message>() {
+        override fun areItemsTheSame(oldItem: Message, newItem: Message): Boolean {
+            return oldItem.id == newItem.id
+        }
+
+        override fun areContentsTheSame(oldItem: Message, newItem: Message): Boolean {
+            return oldItem.status == newItem.status &&
+                    oldItem.content == newItem.content &&
+                    oldItem.mediaUrl == newItem.mediaUrl
+        }
+    }
+}

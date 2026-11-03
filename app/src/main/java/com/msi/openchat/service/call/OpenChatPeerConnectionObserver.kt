@@ -1,0 +1,218 @@
+package com.msi.openchat.service.call
+
+import android.util.Log
+import org.webrtc.AudioTrack
+import org.webrtc.CandidatePairChangeEvent
+import org.webrtc.DataChannel
+import org.webrtc.IceCandidate
+import org.webrtc.IceCandidateErrorEvent
+import org.webrtc.MediaStream
+import org.webrtc.PeerConnection
+import org.webrtc.RtpReceiver
+import org.webrtc.RtpTransceiver
+
+/**
+ * Dedicated PeerConnection.Observer with comprehensive logging for every state change
+ * and complete Throwable containment across all callbacks to prevent native signaling thread SIGABRT crashes.
+ * All parameters are marked nullable to prevent Kotlin's auto-generated Intrinsics.checkNotNullParameter
+ * from throwing unhandled NullPointerExceptions across the JNI boundary (e.g. during end-of-candidates).
+ */
+class OpenChatPeerConnectionObserver(
+    private val onIceCandidateGenerated: (IceCandidate) -> Unit,
+    private val onIceConnectionStateChange: (PeerConnection.IceConnectionState) -> Unit,
+    private val onSignalingChangeCallback: ((PeerConnection.SignalingState) -> Unit)? = null,
+    private val onConnectionChangeCallback: ((PeerConnection.PeerConnectionState) -> Unit)? = null,
+    private val onTrackAddedCallback: ((AudioTrack) -> Unit)? = null
+) : PeerConnection.Observer {
+
+    private val tag = "OpenChatWebRtc_Observer"
+
+    override fun onIceCandidate(candidate: IceCandidate?) {
+        try {
+            if (candidate == null) {
+                Log.d(tag, "[onIceCandidate] Null candidate received (End of ICE gathering)")
+                return
+            }
+            val threadName = Thread.currentThread().name
+            Log.i(
+                tag,
+                "[onIceCandidate] Thread='$threadName', sdpMid=${candidate.sdpMid}, " +
+                        "sdpMLineIndex=${candidate.sdpMLineIndex}, serverUrl=${candidate.serverUrl}, " +
+                        "sdpLength=${candidate.sdp?.length ?: 0}"
+            )
+            if (!candidate.sdp.isNullOrBlank()) {
+                onIceCandidateGenerated(candidate)
+            }
+        } catch (t: Throwable) {
+            Log.e(tag, "[onIceCandidate] Error in candidate callback: ${t.message}", t)
+        }
+    }
+
+    override fun onIceCandidatesRemoved(candidates: Array<out IceCandidate>?) {
+        try {
+            val count = candidates?.size ?: 0
+            Log.d(tag, "[onIceCandidatesRemoved] Removed $count candidates, Thread='${Thread.currentThread().name}'")
+        } catch (t: Throwable) {
+            Log.e(tag, "[onIceCandidatesRemoved] Exception: ${t.message}", t)
+        }
+    }
+
+    override fun onSignalingChange(state: PeerConnection.SignalingState?) {
+        try {
+            if (state == null) return
+            val threadName = Thread.currentThread().name
+            Log.i(tag, "[onSignalingChange] Thread='$threadName', New SignalingState=$state")
+            onSignalingChangeCallback?.invoke(state)
+        } catch (t: Throwable) {
+            Log.e(tag, "[onSignalingChange] Callback error: ${t.message}", t)
+        }
+    }
+
+    override fun onIceConnectionChange(state: PeerConnection.IceConnectionState?) {
+        try {
+            if (state == null) return
+            val threadName = Thread.currentThread().name
+            Log.i(tag, "[onIceConnectionChange] Thread='$threadName', New IceConnectionState=$state")
+            onIceConnectionStateChange(state)
+        } catch (t: Throwable) {
+            Log.e(tag, "[onIceConnectionChange] Callback error: ${t.message}", t)
+        }
+    }
+
+    override fun onStandardizedIceConnectionChange(state: PeerConnection.IceConnectionState?) {
+        try {
+            Log.d(tag, "[onStandardizedIceConnectionChange] state=$state")
+        } catch (t: Throwable) {
+            Log.e(tag, "[onStandardizedIceConnectionChange] Exception: ${t.message}", t)
+        }
+    }
+
+    override fun onConnectionChange(newState: PeerConnection.PeerConnectionState?) {
+        try {
+            if (newState == null) return
+            val threadName = Thread.currentThread().name
+            Log.i(tag, "[onConnectionChange] New PeerConnectionState=$newState, Thread='$threadName'")
+            onConnectionChangeCallback?.invoke(newState)
+        } catch (t: Throwable) {
+            Log.e(tag, "[onConnectionChange] Exception: ${t.message}", t)
+        }
+    }
+
+    override fun onIceConnectionReceivingChange(receiving: Boolean) {
+        try {
+            Log.d(tag, "[onIceConnectionReceivingChange] receiving=$receiving, Thread='${Thread.currentThread().name}'")
+        } catch (t: Throwable) {
+            Log.e(tag, "[onIceConnectionReceivingChange] Exception: ${t.message}", t)
+        }
+    }
+
+    override fun onIceGatheringChange(state: PeerConnection.IceGatheringState?) {
+        try {
+            Log.i(tag, "[onIceGatheringChange] New IceGatheringState=$state, Thread='${Thread.currentThread().name}'")
+        } catch (t: Throwable) {
+            Log.e(tag, "[onIceGatheringChange] Exception: ${t.message}", t)
+        }
+    }
+
+    override fun onIceCandidateError(event: IceCandidateErrorEvent?) {
+        try {
+            Log.w(tag, "[onIceCandidateError] code=${event?.errorCode}, text=${event?.errorText}, url=${event?.url}")
+        } catch (t: Throwable) {
+            Log.e(tag, "[onIceCandidateError] Exception: ${t.message}", t)
+        }
+    }
+
+    override fun onSelectedCandidatePairChanged(event: CandidatePairChangeEvent?) {
+        try {
+            Log.d(tag, "[onSelectedCandidatePairChanged]")
+        } catch (t: Throwable) {
+            Log.e(tag, "[onSelectedCandidatePairChanged] Exception: ${t.message}", t)
+        }
+    }
+
+    override fun onAddStream(stream: MediaStream?) {
+        try {
+            val audioTracksCount = stream?.audioTracks?.size ?: 0
+            val videoTracksCount = stream?.videoTracks?.size ?: 0
+            Log.i(tag, "[onAddStream] StreamId=${stream?.id}, AudioTracks=$audioTracksCount, VideoTracks=$videoTracksCount, Thread='${Thread.currentThread().name}'")
+            stream?.audioTracks?.forEach { track ->
+                if (track != null) {
+                    try {
+                        track.setEnabled(true)
+                        track.setVolume(1.0)
+                    } catch (_: Throwable) {}
+                    onTrackAddedCallback?.invoke(track)
+                }
+            }
+        } catch (t: Throwable) {
+            Log.e(tag, "[onAddStream] Exception: ${t.message}", t)
+        }
+    }
+
+    override fun onRemoveStream(stream: MediaStream?) {
+        try {
+            Log.i(tag, "[onRemoveStream] StreamId=${stream?.id}, Thread='${Thread.currentThread().name}'")
+        } catch (t: Throwable) {
+            Log.e(tag, "[onRemoveStream] Exception: ${t.message}", t)
+        }
+    }
+
+    override fun onDataChannel(dataChannel: DataChannel?) {
+        try {
+            Log.d(tag, "[onDataChannel] ChannelId=${dataChannel?.id()}, label=${dataChannel?.label()}, Thread='${Thread.currentThread().name}'")
+        } catch (t: Throwable) {
+            Log.e(tag, "[onDataChannel] Exception: ${t.message}", t)
+        }
+    }
+
+    override fun onRenegotiationNeeded() {
+        try {
+            Log.d(tag, "[onRenegotiationNeeded] Renegotiation requested by WebRTC, Thread='${Thread.currentThread().name}'")
+        } catch (t: Throwable) {
+            Log.e(tag, "[onRenegotiationNeeded] Exception: ${t.message}", t)
+        }
+    }
+
+    override fun onAddTrack(receiver: RtpReceiver?, mediaStreams: Array<out MediaStream>?) {
+        try {
+            val track = receiver?.track()
+            val trackKind = track?.kind() ?: "unknown"
+            val trackId = track?.id() ?: "unknown"
+            val streamsCount = mediaStreams?.size ?: 0
+            Log.i(tag, "[onAddTrack] Kind=$trackKind, TrackId=$trackId, AssociatedStreams=$streamsCount, Thread='${Thread.currentThread().name}'")
+            if (track is AudioTrack) {
+                try {
+                    track.setEnabled(true)
+                    track.setVolume(1.0)
+                } catch (_: Throwable) {}
+                onTrackAddedCallback?.invoke(track)
+            }
+        } catch (t: Throwable) {
+            Log.e(tag, "[onAddTrack] Exception: ${t.message}", t)
+        }
+    }
+
+    override fun onRemoveTrack(receiver: RtpReceiver?) {
+        try {
+            Log.d(tag, "[onRemoveTrack] Track=${receiver?.track()?.id()}")
+        } catch (t: Throwable) {
+            Log.e(tag, "[onRemoveTrack] Exception: ${t.message}", t)
+        }
+    }
+
+    override fun onTrack(transceiver: RtpTransceiver?) {
+        try {
+            val track = transceiver?.receiver?.track()
+            Log.i(tag, "[onTrack] Kind=${track?.kind()}, TrackId=${track?.id()}")
+            if (track is AudioTrack) {
+                try {
+                    track.setEnabled(true)
+                    track.setVolume(1.0)
+                } catch (_: Throwable) {}
+                onTrackAddedCallback?.invoke(track)
+            }
+        } catch (t: Throwable) {
+            Log.e(tag, "[onTrack] Exception: ${t.message}", t)
+        }
+    }
+}
