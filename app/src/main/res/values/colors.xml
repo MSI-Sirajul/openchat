@@ -19,6 +19,7 @@
     <color name="color_warning">#8A5700</color>
     <color name="color_avatar_bg">#E0EDF8</color>
     <color name="color_avatar_text">#087EBA</color>
+    <color name="ic_launcher_background">#FFFFFF</color>
 
     <!-- Generic palette aliases -->
     <color name="black">#FF000000</color>
