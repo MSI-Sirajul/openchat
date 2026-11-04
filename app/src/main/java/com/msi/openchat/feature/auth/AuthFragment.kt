@@ -16,6 +16,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import com.example.MainActivity
 import com.example.R
 import com.example.databinding.FragmentAuthBinding
+import com.msi.openchat.core.permission.PermissionManager
 import kotlinx.coroutines.launch
 
 class AuthFragment : Fragment() {
@@ -113,7 +114,11 @@ class AuthFragment : Fragment() {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.uiState.collect { state ->
                     if (state.isAuthenticated) {
-                        (activity as? MainActivity)?.navigateToHome()
+                        if (PermissionManager.shouldShowOnboarding(requireContext())) {
+                            (activity as? MainActivity)?.navigateToPermissionOnboarding()
+                        } else {
+                            (activity as? MainActivity)?.navigateToHome()
+                        }
                         return@collect
                     }
 

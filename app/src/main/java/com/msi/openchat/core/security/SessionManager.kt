@@ -129,4 +129,12 @@ class SessionManager(context: Context) {
     }
 
     fun hasSecureCredentials(): Boolean = secureStorage.hasCachedCredentials()
+
+    fun isPermissionOnboardingCompleted(): Boolean {
+        return prefs.getBoolean(Constants.KEY_PERMISSION_ONBOARDING_COMPLETED, false)
+    }
+
+    fun setPermissionOnboardingCompleted(completed: Boolean) {
+        prefs.edit().putBoolean(Constants.KEY_PERMISSION_ONBOARDING_COMPLETED, completed).apply()
+    }
 }

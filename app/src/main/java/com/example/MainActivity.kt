@@ -19,12 +19,14 @@ import com.example.databinding.ActivityMainBinding
 import com.google.android.material.color.DynamicColors
 import com.msi.openchat.core.common.NetworkStatus
 import com.msi.openchat.core.di.ServiceLocator
+import com.msi.openchat.core.permission.PermissionManager
 import com.msi.openchat.feature.auth.AuthFragment
 import com.msi.openchat.feature.calls.CallFragment
 import com.msi.openchat.feature.chat.ChatFragment
 import com.msi.openchat.feature.friends.AddFriendFragment
 import com.msi.openchat.feature.friends.FriendRequestsFragment
 import com.msi.openchat.feature.home.HomeFragment
+import com.msi.openchat.feature.permission.PermissionOnboardingFragment
 import com.msi.openchat.feature.profile.ProfileFragment
 import com.msi.openchat.feature.security.AppLockFragment
 import com.msi.openchat.feature.settings.SettingsFragment
@@ -89,27 +91,11 @@ class MainActivity : AppCompatActivity() {
             }
         } catch (_: Exception) {}
 
-        requestSystemPermissions()
         observeNetwork()
 
         if (savedInstanceState == null) {
             setupInitialFragment()
             handleIntent(intent)
-        }
-    }
-
-    private fun requestSystemPermissions() {
-        val permissionsToRequest = mutableListOf<String>()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                permissionsToRequest.add(Manifest.permission.POST_NOTIFICATIONS)
-            }
-        }
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-            permissionsToRequest.add(Manifest.permission.RECORD_AUDIO)
-        }
-        if (permissionsToRequest.isNotEmpty()) {
-            permissionsLauncher.launch(permissionsToRequest.toTypedArray())
         }
     }
 
@@ -136,11 +122,20 @@ class MainActivity : AppCompatActivity() {
             !ServiceLocator.sessionManager.isAuthenticated() -> AuthFragment.newInstance()
             ServiceLocator.sessionManager.secureStorage.isAppLockEnabled() &&
                     !ServiceLocator.sessionManager.secureStorage.isAppUnlocked() -> AppLockFragment.newInstance()
+            !ServiceLocator.sessionManager.isPermissionOnboardingCompleted() -> PermissionOnboardingFragment.newInstance()
             else -> HomeFragment.newInstance()
         }
 
         supportFragmentManager.commit {
             replace(R.id.fragment_container, initialFragment)
+        }
+    }
+
+    fun navigateToPermissionOnboarding() {
+        supportFragmentManager.popBackStack(null, androidx.fragment.app.FragmentManager.POP_BACK_STACK_INCLUSIVE)
+        supportFragmentManager.commit {
+            setCustomAnimations(R.anim.fade_in, R.anim.fade_out)
+            replace(R.id.fragment_container, PermissionOnboardingFragment.newInstance())
         }
     }
 

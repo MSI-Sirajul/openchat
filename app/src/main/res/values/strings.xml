@@ -90,4 +90,19 @@
     <string name="call_end">End Call</string>
     <string name="call_mute">Mute</string>
     <string name="call_speaker">Speaker</string>
+
+    <!-- Permission Onboarding -->
+    <string name="permissions_onboarding_title">Permissions &amp; Privacy</string>
+    <string name="permissions_onboarding_subtitle">To provide real-time messaging, crystal-clear voice calls, and media sharing, OpenChat needs a few device permissions. You can grant them individually or skip for now.</string>
+    <string name="permissions_btn_done">Done</string>
+    <string name="permissions_btn_skip">Skip</string>
+    <string name="permissions_item_granted">Granted</string>
+    <string name="permissions_notifications_title">Notifications</string>
+    <string name="permissions_notifications_desc">Instant alerts for new incoming messages and voice calls.</string>
+    <string name="permissions_microphone_title">Microphone</string>
+    <string name="permissions_microphone_desc">Record voice messages and speak during crystal-clear audio calls.</string>
+    <string name="permissions_camera_title">Camera</string>
+    <string name="permissions_camera_desc">Take pictures and record videos directly to share with friends.</string>
+    <string name="permissions_media_title">Storage &amp; Media</string>
+    <string name="permissions_media_desc">Select and send photos, videos, and documents from your device.</string>
 </resources>

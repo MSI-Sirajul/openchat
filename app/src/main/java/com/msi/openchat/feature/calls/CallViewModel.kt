@@ -94,7 +94,9 @@ class CallViewModel(
                         callRepository.updateCallStatus(callId, "connected")
                     } catch (_: Exception) {}
                 }
-                startWebRtcCall(isCaller = false)
+                if (hasMicPermission) {
+                    startWebRtcCall(isCaller = false)
+                }
             } else {
                 // Incoming call waiting for user answer/decline
                 viewModelScope.launch {
@@ -105,8 +107,10 @@ class CallViewModel(
                 }
             }
         } else if (!isIncoming) {
-            // Initiating outgoing call
-            initiateOutgoingCall()
+            // Initiating outgoing call if permission granted
+            if (hasMicPermission) {
+                initiateOutgoingCall()
+            }
         }
     }
 

@@ -152,4 +152,80 @@ class OpenChatUnitTest {
         assertNotNull(msgBinding.root)
         assertNotNull(msgBinding.textMessageBody)
     }
+
+    @Test
+    fun testPermissionOnboardingFlow() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        com.msi.openchat.core.di.ServiceLocator.initialize(context)
+
+        val sessionManager = com.msi.openchat.core.di.ServiceLocator.sessionManager
+        sessionManager.setPermissionOnboardingCompleted(false)
+        assertFalse(sessionManager.isPermissionOnboardingCompleted())
+
+        // Should show onboarding because not yet completed
+        assertTrue(com.msi.openchat.core.permission.PermissionManager.shouldShowOnboarding(context))
+
+        val permissions = com.msi.openchat.core.permission.PermissionManager.getOnboardingPermissions(context)
+        assertTrue(permissions.isNotEmpty())
+        assertTrue(permissions.any { it.permission == android.Manifest.permission.RECORD_AUDIO })
+
+        // Test ViewModel
+        val viewModel = com.msi.openchat.feature.permission.PermissionOnboardingViewModel()
+        viewModel.loadPermissions(context)
+
+        val initialState = viewModel.uiState.value
+        assertEquals(permissions.size, initialState.items.size)
+        assertFalse(initialState.isCompleted)
+
+        // Tapping a checkbox updates the permission
+        viewModel.onPermissionResult(android.Manifest.permission.RECORD_AUDIO, true)
+        val updatedState = viewModel.uiState.value
+        assertTrue(updatedState.isDoneEnabled)
+        assertTrue(updatedState.hasInteracted)
+        val micItem = updatedState.items.find { it.permission == android.Manifest.permission.RECORD_AUDIO }
+        assertNotNull(micItem)
+        assertTrue(micItem!!.isGranted)
+
+        // Done finishes onboarding and marks persisted
+        viewModel.onDoneClicked()
+        assertTrue(viewModel.uiState.value.isCompleted)
+        assertTrue(sessionManager.isPermissionOnboardingCompleted())
+    }
+
+    @Test
+    fun testPermissionItemInflation() {
+        val baseContext = ApplicationProvider.getApplicationContext<Context>()
+        val themedContext = androidx.appcompat.view.ContextThemeWrapper(baseContext, com.example.R.style.Theme_MyApplication)
+        val inflater = android.view.LayoutInflater.from(themedContext)
+
+        val itemBinding = com.example.databinding.ItemPermissionOnboardingBinding.inflate(inflater)
+        assertNotNull(itemBinding.root)
+        assertNotNull(itemBinding.textPermissionTitle)
+        assertNotNull(itemBinding.textPermissionDesc)
+        assertNotNull(itemBinding.cbPermission)
+        assertNotNull(itemBinding.imgPermissionIcon)
+
+        val fragmentBinding = com.example.databinding.FragmentPermissionOnboardingBinding.inflate(inflater)
+        assertNotNull(fragmentBinding.root)
+        assertNotNull(fragmentBinding.recyclerPermissions)
+        assertNotNull(fragmentBinding.btnDonePermissions)
+        assertNotNull(fragmentBinding.btnSkipPermissions)
+    }
+
+    @Test
+    fun testPermissionOnboardingSkip() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        com.msi.openchat.core.di.ServiceLocator.initialize(context)
+
+        val sessionManager = com.msi.openchat.core.di.ServiceLocator.sessionManager
+        sessionManager.setPermissionOnboardingCompleted(false)
+
+        val viewModel = com.msi.openchat.feature.permission.PermissionOnboardingViewModel()
+        viewModel.loadPermissions(context)
+
+        // Skip immediately proceeds without granting
+        viewModel.onSkipClicked()
+        assertTrue(viewModel.uiState.value.isCompleted)
+        assertTrue(sessionManager.isPermissionOnboardingCompleted())
+    }
 }

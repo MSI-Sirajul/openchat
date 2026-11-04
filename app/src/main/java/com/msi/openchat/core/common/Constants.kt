@@ -28,6 +28,7 @@ object Constants {
     const val KEY_REFRESH_TOKEN = "refresh_token"
     const val KEY_USER_ID = "user_id"
     const val KEY_USER_EMAIL = "user_email"
+    const val KEY_PERMISSION_ONBOARDING_COMPLETED = "permission_onboarding_completed"
 
     // Notification channels
     const val CHANNEL_INCOMING_CALLS = "openchat_incoming_calls"

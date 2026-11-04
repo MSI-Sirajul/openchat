@@ -15,6 +15,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import com.example.MainActivity
 import com.example.R
 import com.example.databinding.FragmentAppLockBinding
+import com.msi.openchat.core.permission.PermissionManager
 import com.msi.openchat.core.security.BiometricAuthHelper
 import kotlinx.coroutines.launch
 
@@ -102,7 +103,11 @@ class AppLockFragment : Fragment() {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.uiState.collect { state ->
                     if (state.isUnlocked) {
-                        (activity as? MainActivity)?.navigateToHome()
+                        if (PermissionManager.shouldShowOnboarding(requireContext())) {
+                            (activity as? MainActivity)?.navigateToPermissionOnboarding()
+                        } else {
+                            (activity as? MainActivity)?.navigateToHome()
+                        }
                         return@collect
                     }
 

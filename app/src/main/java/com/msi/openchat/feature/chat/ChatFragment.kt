@@ -3,6 +3,7 @@ package com.msi.openchat.feature.chat
 import android.Manifest
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
@@ -112,6 +113,36 @@ class ChatFragment : Fragment() {
             (activity as? MainActivity)?.navigateToCall(contactId, contactName)
         } else {
             Toast.makeText(requireContext(), "Microphone permission is required to start a call", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private var pendingMediaAction: (() -> Unit)? = null
+
+    private val mediaPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            pendingMediaAction?.invoke()
+        } else {
+            Toast.makeText(
+                requireContext(),
+                "Storage and media permission is needed to select attachments",
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+        pendingMediaAction = null
+    }
+
+    private fun checkAndRequestMediaPermission(permission: String, onGranted: () -> Unit) {
+        val hasPerm = ContextCompat.checkSelfPermission(
+            requireContext(),
+            permission
+        ) == PackageManager.PERMISSION_GRANTED
+        if (hasPerm) {
+            onGranted()
+        } else {
+            pendingMediaAction = onGranted
+            mediaPermissionLauncher.launch(permission)
         }
     }
 
@@ -270,10 +301,45 @@ class ChatFragment : Fragment() {
             popup.menu.add(0, 4, 3, "Document")
             popup.setOnMenuItemClickListener { item ->
                 when (item.itemId) {
-                    1 -> photoPickerLauncher.launch(arrayOf("image/*"))
-                    2 -> videoPickerLauncher.launch(arrayOf("video/*"))
-                    3 -> audioPickerLauncher.launch(arrayOf("audio/*"))
-                    4 -> filePickerLauncher.launch(arrayOf("*/*"))
+                    1 -> {
+                        val perm = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            Manifest.permission.READ_MEDIA_IMAGES
+                        } else {
+                            Manifest.permission.READ_EXTERNAL_STORAGE
+                        }
+                        checkAndRequestMediaPermission(perm) {
+                            photoPickerLauncher.launch(arrayOf("image/*"))
+                        }
+                    }
+                    2 -> {
+                        val perm = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            Manifest.permission.READ_MEDIA_VIDEO
+                        } else {
+                            Manifest.permission.READ_EXTERNAL_STORAGE
+                        }
+                        checkAndRequestMediaPermission(perm) {
+                            videoPickerLauncher.launch(arrayOf("video/*"))
+                        }
+                    }
+                    3 -> {
+                        val perm = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            Manifest.permission.READ_MEDIA_AUDIO
+                        } else {
+                            Manifest.permission.READ_EXTERNAL_STORAGE
+                        }
+                        checkAndRequestMediaPermission(perm) {
+                            audioPickerLauncher.launch(arrayOf("audio/*"))
+                        }
+                    }
+                    4 -> {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            filePickerLauncher.launch(arrayOf("*/*"))
+                        } else {
+                            checkAndRequestMediaPermission(Manifest.permission.READ_EXTERNAL_STORAGE) {
+                                filePickerLauncher.launch(arrayOf("*/*"))
+                            }
+                        }
+                    }
                 }
                 true
             }

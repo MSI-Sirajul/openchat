@@ -5,11 +5,15 @@ import android.animation.PropertyValuesHolder
 import android.animation.ValueAnimator
 import android.content.res.ColorStateList
 import android.graphics.Color
+import android.Manifest
+import android.content.pm.PackageManager
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
@@ -25,6 +29,20 @@ class CallFragment : Fragment() {
 
     private var _binding: FragmentCallBinding? = null
     private val binding get() = _binding!!
+
+    private val micPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            callViewModel.onPermissionGranted()
+        } else {
+            Toast.makeText(
+                requireContext(),
+                "Microphone permission is required for voice calls",
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+    }
 
     private var contactId: String = ""
     private var contactName: String = "Voice Call"
@@ -73,14 +91,33 @@ class CallFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
+        checkAndRequestMicPermission()
         setupButtons()
         startPulseAnimation()
         observeViewModel()
     }
 
+    private fun checkAndRequestMicPermission() {
+        val hasMic = ContextCompat.checkSelfPermission(
+            requireContext(),
+            Manifest.permission.RECORD_AUDIO
+        ) == PackageManager.PERMISSION_GRANTED
+        if (!hasMic) {
+            micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        }
+    }
+
     private fun setupButtons() {
         binding.fabAcceptIncoming.setOnClickListener {
-            callViewModel.acceptCall()
+            val hasMic = ContextCompat.checkSelfPermission(
+                requireContext(),
+                Manifest.permission.RECORD_AUDIO
+            ) == PackageManager.PERMISSION_GRANTED
+            if (hasMic) {
+                callViewModel.acceptCall()
+            } else {
+                micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+            }
         }
 
         binding.fabDeclineIncoming.setOnClickListener {
