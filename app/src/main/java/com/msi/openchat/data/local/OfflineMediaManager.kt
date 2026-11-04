@@ -200,40 +200,7 @@ object OfflineMediaManager {
      * Proactively caches media for any incoming or loaded message.
      */
     fun cacheMessageMediaProactively(context: Context, message: Message, messageDao: MessageDao?) {
-        if (message.type !in listOf("image", "video", "audio", "voice", "file")) return
-        val existing = getLocalFileIfAvailable(message.localFilePath)
-        if (existing != null) return
-
-        val mediaUrl = message.mediaUrl ?: return
-        if (mediaUrl.startsWith("data:")) {
-            val ext = when (message.type) {
-                "image" -> "jpg"
-                "video" -> "mp4"
-                "audio", "voice" -> "m4a"
-                else -> "bin"
-            }
-            val fileName = "${message.id}_offline.$ext"
-            val file = saveBase64Locally(context, mediaUrl, fileName)
-            if (file != null) {
-                CoroutineScope(Dispatchers.IO).launch {
-                    messageDao?.updateLocalFilePath(message.id, file.absolutePath)
-                }
-            }
-        } else if (mediaUrl.startsWith("http://") || mediaUrl.startsWith("https://")) {
-            val ext = when (message.type) {
-                "image" -> "jpg"
-                "video" -> "mp4"
-                "audio", "voice" -> "m4a"
-                else -> "bin"
-            }
-            cacheRemoteMediaAsync(
-                context = context,
-                messageId = message.id,
-                remoteUrl = mediaUrl,
-                preferredFileName = "${message.id}_offline.$ext",
-                messageDao = messageDao
-            )
-        }
+        // No-op: Media and attachments are NOT copied to internal storage.
     }
 
     /**
@@ -345,6 +312,22 @@ object OfflineMediaManager {
     fun openAttachment(context: Context, message: Message) {
         val fileName = message.content?.takeIf { it.isNotBlank() && it != "Attachment" && it != "📎 Document" }
             ?: "attachment_${message.id.take(8)}"
+
+        val localPath = message.localFilePath
+        if (!localPath.isNullOrBlank() && localPath.startsWith("content://")) {
+            val uri = Uri.parse(localPath)
+            if (com.msi.openchat.core.media.PersistableUriManager.isUriAccessible(context, uri)) {
+                com.msi.openchat.core.media.PersistableUriManager.openDocument(
+                    context = context,
+                    uri = uri,
+                    mimeType = getMimeType(fileName),
+                    displayName = fileName
+                )
+            } else {
+                Toast.makeText(context, "Attachment is no longer accessible or permission was revoked", Toast.LENGTH_SHORT).show()
+            }
+            return
+        }
 
         val resolvedFile = resolveMessageMediaFile(context, message)
         if (resolvedFile != null && resolvedFile.exists() && resolvedFile.length() > 0) {

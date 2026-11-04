@@ -176,6 +176,22 @@ class NhostStorageClient(
         }
     }
 
+    suspend fun uploadUri(
+        contentResolver: android.content.ContentResolver,
+        uri: android.net.Uri,
+        fileName: String,
+        mimeType: String,
+        bucketId: String = defaultBucket
+    ): Resource<String> = withContext(Dispatchers.IO) {
+        try {
+            val bytes = contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                ?: return@withContext Resource.Error("Unable to open URI stream")
+            uploadBytes(bytes, fileName, mimeType, bucketId)
+        } catch (e: Exception) {
+            Resource.Error(e.message ?: "Failed to upload from URI", e)
+        }
+    }
+
     suspend fun uploadBytes(
         bytes: ByteArray,
         fileName: String,

@@ -38,6 +38,9 @@ interface MessageDao {
     @Query("UPDATE messages SET local_file_path = :localPath WHERE id = :id")
     suspend fun updateLocalFilePath(id: String, localPath: String)
 
+    @Query("SELECT * FROM messages WHERE local_file_path IS NOT NULL")
+    suspend fun getAllMessagesWithLocalPath(): List<MessageEntity>
+
     @Query("UPDATE messages SET media_url = :mediaUrl WHERE id = :id")
     suspend fun updateMediaUrl(id: String, mediaUrl: String)
 

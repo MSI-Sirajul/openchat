@@ -1,5 +1,6 @@
 package com.msi.openchat.data.repository
 
+import android.content.Context
 import android.net.Uri
 import android.util.Log
 import com.google.android.gms.tasks.Task
@@ -299,7 +300,8 @@ class ChatRepository(
         content: String? = null,
         mediaDurationSeconds: Int? = null,
         mediaFileSize: Long? = null,
-        recipientId: String? = null
+        recipientId: String? = null,
+        localFilePath: String? = null
     ): Resource<Message> = withContext(Dispatchers.IO) {
         val senderId = sessionManager.getUserId() ?: FirebaseManager.auth.currentUser?.uid
             ?: return@withContext Resource.Error("Not authenticated")
@@ -371,6 +373,7 @@ class ChatRepository(
                 type = type,
                 content = content ?: displaySummary,
                 mediaUrl = mediaUrl,
+                localFilePath = localFilePath,
                 mediaDurationSeconds = mediaDurationSeconds ?: 0,
                 mediaFileSize = mediaFileSize ?: 0L,
                 status = "sent",
@@ -384,6 +387,41 @@ class ChatRepository(
         } else {
             Resource.Error("Failed to send media message")
         }
+    }
+
+    suspend fun sendMediaFromUri(
+        context: Context,
+        conversationId: String,
+        uri: Uri,
+        fileName: String,
+        mimeType: String,
+        type: String,
+        fileSize: Long,
+        durationSeconds: Int = 0
+    ): Resource<Message> = withContext(Dispatchers.IO) {
+        val bucketId = com.msi.openchat.data.remote.storage.NhostStorageClient.getBucketForType(type)
+        val uploadRes = storageClient.uploadUri(
+            contentResolver = context.contentResolver,
+            uri = uri,
+            fileName = fileName,
+            mimeType = mimeType,
+            bucketId = bucketId
+        )
+
+        val mediaUrl = when (uploadRes) {
+            is Resource.Success -> uploadRes.data
+            else -> uri.toString()
+        }
+
+        sendMediaMessage(
+            conversationId = conversationId,
+            type = type,
+            mediaUrl = mediaUrl,
+            content = fileName,
+            mediaDurationSeconds = durationSeconds,
+            mediaFileSize = fileSize,
+            localFilePath = uri.toString()
+        )
     }
 
     suspend fun uploadMedia(file: File, type: String, conversationId: String): Resource<String> = withContext(Dispatchers.IO) {

@@ -55,21 +55,103 @@ class HomeFragment : Fragment() {
     }
 
     private var isUpdatingTabs = false
+    private var currentTabIndex = 0
 
     private fun setupTabs() {
-        // Material 3 Bottom Navigation View
+        // Apply initial tab visibility without animation
+        applyTabVisibility(currentTabIndex)
+
+        // Material 3 Bottom Navigation View with animation on tab change
         binding.bottomNavHome.setOnItemSelectedListener { item ->
             if (isUpdatingTabs) return@setOnItemSelectedListener true
-            val tabIndex = when (item.itemId) {
+            val targetTabIndex = when (item.itemId) {
                 R.id.nav_chats -> 0
                 R.id.nav_calls -> 1
                 R.id.nav_friends -> 2
                 else -> 0
             }
-            viewModel.selectTab(tabIndex)
-            applyTabVisibility(tabIndex)
+            if (targetTabIndex == currentTabIndex) return@setOnItemSelectedListener true
+            val oldIndex = currentTabIndex
+            currentTabIndex = targetTabIndex
+            viewModel.selectTab(targetTabIndex)
+            animateTabTransition(oldIndex, targetTabIndex)
             true
         }
+    }
+
+    private fun animateTabTransition(oldIndex: Int, newIndex: Int) {
+        val outgoingView = getTabView(oldIndex)
+        val incomingView = getTabView(newIndex)
+        val movingRight = newIndex > oldIndex
+        val slideOffset = 60f
+
+        // Animate outgoing tab view (slide out + fade)
+        outgoingView.animate()
+            .alpha(0f)
+            .translationX(if (movingRight) -slideOffset else slideOffset)
+            .setDuration(180)
+            .setInterpolator(android.view.animation.DecelerateInterpolator())
+            .withEndAction {
+                outgoingView.visibility = View.GONE
+                outgoingView.translationX = 0f
+                outgoingView.alpha = 1f
+            }
+            .start()
+
+        // Prepare incoming tab view and animate in (slide in + fade)
+        incomingView.visibility = View.VISIBLE
+        incomingView.alpha = 0f
+        incomingView.translationX = if (movingRight) slideOffset else -slideOffset
+        incomingView.animate()
+            .alpha(1f)
+            .translationX(0f)
+            .setDuration(220)
+            .setInterpolator(android.view.animation.DecelerateInterpolator())
+            .start()
+
+        // Animated FAB icon transition
+        animateFabTransition(newIndex)
+    }
+
+    private fun getTabView(index: Int): View {
+        return when (index) {
+            0 -> binding.viewTabChats
+            1 -> binding.viewTabCalls
+            2 -> binding.viewTabFriends
+            else -> binding.viewTabChats
+        }
+    }
+
+    private fun animateFabTransition(tabIndex: Int) {
+        binding.fabHomeAction.animate()
+            .scaleX(0.6f)
+            .scaleY(0.6f)
+            .alpha(0f)
+            .setDuration(110)
+            .withEndAction {
+                when (tabIndex) {
+                    0 -> {
+                        binding.fabHomeAction.setImageResource(R.drawable.ic_chat_24)
+                        binding.fabHomeAction.contentDescription = "New Chat"
+                    }
+                    1 -> {
+                        binding.fabHomeAction.setImageResource(R.drawable.ic_call_24)
+                        binding.fabHomeAction.contentDescription = "New Call"
+                    }
+                    2 -> {
+                        binding.fabHomeAction.setImageResource(R.drawable.ic_person_add_24)
+                        binding.fabHomeAction.contentDescription = "Add Friend"
+                    }
+                }
+                binding.fabHomeAction.animate()
+                    .scaleX(1f)
+                    .scaleY(1f)
+                    .alpha(1f)
+                    .setDuration(180)
+                    .setInterpolator(android.view.animation.OvershootInterpolator(1.2f))
+                    .start()
+            }
+            .start()
     }
 
     private fun applyTabVisibility(tabIndex: Int) {

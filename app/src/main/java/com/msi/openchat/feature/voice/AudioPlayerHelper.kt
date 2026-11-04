@@ -36,7 +36,16 @@ class AudioPlayerHelper(
                         .setUsage(AudioAttributes.USAGE_MEDIA)
                         .build()
                 )
-                if (audioUrl.startsWith("data:")) {
+                if (audioUrl.startsWith("content://")) {
+                    val uri = android.net.Uri.parse(audioUrl)
+                    val ctx = com.msi.openchat.core.di.ServiceLocator.context
+                    if (!com.msi.openchat.core.media.PersistableUriManager.isUriAccessible(ctx, uri)) {
+                        android.widget.Toast.makeText(ctx, "Audio file is no longer accessible on this device", android.widget.Toast.LENGTH_SHORT).show()
+                        stopAudio()
+                        return
+                    }
+                    setDataSource(ctx, uri)
+                } else if (audioUrl.startsWith("data:")) {
                     val base64Data = audioUrl.substringAfter("base64,")
                     val decodedBytes = android.util.Base64.decode(base64Data, android.util.Base64.DEFAULT)
                     val tempAudioFile = java.io.File.createTempFile("voice_note_", ".m4a")

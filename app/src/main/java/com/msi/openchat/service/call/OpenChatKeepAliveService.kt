@@ -180,6 +180,31 @@ class OpenChatKeepAliveService : Service() {
         convListener = null
     }
 
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        super.onTaskRemoved(rootIntent)
+        Log.i(tag, "App task cleared from recent apps - ensuring keep-alive service persistence")
+        try {
+            val restartIntent = Intent(applicationContext, OpenChatKeepAliveService::class.java).apply {
+                action = ACTION_START
+                setPackage(packageName)
+            }
+            val pendingIntent = android.app.PendingIntent.getService(
+                applicationContext,
+                2026,
+                restartIntent,
+                android.app.PendingIntent.FLAG_ONE_SHOT or android.app.PendingIntent.FLAG_IMMUTABLE
+            )
+            val alarmManager = getSystemService(Context.ALARM_SERVICE) as? android.app.AlarmManager
+            alarmManager?.set(
+                android.app.AlarmManager.RTC_WAKEUP,
+                System.currentTimeMillis() + 1000,
+                pendingIntent
+            )
+        } catch (e: Exception) {
+            Log.w(tag, "Failed to schedule service resurrection on task removed: ${e.message}")
+        }
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         removeListeners()

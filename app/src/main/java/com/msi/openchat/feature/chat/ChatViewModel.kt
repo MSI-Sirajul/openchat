@@ -96,15 +96,6 @@ class ChatViewModel(
                         messages = localList,
                         isLoading = false
                     )
-                    localList.forEach { msg ->
-                        if (msg.localFilePath.isNullOrBlank() && msg.type in listOf("image", "video", "audio", "voice", "file")) {
-                            com.msi.openchat.data.local.OfflineMediaManager.cacheMessageMediaProactively(
-                                ServiceLocator.context,
-                                msg,
-                                ServiceLocator.messageDao
-                            )
-                        }
-                    }
                 }
             }
         }
@@ -163,15 +154,6 @@ class ChatViewModel(
                 val currentUid = sessionManager.getUserId()
                 if (msg.senderId != currentUid && msg.status != "read") {
                     markMessagesAsRead()
-                }
-
-                // Proactively cache media locally for offline access
-                if (msg.type in listOf("image", "video", "audio", "voice", "file")) {
-                    com.msi.openchat.data.local.OfflineMediaManager.cacheMessageMediaProactively(
-                        ServiceLocator.context,
-                        msg,
-                        ServiceLocator.messageDao
-                    )
                 }
 
                 val currentList = _uiState.value.messages
@@ -353,24 +335,30 @@ class ChatViewModel(
             return
         }
 
-        // 1. Check local file or offline cache first for instant playback
-        val localFile = com.msi.openchat.data.local.OfflineMediaManager.resolveMessageMediaFile(ServiceLocator.context, message)
-        if (localFile != null && localFile.exists() && localFile.length() > 0) {
-            audioPlayerHelper.playAudio(message.id, localFile.absolutePath)
-            return
+        val localPath = message.localFilePath
+        if (!localPath.isNullOrBlank()) {
+            if (localPath.startsWith("content://")) {
+                val uri = Uri.parse(localPath)
+                if (com.msi.openchat.core.media.PersistableUriManager.isUriAccessible(ServiceLocator.context, uri)) {
+                    audioPlayerHelper.playAudio(message.id, localPath)
+                    return
+                } else {
+                    _uiState.value = _uiState.value.copy(errorMessage = "Audio file is no longer accessible")
+                    return
+                }
+            } else {
+                val localFile = File(localPath)
+                if (localFile.exists() && localFile.length() > 0) {
+                    audioPlayerHelper.playAudio(message.id, localFile.absolutePath)
+                    return
+                }
+            }
         }
 
         val storagePath = message.mediaUrl ?: return
-        if (storagePath.startsWith("data:")) {
-            val cachedFile = com.msi.openchat.data.local.OfflineMediaManager.saveBase64Locally(
-                ServiceLocator.context,
-                storagePath,
-                "${message.id}_voice.m4a"
-            )
-            if (cachedFile != null && cachedFile.exists()) {
-                audioPlayerHelper.playAudio(message.id, cachedFile.absolutePath)
-                return
-            }
+        if (storagePath.startsWith("data:") || storagePath.startsWith("http://") || storagePath.startsWith("https://")) {
+            audioPlayerHelper.playAudio(message.id, storagePath)
+            return
         }
 
         viewModelScope.launch {
@@ -386,50 +374,23 @@ class ChatViewModel(
         }
     }
 
-    private fun getMediaSize(context: Context, uri: Uri): Long {
-        var size: Long = -1
-        try {
-            context.contentResolver.query(uri, arrayOf(OpenableColumns.SIZE), null, null, null)?.use { cursor ->
-                val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
-                if (sizeIndex >= 0 && cursor.moveToFirst()) {
-                    size = cursor.getLong(sizeIndex)
-                }
-            }
-        } catch (_: Exception) {}
-        if (size <= 0) {
-            try {
-                context.contentResolver.openFileDescriptor(uri, "r")?.use { pfd ->
-                    size = pfd.statSize
-                }
-            } catch (_: Exception) {}
-        }
-        return size
-    }
-
-    fun sendImage(context: Context, uri: Uri) {
-        // No size restrictions on photos
+    fun sendImageUri(context: Context, uri: Uri) {
         _uiState.value = _uiState.value.copy(isUploadingMedia = true)
         viewModelScope.launch {
             try {
-                val mimeType = context.contentResolver.getType(uri) ?: "image/jpeg"
-                val inputStream = context.contentResolver.openInputStream(uri)
-                    ?: throw java.io.IOException("Cannot read selected image")
-
-                val preGeneratedId = UUID.randomUUID().toString()
-                val persistentImage = com.msi.openchat.data.local.OfflineMediaManager.saveInputStreamLocally(
-                    context,
-                    inputStream,
-                    "${preGeneratedId}_photo.jpg"
-                )
-
-                compressImageFileIfNeeded(persistentImage)
-
-                when (val res = chatRepository.sendImageMessage(conversationId, persistentImage, mimeType)) {
+                val meta = com.msi.openchat.core.media.PersistableUriManager.extractMetadata(context, uri)
+                when (val res = chatRepository.sendMediaFromUri(
+                    context = context,
+                    conversationId = conversationId,
+                    uri = uri,
+                    fileName = meta.displayName,
+                    mimeType = meta.mimeType.ifBlank { "image/jpeg" },
+                    type = "image",
+                    fileSize = meta.size
+                )) {
                     is Resource.Success -> {
-                        val messageWithLocal = res.data.copy(localFilePath = persistentImage.absolutePath)
-                        ServiceLocator.messageDao?.updateLocalFilePath(res.data.id, persistentImage.absolutePath)
                         _uiState.value = _uiState.value.copy(
-                            messages = _uiState.value.messages + messageWithLocal,
+                            messages = _uiState.value.messages + res.data,
                             isUploadingMedia = false
                         )
                     }
@@ -452,11 +413,11 @@ class ChatViewModel(
         }
     }
 
-    fun sendVideo(context: Context, uri: Uri) {
-        val size = getMediaSize(context, uri)
+    fun sendVideoUri(context: Context, uri: Uri) {
+        val meta = com.msi.openchat.core.media.PersistableUriManager.extractMetadata(context, uri)
         val maxVideoSize = 100 * 1024 * 1024L // 100 MB limit
-        if (size > maxVideoSize) {
-            val sizeMb = size / (1024.0 * 1024.0)
+        if (meta.size > maxVideoSize) {
+            val sizeMb = meta.size / (1024.0 * 1024.0)
             _uiState.value = _uiState.value.copy(
                 errorMessage = "Video size exceeds 100 MB limit (Selected: %.1f MB). Please choose a video up to 100 MB.".format(sizeMb)
             )
@@ -466,23 +427,19 @@ class ChatViewModel(
         _uiState.value = _uiState.value.copy(isUploadingMedia = true)
         viewModelScope.launch {
             try {
-                val mimeType = context.contentResolver.getType(uri) ?: "video/mp4"
-                val inputStream = context.contentResolver.openInputStream(uri)
-                    ?: throw java.io.IOException("Cannot read selected video")
-
-                val preGeneratedId = UUID.randomUUID().toString()
-                val persistentVideo = com.msi.openchat.data.local.OfflineMediaManager.saveInputStreamLocally(
-                    context,
-                    inputStream,
-                    "${preGeneratedId}_video.mp4"
-                )
-
-                when (val res = chatRepository.sendVideoMessage(conversationId, persistentVideo, mimeType)) {
+                when (val res = chatRepository.sendMediaFromUri(
+                    context = context,
+                    conversationId = conversationId,
+                    uri = uri,
+                    fileName = meta.displayName,
+                    mimeType = meta.mimeType.ifBlank { "video/mp4" },
+                    type = "video",
+                    fileSize = meta.size,
+                    durationSeconds = meta.durationSeconds
+                )) {
                     is Resource.Success -> {
-                        val messageWithLocal = res.data.copy(localFilePath = persistentVideo.absolutePath)
-                        ServiceLocator.messageDao?.updateLocalFilePath(res.data.id, persistentVideo.absolutePath)
                         _uiState.value = _uiState.value.copy(
-                            messages = _uiState.value.messages + messageWithLocal,
+                            messages = _uiState.value.messages + res.data,
                             isUploadingMedia = false
                         )
                     }
@@ -505,36 +462,63 @@ class ChatViewModel(
         }
     }
 
-    fun sendFile(context: Context, uri: Uri) {
+    fun sendAudioUri(context: Context, uri: Uri) {
+        val meta = com.msi.openchat.core.media.PersistableUriManager.extractMetadata(context, uri)
         _uiState.value = _uiState.value.copy(isUploadingMedia = true)
         viewModelScope.launch {
             try {
-                val mimeType = context.contentResolver.getType(uri) ?: "application/octet-stream"
-                var fileName = "Document_${System.currentTimeMillis()}"
-
-                context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
-                    val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-                    if (nameIndex >= 0 && cursor.moveToFirst()) {
-                        fileName = cursor.getString(nameIndex) ?: fileName
+                when (val res = chatRepository.sendMediaFromUri(
+                    context = context,
+                    conversationId = conversationId,
+                    uri = uri,
+                    fileName = meta.displayName,
+                    mimeType = meta.mimeType.ifBlank { "audio/mpeg" },
+                    type = "audio",
+                    fileSize = meta.size,
+                    durationSeconds = meta.durationSeconds
+                )) {
+                    is Resource.Success -> {
+                        _uiState.value = _uiState.value.copy(
+                            messages = _uiState.value.messages + res.data,
+                            isUploadingMedia = false
+                        )
+                    }
+                    is Resource.Error -> {
+                        _uiState.value = _uiState.value.copy(
+                            isUploadingMedia = false,
+                            errorMessage = res.message
+                        )
+                    }
+                    else -> {
+                        _uiState.value = _uiState.value.copy(isUploadingMedia = false)
                     }
                 }
-
-                val inputStream = context.contentResolver.openInputStream(uri)
-                    ?: throw java.io.IOException("Cannot read selected file")
-
-                val preGeneratedId = UUID.randomUUID().toString()
-                val persistentFile = com.msi.openchat.data.local.OfflineMediaManager.saveInputStreamLocally(
-                    context,
-                    inputStream,
-                    "${preGeneratedId}_$fileName"
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    isUploadingMedia = false,
+                    errorMessage = e.message ?: "Failed to upload audio"
                 )
+            }
+        }
+    }
 
-                when (val res = chatRepository.sendFileMessage(conversationId, persistentFile, fileName, mimeType)) {
+    fun sendFileUri(context: Context, uri: Uri) {
+        val meta = com.msi.openchat.core.media.PersistableUriManager.extractMetadata(context, uri)
+        _uiState.value = _uiState.value.copy(isUploadingMedia = true)
+        viewModelScope.launch {
+            try {
+                when (val res = chatRepository.sendMediaFromUri(
+                    context = context,
+                    conversationId = conversationId,
+                    uri = uri,
+                    fileName = meta.displayName,
+                    mimeType = meta.mimeType.ifBlank { "application/octet-stream" },
+                    type = "file",
+                    fileSize = meta.size
+                )) {
                     is Resource.Success -> {
-                        val messageWithLocal = res.data.copy(localFilePath = persistentFile.absolutePath)
-                        ServiceLocator.messageDao?.updateLocalFilePath(res.data.id, persistentFile.absolutePath)
                         _uiState.value = _uiState.value.copy(
-                            messages = _uiState.value.messages + messageWithLocal,
+                            messages = _uiState.value.messages + res.data,
                             isUploadingMedia = false
                         )
                     }
@@ -557,13 +541,35 @@ class ChatViewModel(
         }
     }
 
+    fun sendImage(context: Context, uri: Uri) {
+        sendImageUri(context, uri)
+    }
+
+    fun sendVideo(context: Context, uri: Uri) {
+        sendVideoUri(context, uri)
+    }
+
+    fun sendFile(context: Context, uri: Uri) {
+        sendFileUri(context, uri)
+    }
+
     fun resolveMediaUrl(mediaUrl: String, onResolved: (String) -> Unit) {
-        // 1. Check if media is available locally on device for offline playback/viewing
         val matchingMessage = _uiState.value.messages.firstOrNull { it.mediaUrl == mediaUrl || it.id == mediaUrl }
-        val localFile = com.msi.openchat.data.local.OfflineMediaManager.getLocalFileIfAvailable(matchingMessage?.localFilePath)
-        if (localFile != null) {
-            onResolved("file://${localFile.absolutePath}")
-            return
+        val localPath = matchingMessage?.localFilePath
+        if (!localPath.isNullOrBlank()) {
+            if (localPath.startsWith("content://")) {
+                val uri = Uri.parse(localPath)
+                if (com.msi.openchat.core.media.PersistableUriManager.isUriAccessible(ServiceLocator.context, uri)) {
+                    onResolved(localPath)
+                    return
+                }
+            } else {
+                val localFile = File(localPath)
+                if (localFile.exists() && localFile.length() > 0) {
+                    onResolved("file://${localFile.absolutePath}")
+                    return
+                }
+            }
         }
 
         if (mediaUrl.startsWith("file://") || mediaUrl.startsWith("content://")) {
@@ -571,23 +577,8 @@ class ChatViewModel(
             return
         }
 
-        if (mediaUrl.startsWith("data:") || mediaUrl.startsWith("http")) {
+        if (mediaUrl.startsWith("data:") || mediaUrl.startsWith("http://") || mediaUrl.startsWith("https://")) {
             onResolved(mediaUrl)
-            if (matchingMessage != null) {
-                val ext = when (matchingMessage.type) {
-                    "image" -> "jpg"
-                    "video" -> "mp4"
-                    "audio", "voice" -> "m4a"
-                    else -> "bin"
-                }
-                com.msi.openchat.data.local.OfflineMediaManager.cacheRemoteMediaAsync(
-                    context = ServiceLocator.context,
-                    messageId = matchingMessage.id,
-                    remoteUrl = mediaUrl,
-                    preferredFileName = "offline_${matchingMessage.id}.$ext",
-                    messageDao = ServiceLocator.messageDao
-                )
-            }
             return
         }
 
@@ -595,21 +586,6 @@ class ChatViewModel(
             when (val res = chatRepository.getMediaPlayableUrl(mediaUrl)) {
                 is Resource.Success -> {
                     onResolved(res.data)
-                    if (matchingMessage != null) {
-                        val ext = when (matchingMessage.type) {
-                            "image" -> "jpg"
-                            "video" -> "mp4"
-                            "audio", "voice" -> "m4a"
-                            else -> "bin"
-                        }
-                        com.msi.openchat.data.local.OfflineMediaManager.cacheRemoteMediaAsync(
-                            context = ServiceLocator.context,
-                            messageId = matchingMessage.id,
-                            remoteUrl = res.data,
-                            preferredFileName = "offline_${matchingMessage.id}.$ext",
-                            messageDao = ServiceLocator.messageDao
-                        )
-                    }
                 }
                 else -> Unit
             }

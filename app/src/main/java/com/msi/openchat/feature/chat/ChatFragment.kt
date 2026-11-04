@@ -60,21 +60,39 @@ class ChatFragment : Fragment() {
     private lateinit var chatMessageAdapter: ChatMessageAdapter
 
     private val photoPickerLauncher = registerForActivityResult(
-        ActivityResultContracts.PickVisualMedia()
+        ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
-        uri?.let { chatViewModel.sendImage(requireContext(), it) }
+        uri?.let {
+            com.msi.openchat.core.media.PersistableUriManager.takePersistablePermission(requireContext(), it)
+            chatViewModel.sendImageUri(requireContext(), it)
+        }
     }
 
     private val videoPickerLauncher = registerForActivityResult(
-        ActivityResultContracts.PickVisualMedia()
+        ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
-        uri?.let { chatViewModel.sendVideo(requireContext(), it) }
+        uri?.let {
+            com.msi.openchat.core.media.PersistableUriManager.takePersistablePermission(requireContext(), it)
+            chatViewModel.sendVideoUri(requireContext(), it)
+        }
+    }
+
+    private val audioPickerLauncher = registerForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        uri?.let {
+            com.msi.openchat.core.media.PersistableUriManager.takePersistablePermission(requireContext(), it)
+            chatViewModel.sendAudioUri(requireContext(), it)
+        }
     }
 
     private val filePickerLauncher = registerForActivityResult(
-        ActivityResultContracts.GetContent()
+        ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
-        uri?.let { chatViewModel.sendFile(requireContext(), it) }
+        uri?.let {
+            com.msi.openchat.core.media.PersistableUriManager.takePersistablePermission(requireContext(), it)
+            chatViewModel.sendFileUri(requireContext(), it)
+        }
     }
 
     private val micRecordingLauncher = registerForActivityResult(
@@ -171,12 +189,32 @@ class ChatFragment : Fragment() {
             onPlayVoice = { message -> chatViewModel.playVoiceMessage(message) },
             onResolveUrl = { ref, callback -> chatViewModel.resolveMediaUrl(ref, callback) },
             onMediaClick = { message, resolvedUrl ->
-                val localFile = OfflineMediaManager.resolveMessageMediaFile(requireContext(), message)
-                val finalUrl = localFile?.let { "file://${it.absolutePath}" } ?: resolvedUrl
+                val localPath = message.localFilePath
+                val finalUrl = if (!localPath.isNullOrBlank()) {
+                    if (localPath.startsWith("content://") || localPath.startsWith("file://")) localPath
+                    else "file://$localPath"
+                } else {
+                    resolvedUrl
+                }
                 showMediaPreview(finalUrl, message.type == "video", message.content)
             },
             onAttachmentClick = { message ->
-                OfflineMediaManager.openAttachment(requireContext(), message)
+                val localPath = message.localFilePath
+                if (!localPath.isNullOrBlank() && localPath.startsWith("content://")) {
+                    val uri = Uri.parse(localPath)
+                    if (com.msi.openchat.core.media.PersistableUriManager.isUriAccessible(requireContext(), uri)) {
+                        com.msi.openchat.core.media.PersistableUriManager.openDocument(
+                            context = requireContext(),
+                            uri = uri,
+                            mimeType = null,
+                            displayName = message.content.orEmpty()
+                        )
+                    } else {
+                        Toast.makeText(requireContext(), "Attachment file is no longer accessible or permission was revoked", Toast.LENGTH_SHORT).show()
+                    }
+                } else {
+                    OfflineMediaManager.openAttachment(requireContext(), message)
+                }
             }
         )
 
@@ -228,20 +266,14 @@ class ChatFragment : Fragment() {
             val popup = PopupMenu(requireContext(), v)
             popup.menu.add(0, 1, 0, "Photo")
             popup.menu.add(0, 2, 1, "Video")
-            popup.menu.add(0, 3, 2, "Document")
+            popup.menu.add(0, 3, 2, "Audio")
+            popup.menu.add(0, 4, 3, "Document")
             popup.setOnMenuItemClickListener { item ->
                 when (item.itemId) {
-                    1 -> photoPickerLauncher.launch(
-                        androidx.activity.result.PickVisualMediaRequest(
-                            ActivityResultContracts.PickVisualMedia.ImageOnly
-                        )
-                    )
-                    2 -> videoPickerLauncher.launch(
-                        androidx.activity.result.PickVisualMediaRequest(
-                            ActivityResultContracts.PickVisualMedia.VideoOnly
-                        )
-                    )
-                    3 -> filePickerLauncher.launch("*/*")
+                    1 -> photoPickerLauncher.launch(arrayOf("image/*"))
+                    2 -> videoPickerLauncher.launch(arrayOf("video/*"))
+                    3 -> audioPickerLauncher.launch(arrayOf("audio/*"))
+                    4 -> filePickerLauncher.launch(arrayOf("*/*"))
                 }
                 true
             }
@@ -294,8 +326,11 @@ class ChatFragment : Fragment() {
         } else {
             binding.videoPreviewPlayer.stopPlayback()
             binding.videoPreviewPlayer.visibility = View.GONE
-            binding.imgPreviewPhoto.visibility = View.VISIBLE
-            if (url.startsWith("data:")) {
+            if (url.startsWith("content://")) {
+                binding.imgPreviewPhoto.load(Uri.parse(url)) {
+                    crossfade(true)
+                }
+            } else if (url.startsWith("data:")) {
                 try {
                     val raw = if (url.contains(",")) url.substringAfter(",") else url
                     val bytes = android.util.Base64.decode(raw, android.util.Base64.DEFAULT)

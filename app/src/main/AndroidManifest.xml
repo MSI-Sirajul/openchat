@@ -22,12 +22,13 @@
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
     <uses-permission android:name="android.permission.USE_FINGERPRINT" />
 
-    
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_PHONE_CALL" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.MANAGE_OWN_CALLS" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <application
         android:name="com.msi.openchat.OpenChatApplication"
@@ -110,10 +111,23 @@
             android:exported="false"
             android:foregroundServiceType="microphone|phoneCall" />
 
-        <!-- Continuous Realtime Keep-Alive Service -->
+        <!-- Continuous Realtime Keep-Alive Service (persists when cleared from recents) -->
         <service
             android:name="com.msi.openchat.service.call.OpenChatKeepAliveService"
-            android:exported="false" />
+            android:exported="false"
+            android:stopWithTask="false" />
+
+        <!-- Device Boot & Package Update Receiver for Data Sync & Keep-Alive -->
+        <receiver
+            android:name="com.msi.openchat.service.sync.OpenChatBootReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+            </intent-filter>
+        </receiver>
 
         <!-- Firebase Cloud Messaging Handler Service -->
         <service

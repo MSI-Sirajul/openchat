@@ -138,13 +138,13 @@ class ChatMessageAdapter(
                 when (message.status) {
                     "read" -> {
                         binding.textSeenStatus.visibility = View.GONE
-                        binding.imageMessageStatus.setImageResource(R.drawable.ic_check_double_16)
-                        binding.imageMessageStatus.setColorFilter(Color.parseColor("#3897F0")) // 2 Blue ticks
+                        binding.imageMessageStatus.setImageResource(R.drawable.ic_read)
+                        binding.imageMessageStatus.clearColorFilter()
                     }
                     "delivered" -> {
                         binding.textSeenStatus.visibility = View.GONE
-                        binding.imageMessageStatus.setImageResource(R.drawable.ic_check_double_16)
-                        binding.imageMessageStatus.setColorFilter(bubbleTimeColor) // 2 Grey ticks
+                        binding.imageMessageStatus.setImageResource(R.drawable.ic_delevered)
+                        binding.imageMessageStatus.setColorFilter(bubbleTimeColor)
                     }
                     "sending" -> {
                         binding.textSeenStatus.visibility = View.GONE
@@ -153,8 +153,8 @@ class ChatMessageAdapter(
                     }
                     else -> { // "sent"
                         binding.textSeenStatus.visibility = View.GONE
-                        binding.imageMessageStatus.setImageResource(R.drawable.ic_check_single_16)
-                        binding.imageMessageStatus.setColorFilter(bubbleTimeColor) // 1 Grey tick
+                        binding.imageMessageStatus.setImageResource(R.drawable.ic_sent)
+                        binding.imageMessageStatus.setColorFilter(bubbleTimeColor)
                     }
                 }
             } else {
@@ -215,72 +215,79 @@ class ChatMessageAdapter(
                     binding.layoutMediaContainer.clipToOutline = true
 
                     var currentLoadedUrl: String? = message.localFilePath ?: message.mediaUrl
+                    var isLoaded = false
 
-                    // 1. Direct local file path check
+                    // 1. Direct content:// URI check (zero-copy, direct rendering)
+                    if (!message.localFilePath.isNullOrBlank() && message.localFilePath.startsWith("content://")) {
+                        val uri = android.net.Uri.parse(message.localFilePath)
+                        if (com.msi.openchat.core.media.PersistableUriManager.isUriAccessible(context, uri)) {
+                            currentLoadedUrl = message.localFilePath
+                            loadUriMedia(binding.imageAttachment, context, uri, isVideo)
+                            isLoaded = true
+                        } else {
+                            binding.imageAttachment.setImageResource(if (isVideo) R.drawable.ic_video_24 else R.drawable.ic_image_24)
+                            binding.imageAttachment.setColorFilter(bubbleTimeColor)
+                            isLoaded = true
+                        }
+                    }
+
+                    // 2. Direct local file path check (for legacy or offline records)
                     var localFile: java.io.File? = null
-                    if (!message.localFilePath.isNullOrBlank()) {
+                    if (!isLoaded && !message.localFilePath.isNullOrBlank()) {
                         val f = java.io.File(message.localFilePath.removePrefix("file://"))
                         if (f.exists() && f.length() > 0) {
                             localFile = f
                         }
                     }
 
-                    // 2. Resolve from offline storage / cache
-                    if (localFile == null) {
-                        localFile = com.msi.openchat.data.local.OfflineMediaManager.resolveMessageMediaFile(context, message) { cachedFile ->
-                            binding.imageAttachment.post {
-                                currentLoadedUrl = "file://${cachedFile.absolutePath}"
-                                loadImageFile(binding.imageAttachment, cachedFile, isVideo)
-                            }
-                        }
-                    }
-
-                    if (localFile != null && localFile.exists() && localFile.length() > 0) {
-                        currentLoadedUrl = "file://${localFile.absolutePath}"
-                        loadImageFile(binding.imageAttachment, localFile, isVideo)
-                    } else {
-                        val mediaUrl = message.mediaUrl
-                        if (!mediaUrl.isNullOrBlank()) {
-                            if (mediaUrl.startsWith("data:")) {
-                                try {
-                                    val rawBase64 = if (mediaUrl.contains(",")) mediaUrl.substringAfter(",") else mediaUrl
-                                    val bytes = android.util.Base64.decode(rawBase64, android.util.Base64.DEFAULT)
-                                    val opts = android.graphics.BitmapFactory.Options().apply {
-                                        inPreferredConfig = android.graphics.Bitmap.Config.RGB_565
+                    if (!isLoaded) {
+                        if (localFile != null && localFile.exists() && localFile.length() > 0) {
+                            currentLoadedUrl = "file://${localFile.absolutePath}"
+                            loadImageFile(binding.imageAttachment, localFile, isVideo)
+                        } else {
+                            val mediaUrl = message.mediaUrl
+                            if (!mediaUrl.isNullOrBlank()) {
+                                if (mediaUrl.startsWith("data:")) {
+                                    try {
+                                        val rawBase64 = if (mediaUrl.contains(",")) mediaUrl.substringAfter(",") else mediaUrl
+                                        val bytes = android.util.Base64.decode(rawBase64, android.util.Base64.DEFAULT)
+                                        val opts = android.graphics.BitmapFactory.Options().apply {
+                                            inPreferredConfig = android.graphics.Bitmap.Config.RGB_565
+                                        }
+                                        val bitmap = android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size, opts)
+                                        if (bitmap != null) {
+                                            binding.imageAttachment.setImageBitmap(bitmap)
+                                            currentLoadedUrl = mediaUrl
+                                        }
+                                    } catch (t: Throwable) {
+                                        android.util.Log.e("ChatMessageAdapter", "Error decoding base64 image: ${t.message}")
                                     }
-                                    val bitmap = android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size, opts)
-                                    if (bitmap != null) {
-                                        binding.imageAttachment.setImageBitmap(bitmap)
-                                        currentLoadedUrl = mediaUrl
+                                } else if (mediaUrl.startsWith("http://") || mediaUrl.startsWith("https://")) {
+                                    currentLoadedUrl = mediaUrl
+                                    binding.imageAttachment.load(mediaUrl) {
+                                        crossfade(true)
                                     }
-                                } catch (t: Throwable) {
-                                    android.util.Log.e("ChatMessageAdapter", "Error decoding base64 image: ${t.message}")
-                                }
-                            } else if (mediaUrl.startsWith("http://") || mediaUrl.startsWith("https://")) {
-                                currentLoadedUrl = mediaUrl
-                                binding.imageAttachment.load(mediaUrl) {
-                                    crossfade(true)
-                                }
-                            } else {
-                                onResolveUrl(mediaUrl) { resolved ->
-                                    if (resolved != null) {
-                                        currentLoadedUrl = resolved
-                                        if (resolved.startsWith("data:")) {
-                                            try {
-                                                val raw = if (resolved.contains(",")) resolved.substringAfter(",") else resolved
-                                                val b = android.util.Base64.decode(raw, android.util.Base64.DEFAULT)
-                                                val opts = android.graphics.BitmapFactory.Options().apply {
-                                                    inPreferredConfig = android.graphics.Bitmap.Config.RGB_565
-                                                }
-                                                val bmp = android.graphics.BitmapFactory.decodeByteArray(b, 0, b.size, opts)
-                                                if (bmp != null) {
-                                                    binding.imageAttachment.post { binding.imageAttachment.setImageBitmap(bmp) }
-                                                }
-                                            } catch (_: Throwable) {}
-                                        } else {
-                                            binding.imageAttachment.post {
-                                                binding.imageAttachment.load(resolved) {
-                                                    crossfade(true)
+                                } else {
+                                    onResolveUrl(mediaUrl) { resolved ->
+                                        if (resolved != null) {
+                                            currentLoadedUrl = resolved
+                                            if (resolved.startsWith("data:")) {
+                                                try {
+                                                    val raw = if (resolved.contains(",")) resolved.substringAfter(",") else resolved
+                                                    val b = android.util.Base64.decode(raw, android.util.Base64.DEFAULT)
+                                                    val opts = android.graphics.BitmapFactory.Options().apply {
+                                                        inPreferredConfig = android.graphics.Bitmap.Config.RGB_565
+                                                    }
+                                                    val bmp = android.graphics.BitmapFactory.decodeByteArray(b, 0, b.size, opts)
+                                                    if (bmp != null) {
+                                                        binding.imageAttachment.post { binding.imageAttachment.setImageBitmap(bmp) }
+                                                    }
+                                                } catch (_: Throwable) {}
+                                            } else {
+                                                binding.imageAttachment.post {
+                                                    binding.imageAttachment.load(resolved) {
+                                                        crossfade(true)
+                                                    }
                                                 }
                                             }
                                         }
@@ -303,7 +310,13 @@ class ChatMessageAdapter(
                     binding.layoutFileAttachment.visibility = View.VISIBLE
 
                     val rawContent = message.content.orEmpty().trim()
-                    val displayFileName = if (rawContent.isNotBlank() && rawContent != "Attachment" && rawContent != "📎 Document") {
+                    val localPath = message.localFilePath
+                    val isRevokedOrDeleted = !localPath.isNullOrBlank() && localPath.startsWith("content://") &&
+                            !com.msi.openchat.core.media.PersistableUriManager.isUriAccessible(context, android.net.Uri.parse(localPath))
+
+                    val displayFileName = if (isRevokedOrDeleted) {
+                        "$rawContent (Unavailable)"
+                    } else if (rawContent.isNotBlank() && rawContent != "Attachment" && rawContent != "📎 Document") {
                         rawContent
                     } else {
                         "Document_${message.id.take(6)}"
@@ -322,6 +335,25 @@ class ChatMessageAdapter(
                     binding.textMessageBody.visibility = View.VISIBLE
                     binding.textMessageBody.text = message.content.orEmpty()
                 }
+            }
+        }
+
+        private fun loadUriMedia(imageView: android.widget.ImageView, context: android.content.Context, uri: android.net.Uri, isVideo: Boolean) {
+            imageView.clearColorFilter()
+            if (isVideo) {
+                try {
+                    val retriever = android.media.MediaMetadataRetriever()
+                    retriever.setDataSource(context, uri)
+                    val frame = retriever.getFrameAtTime(1000000)
+                    retriever.release()
+                    if (frame != null) {
+                        imageView.setImageBitmap(frame)
+                        return
+                    }
+                } catch (_: Throwable) {}
+            }
+            imageView.load(uri) {
+                crossfade(true)
             }
         }
 

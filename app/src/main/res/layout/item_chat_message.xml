@@ -204,13 +204,13 @@
 
             <ImageView
                 android:id="@+id/imageMessageStatus"
-                android:layout_width="14dp"
-                android:layout_height="14dp"
-                android:layout_marginStart="3dp"
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:layout_marginStart="4dp"
                 android:contentDescription="Message status"
                 android:visibility="gone"
                 tools:visibility="visible"
-                tools:src="@drawable/ic_check_double_16" />
+                tools:src="@drawable/ic_read" />
         </LinearLayout>
     </LinearLayout>
 </LinearLayout>

@@ -7,6 +7,9 @@ import coil.ImageLoaderFactory
 import coil.disk.DiskCache
 import coil.memory.MemoryCache
 import com.msi.openchat.core.di.ServiceLocator
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 /**
  * OpenChatApplication
@@ -23,10 +26,22 @@ class OpenChatApplication : Application(), ImageLoaderFactory {
         // Initialize lightweight app context reference in ServiceLocator
         ServiceLocator.initialize(this)
 
-        // Schedule reliable periodic background data sync via WorkManager
+        // Schedule reliable periodic background data sync via WorkManager & start keep-alive service
         try {
             com.msi.openchat.service.sync.DataSyncWorker.schedulePeriodicSync(this)
+            if (ServiceLocator.sessionManager.isAuthenticated()) {
+                com.msi.openchat.service.call.OpenChatKeepAliveService.start(this)
+            }
         } catch (_: Exception) {}
+
+        // Migrate legacy local media files to URIs and delete internal storage copies
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+            try {
+                ServiceLocator.messageDao?.let { dao ->
+                    com.msi.openchat.core.media.PersistableUriManager.migrateLegacyMediaToUris(this@OpenChatApplication, dao)
+                }
+            } catch (_: Exception) {}
+        }
     }
 
     override fun newImageLoader(): ImageLoader {

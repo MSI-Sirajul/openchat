@@ -53,6 +53,9 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        // Sync status bar color and icon appearance with title bar surface color
+        syncStatusBarColor()
+
         // Relaunch Credential Check: If user credentials exist in secure storage, validate and refresh token
         if (ServiceLocator.sessionManager.hasSecureCredentials()) {
             CoroutineScope(Dispatchers.IO).launch {
@@ -265,9 +268,21 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        syncStatusBarColor()
+    }
+
     override fun onStop() {
         super.onStop()
         ServiceLocator.presenceManager.onAppBackgrounded()
+    }
+
+    fun syncStatusBarColor() {
+        val surfaceColor = ContextCompat.getColor(this, R.color.color_surface)
+        window.statusBarColor = surfaceColor
+        val isDark = resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK == android.content.res.Configuration.UI_MODE_NIGHT_YES
+        androidx.core.view.WindowInsetsControllerCompat(window, window.decorView).isAppearanceLightStatusBars = !isDark
     }
 
     override fun onNewIntent(intent: Intent) {
