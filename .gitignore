@@ -14,7 +14,5 @@
 .externalNativeBuild
 .cxx
 local.properties
-.env
 debug.keystore
-.env.example
 /public
