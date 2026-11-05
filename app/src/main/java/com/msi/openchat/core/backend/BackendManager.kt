@@ -103,6 +103,7 @@ object BackendManager {
 
             // Setup Inbox Processor
             inboxProcessor = ConversationInboxProcessor(
+                context = context,
                 messageDao = database.messageDao(),
                 conversationDao = database.conversationDao(),
                 currentUserIdProvider = { sessionManager.getUserId() ?: FirebaseManager.auth.currentUser?.uid }
@@ -110,6 +111,7 @@ object BackendManager {
 
             // Setup Per-Conversation Outbox Queue
             outboxQueue = ConversationOutboxQueue(
+                context = context,
                 messageDao = database.messageDao(),
                 currentUserIdProvider = { sessionManager.getUserId() ?: FirebaseManager.auth.currentUser?.uid },
                 fileUploader = { file, mimeType, bucket, onProgress ->

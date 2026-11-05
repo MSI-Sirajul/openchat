@@ -231,12 +231,24 @@ class ChatMessageAdapter(
                         }
                     }
 
-                    // 2. Direct local file path check (for legacy or offline records)
+                    // 2. Direct local file path or receiver cache check
                     var localFile: java.io.File? = null
                     if (!isLoaded && !message.localFilePath.isNullOrBlank()) {
                         val f = java.io.File(message.localFilePath.removePrefix("file://"))
                         if (f.exists() && f.length() > 0) {
                             localFile = f
+                        }
+                    }
+                    if (!isLoaded && localFile == null) {
+                        val cached = com.msi.openchat.core.media.MediaDownloadManager.getCachedFile(
+                            context = context,
+                            messageId = message.id,
+                            remoteUrl = message.mediaUrl,
+                            type = message.type,
+                            originalName = message.content
+                        )
+                        if (cached != null && cached.exists() && cached.length() > 0) {
+                            localFile = cached
                         }
                     }
 

@@ -355,21 +355,44 @@ class ChatViewModel(
             }
         }
 
-        val storagePath = message.mediaUrl ?: return
-        if (storagePath.startsWith("data:") || storagePath.startsWith("http://") || storagePath.startsWith("https://")) {
-            audioPlayerHelper.playAudio(message.id, storagePath)
+        // Cache lookup: check if audio is already cached locally
+        val cached = com.msi.openchat.core.media.MediaDownloadManager.getCachedFile(
+            context = ServiceLocator.context,
+            messageId = message.id,
+            remoteUrl = message.mediaUrl,
+            type = "audio",
+            originalName = message.content
+        )
+        if (cached != null && cached.exists() && cached.length() > 0) {
+            audioPlayerHelper.playAudio(message.id, cached.absolutePath)
             return
         }
 
+        val storagePath = message.mediaUrl ?: return
         viewModelScope.launch {
-            when (val res = chatRepository.getAudioPlayableUrl(storagePath)) {
-                is Resource.Success -> {
-                    audioPlayerHelper.playAudio(message.id, res.data)
+            // Download to cache first, then play strictly from cache
+            val downloadRes = com.msi.openchat.core.media.MediaDownloadManager.downloadToCache(
+                context = ServiceLocator.context,
+                messageId = message.id,
+                remoteUrl = storagePath,
+                type = "audio",
+                originalName = message.content
+            )
+            val downloadedFile = downloadRes.getOrNull()
+            if (downloadedFile != null && downloadedFile.exists()) {
+                audioPlayerHelper.playAudio(message.id, downloadedFile.absolutePath)
+            } else if (storagePath.startsWith("data:") || storagePath.startsWith("http://") || storagePath.startsWith("https://")) {
+                audioPlayerHelper.playAudio(message.id, storagePath)
+            } else {
+                when (val res = chatRepository.getAudioPlayableUrl(storagePath)) {
+                    is Resource.Success -> {
+                        audioPlayerHelper.playAudio(message.id, res.data)
+                    }
+                    is Resource.Error -> {
+                        _uiState.value = _uiState.value.copy(errorMessage = res.message)
+                    }
+                    else -> Unit
                 }
-                is Resource.Error -> {
-                    _uiState.value = _uiState.value.copy(errorMessage = res.message)
-                }
-                else -> Unit
             }
         }
     }

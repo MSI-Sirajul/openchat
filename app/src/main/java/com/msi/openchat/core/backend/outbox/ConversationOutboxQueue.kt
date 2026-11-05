@@ -30,6 +30,7 @@ import java.util.concurrent.ConcurrentHashMap
  * 5. Server timestamp reconciliation on ack.
  */
 class ConversationOutboxQueue(
+    private val context: Context,
     private val messageDao: MessageDao,
     private val currentUserIdProvider: () -> String?,
     private val fileUploader: suspend (file: File, mimeType: String, bucket: String, onProgress: (Float) -> Unit) -> String?,
@@ -180,22 +181,38 @@ class ConversationOutboxQueue(
 
             var resolvedMediaUrl = current.mediaUrl
 
-            // Step 1: Upload file if this is a media message and hasn't been uploaded yet
+            // Step 1: Compress & upload file if this is a media message and hasn't been uploaded yet
             if (resolvedMediaUrl.isNullOrBlank() && !current.localFilePath.isNullOrBlank()) {
-                val file = resolveFile(current.localFilePath)
-                if (file != null && file.exists()) {
-                    messageDao.updateUploadProgress(current.id, 0.1f, "uploading")
+                val sourcePath = current.localFilePath
+                messageDao.updateUploadProgress(current.id, 0.05f, "compressing")
+
+                // Zero-copy: keep original content:// URI untouched; compress to temporary scratch file
+                val compressedFile = com.msi.openchat.core.media.MediaCompressionManager.compressMedia(
+                    context = context,
+                    sourceUriString = sourcePath,
+                    type = current.type,
+                    mimeType = current.mediaMimeType
+                )
+
+                if (compressedFile != null && compressedFile.exists() && compressedFile.length() > 0) {
+                    messageDao.updateUploadProgress(current.id, 0.2f, "uploading")
                     val bucket = com.msi.openchat.data.remote.storage.NhostStorageClient.getBucketForType(current.type)
-                    val mime = current.mediaMimeType ?: "application/octet-stream"
+                    val mime = current.mediaMimeType ?: when (current.type) {
+                        "image" -> "image/jpeg"
+                        "video" -> "video/mp4"
+                        "audio" -> "audio/mp4"
+                        else -> "application/octet-stream"
+                    }
 
                     var uploadedUrl: String? = null
                     var uploadAttempts = 0
                     while (uploadedUrl == null && uploadAttempts < 3) {
                         uploadAttempts++
                         try {
-                            uploadedUrl = fileUploader(file, mime, bucket) { progress ->
+                            uploadedUrl = fileUploader(compressedFile, mime, bucket) { progress ->
                                 scope.launch {
-                                    messageDao.updateUploadProgress(current.id, progress, "uploading")
+                                    val mappedProgress = 0.2f + (progress * 0.8f)
+                                    messageDao.updateUploadProgress(current.id, mappedProgress, "uploading")
                                 }
                             }
                         } catch (e: Exception) {
@@ -204,6 +221,9 @@ class ConversationOutboxQueue(
                             backoffMs = (backoffMs * 2).coerceAtMost(30000L)
                         }
                     }
+
+                    // Ephemeral cleanup: scratch file is no longer needed
+                    try { compressedFile.delete() } catch (_: Exception) {}
 
                     if (uploadedUrl != null) {
                         resolvedMediaUrl = uploadedUrl
@@ -221,6 +241,16 @@ class ConversationOutboxQueue(
                         )
                         return
                     }
+                } else {
+                    Log.e(tag, "Failed to resolve or compress media file from $sourcePath for ${current.id}")
+                    messageDao.updateOutboxStatus(
+                        id = current.id,
+                        outboxStatus = "failed",
+                        status = "failed",
+                        retryCount = current.retryCount + 1,
+                        lastAttemptMs = System.currentTimeMillis()
+                    )
+                    return
                 }
             }
 

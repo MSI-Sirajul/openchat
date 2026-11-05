@@ -351,7 +351,36 @@
                 android:textSize="16sp"
                 android:fontFamily="sans-serif-bold"
                 android:text="Media Preview" />
+
+            <!-- Download Button: saves file to OpenChat/ subfolders on device -->
+            <ImageButton
+                android:id="@+id/btn_download_preview"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:src="@drawable/ic_download_24"
+                android:contentDescription="Download to OpenChat folder"
+                app:tint="#FFFFFF" />
         </LinearLayout>
+
+        <!-- Loading spinner for media download / resolution -->
+        <ProgressBar
+            android:id="@+id/progress_preview_loading"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_gravity="center"
+            android:indeterminate="true"
+            android:visibility="gone" />
+
+        <!-- Error display if file could not be retrieved -->
+        <TextView
+            android:id="@+id/text_preview_error"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:textColor="#FFFFFF"
+            android:textSize="14sp"
+            android:visibility="gone" />
 
         <!-- Photo ImageView -->
         <ImageView

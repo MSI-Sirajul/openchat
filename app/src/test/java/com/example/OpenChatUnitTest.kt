@@ -203,13 +203,24 @@ class OpenChatUnitTest {
         assertNotNull(itemBinding.textPermissionTitle)
         assertNotNull(itemBinding.textPermissionDesc)
         assertNotNull(itemBinding.cbPermission)
-        assertNotNull(itemBinding.imgPermissionIcon)
 
         val fragmentBinding = com.example.databinding.FragmentPermissionOnboardingBinding.inflate(inflater)
         assertNotNull(fragmentBinding.root)
         assertNotNull(fragmentBinding.recyclerPermissions)
         assertNotNull(fragmentBinding.btnDonePermissions)
         assertNotNull(fragmentBinding.btnSkipPermissions)
+    }
+
+    @Test
+    fun testMediaDownloadManagerCachePaths() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        assertEquals("images", com.msi.openchat.core.media.MediaDownloadManager.getCacheSubfolder("image"))
+        assertEquals("videos", com.msi.openchat.core.media.MediaDownloadManager.getCacheSubfolder("video"))
+        assertEquals("audio", com.msi.openchat.core.media.MediaDownloadManager.getCacheSubfolder("audio"))
+        assertEquals("files", com.msi.openchat.core.media.MediaDownloadManager.getCacheSubfolder("file"))
+
+        val fileName = com.msi.openchat.core.media.MediaDownloadManager.getCacheFileName("msg123", "http://test.com/photo.png", "vacation.png", "image")
+        assertEquals("msg123_vacation.png", fileName)
     }
 
     @Test

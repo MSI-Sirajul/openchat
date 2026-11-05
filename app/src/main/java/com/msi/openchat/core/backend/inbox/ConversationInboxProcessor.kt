@@ -1,5 +1,6 @@
 package com.msi.openchat.core.backend.inbox
 
+import android.content.Context
 import android.util.Log
 import com.msi.openchat.data.local.dao.ConversationDao
 import com.msi.openchat.data.local.dao.MessageDao
@@ -21,6 +22,7 @@ import kotlinx.coroutines.sync.withLock
  * 4. Updates unread counts and conversation preview metadata atomically.
  */
 class ConversationInboxProcessor(
+    private val context: Context,
     private val messageDao: MessageDao,
     private val conversationDao: ConversationDao?,
     private val currentUserIdProvider: () -> String?
@@ -110,6 +112,11 @@ class ConversationInboxProcessor(
                     )
                     messageDao.insertMessage(entity)
                     Log.i(tag, "Inserted incoming message ${message.id} into conv $expectedConversationId with seq $assignedSeq")
+
+                    // Automatic background download for incoming media (receiver-side caching)
+                    if (!message.mediaUrl.isNullOrBlank() && message.type in listOf("image", "photo", "video", "audio", "voice", "file")) {
+                        com.msi.openchat.core.media.MediaDownloadManager.enqueueBackgroundDownload(context, message)
+                    }
                 }
 
                 // Update conversation summary

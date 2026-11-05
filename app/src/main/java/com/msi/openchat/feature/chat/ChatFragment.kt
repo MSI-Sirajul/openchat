@@ -1,6 +1,7 @@
 package com.msi.openchat.feature.chat
 
 import android.Manifest
+import android.content.Context
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
@@ -220,32 +221,10 @@ class ChatFragment : Fragment() {
             onPlayVoice = { message -> chatViewModel.playVoiceMessage(message) },
             onResolveUrl = { ref, callback -> chatViewModel.resolveMediaUrl(ref, callback) },
             onMediaClick = { message, resolvedUrl ->
-                val localPath = message.localFilePath
-                val finalUrl = if (!localPath.isNullOrBlank()) {
-                    if (localPath.startsWith("content://") || localPath.startsWith("file://")) localPath
-                    else "file://$localPath"
-                } else {
-                    resolvedUrl
-                }
-                showMediaPreview(finalUrl, message.type == "video", message.content)
+                showMediaPreview(message, resolvedUrl)
             },
             onAttachmentClick = { message ->
-                val localPath = message.localFilePath
-                if (!localPath.isNullOrBlank() && localPath.startsWith("content://")) {
-                    val uri = Uri.parse(localPath)
-                    if (com.msi.openchat.core.media.PersistableUriManager.isUriAccessible(requireContext(), uri)) {
-                        com.msi.openchat.core.media.PersistableUriManager.openDocument(
-                            context = requireContext(),
-                            uri = uri,
-                            mimeType = null,
-                            displayName = message.content.orEmpty()
-                        )
-                    } else {
-                        Toast.makeText(requireContext(), "Attachment file is no longer accessible or permission was revoked", Toast.LENGTH_SHORT).show()
-                    }
-                } else {
-                    OfflineMediaManager.openAttachment(requireContext(), message)
-                }
+                openAttachmentWithCache(message)
             }
         )
 
@@ -357,69 +336,276 @@ class ChatFragment : Fragment() {
         }
     }
 
+    private var activePreviewJob: kotlinx.coroutines.Job? = null
+    private var activePreviewDownloadFile: java.io.File? = null
+    private var activePreviewSourceUri: Uri? = null
+    private var activePreviewMessage: Message? = null
+
     private fun setupPreviewOverlay() {
         binding.btnClosePreview.setOnClickListener {
-            binding.videoPreviewPlayer.stopPlayback()
-            binding.layoutFullscreenPreview.visibility = View.GONE
+            closePreviewOverlay()
         }
         binding.layoutFullscreenPreview.setOnClickListener {
-            binding.videoPreviewPlayer.stopPlayback()
-            binding.layoutFullscreenPreview.visibility = View.GONE
+            closePreviewOverlay()
+        }
+        binding.btnDownloadPreview.setOnClickListener {
+            handleDownloadAction()
         }
     }
 
-    private fun showMediaPreview(url: String, isVideo: Boolean, title: String?) {
-        binding.layoutFullscreenPreview.visibility = View.VISIBLE
-        binding.textPreviewTitle.text = title?.takeIf { it.isNotBlank() } ?: (if (isVideo) "Video Preview" else "Photo Preview")
+    private fun closePreviewOverlay() {
+        activePreviewJob?.cancel()
+        activePreviewJob = null
+        try { binding.videoPreviewPlayer.stopPlayback() } catch (_: Exception) {}
+        binding.layoutFullscreenPreview.visibility = View.GONE
+        binding.imgPreviewPhoto.visibility = View.GONE
+        binding.videoPreviewPlayer.visibility = View.GONE
+        binding.progressPreviewLoading.visibility = View.GONE
+        binding.textPreviewError.visibility = View.GONE
+        activePreviewDownloadFile = null
+        activePreviewSourceUri = null
+        activePreviewMessage = null
+    }
 
+    private fun handleDownloadAction() {
+        val msg = activePreviewMessage ?: return
+        val context = requireContext()
+
+        val sourceFile = activePreviewDownloadFile
+        if (sourceFile != null && sourceFile.exists()) {
+            viewLifecycleOwner.lifecycleScope.launch {
+                val result = com.msi.openchat.core.media.MediaDownloadManager.saveToExternalStorage(
+                    context = context,
+                    sourceFile = sourceFile,
+                    displayName = msg.content,
+                    type = msg.type
+                )
+                if (result.isSuccess) {
+                    val subfolder = com.msi.openchat.core.media.MediaDownloadManager.getCacheSubfolder(msg.type).replaceFirstChar { it.uppercase() }
+                    Toast.makeText(context, "Saved to OpenChat/$subfolder", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(context, "Failed to save: ${result.exceptionOrNull()?.message}", Toast.LENGTH_SHORT).show()
+                }
+            }
+            return
+        }
+
+        val sourceUri = activePreviewSourceUri
+        if (sourceUri != null) {
+            viewLifecycleOwner.lifecycleScope.launch {
+                val tempFile = com.msi.openchat.core.media.MediaCompressionManager.copyUriToTempFile(
+                    context = context,
+                    uriString = sourceUri.toString(),
+                    mimeType = when (msg.type) {
+                        "video" -> "video/mp4"
+                        "audio", "voice" -> "audio/mp4"
+                        "file" -> "application/octet-stream"
+                        else -> "image/jpeg"
+                    }
+                )
+                if (tempFile != null && tempFile.exists()) {
+                    val result = com.msi.openchat.core.media.MediaDownloadManager.saveToExternalStorage(
+                        context = context,
+                        sourceFile = tempFile,
+                        displayName = msg.content,
+                        type = msg.type
+                    )
+                    tempFile.delete()
+                    if (result.isSuccess) {
+                        val subfolder = com.msi.openchat.core.media.MediaDownloadManager.getCacheSubfolder(msg.type).replaceFirstChar { it.uppercase() }
+                        Toast.makeText(context, "Saved to OpenChat/$subfolder", Toast.LENGTH_SHORT).show()
+                    } else {
+                        Toast.makeText(context, "Failed to save: ${result.exceptionOrNull()?.message}", Toast.LENGTH_SHORT).show()
+                    }
+                } else {
+                    Toast.makeText(context, "Cannot export file", Toast.LENGTH_SHORT).show()
+                }
+            }
+            return
+        }
+
+        Toast.makeText(context, "Media is still loading, please wait...", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun showMediaPreview(message: Message, resolvedUrl: String?) {
+        activePreviewJob?.cancel()
+        activePreviewMessage = message
+        activePreviewDownloadFile = null
+        activePreviewSourceUri = null
+
+        binding.layoutFullscreenPreview.visibility = View.VISIBLE
+        val isVideo = message.type == "video"
+        val titleText = message.content?.takeIf { it.isNotBlank() && !it.startsWith("📷") && !it.startsWith("📹") }
+            ?: if (isVideo) "Video Preview" else "Photo Preview"
+        binding.textPreviewTitle.text = titleText
+
+        // Reset views
+        binding.imgPreviewPhoto.visibility = View.GONE
+        binding.videoPreviewPlayer.visibility = View.GONE
+        binding.textPreviewError.visibility = View.GONE
+        binding.progressPreviewLoading.visibility = View.VISIBLE
+
+        val context = requireContext()
+
+        // 1. Check sender local content:// URI (zero copy)
+        val localPath = message.localFilePath
+        if (!localPath.isNullOrBlank() && localPath.startsWith("content://")) {
+            val uri = Uri.parse(localPath)
+            if (com.msi.openchat.core.media.PersistableUriManager.isUriAccessible(context, uri)) {
+                activePreviewSourceUri = uri
+                renderPreviewFromUri(uri, isVideo)
+                return
+            }
+        }
+
+        // 2. Check receiver cache lookup
+        val cached = com.msi.openchat.core.media.MediaDownloadManager.getCachedFile(
+            context = context,
+            messageId = message.id,
+            remoteUrl = message.mediaUrl ?: resolvedUrl,
+            type = message.type,
+            originalName = message.content
+        )
+        if (cached != null && cached.exists() && cached.length() > 0) {
+            activePreviewDownloadFile = cached
+            renderPreviewFromFile(cached, isVideo)
+            return
+        }
+
+        // 3. Fallback: Download to cache first, then render from cache
+        val effectiveUrl = message.mediaUrl?.takeIf { it.isNotBlank() } ?: resolvedUrl
+        if (effectiveUrl.isNullOrBlank()) {
+            binding.progressPreviewLoading.visibility = View.GONE
+            binding.textPreviewError.visibility = View.VISIBLE
+            binding.textPreviewError.text = "Media file is unavailable"
+            return
+        }
+
+        activePreviewJob = viewLifecycleOwner.lifecycleScope.launch {
+            val result = com.msi.openchat.core.media.MediaDownloadManager.downloadToCache(
+                context = context,
+                messageId = message.id,
+                remoteUrl = effectiveUrl,
+                type = message.type,
+                originalName = message.content
+            )
+            val file = result.getOrNull()
+            if (file != null && file.exists()) {
+                activePreviewDownloadFile = file
+                renderPreviewFromFile(file, isVideo)
+            } else {
+                binding.progressPreviewLoading.visibility = View.GONE
+                binding.textPreviewError.visibility = View.VISIBLE
+                binding.textPreviewError.text = "Failed to load media: ${result.exceptionOrNull()?.message ?: "Unknown error"}"
+            }
+        }
+    }
+
+    private fun renderPreviewFromUri(uri: Uri, isVideo: Boolean) {
+        binding.progressPreviewLoading.visibility = View.GONE
         if (isVideo) {
-            binding.imgPreviewPhoto.visibility = View.GONE
             binding.videoPreviewPlayer.visibility = View.VISIBLE
             val mediaController = MediaController(requireContext())
             mediaController.setAnchorView(binding.videoPreviewPlayer)
             binding.videoPreviewPlayer.setMediaController(mediaController)
-
-            val videoUri = if (url.startsWith("file://") || url.startsWith("content://") || url.startsWith("http://") || url.startsWith("https://")) {
-                Uri.parse(url)
-            } else {
-                Uri.fromFile(java.io.File(url))
-            }
-            binding.videoPreviewPlayer.setVideoURI(videoUri)
+            binding.videoPreviewPlayer.setVideoURI(uri)
             binding.videoPreviewPlayer.setOnPreparedListener { mp ->
                 mp.isLooping = true
                 binding.videoPreviewPlayer.start()
             }
         } else {
-            binding.videoPreviewPlayer.stopPlayback()
-            binding.videoPreviewPlayer.visibility = View.GONE
-            if (url.startsWith("content://")) {
-                binding.imgPreviewPhoto.load(Uri.parse(url)) {
-                    crossfade(true)
-                }
-            } else if (url.startsWith("data:")) {
-                try {
-                    val raw = if (url.contains(",")) url.substringAfter(",") else url
-                    val bytes = android.util.Base64.decode(raw, android.util.Base64.DEFAULT)
-                    val opts = android.graphics.BitmapFactory.Options().apply {
-                        inPreferredConfig = android.graphics.Bitmap.Config.RGB_565
-                    }
-                    val bmp = android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size, opts)
-                    if (bmp != null) {
-                        binding.imgPreviewPhoto.setImageBitmap(bmp)
-                    }
-                } catch (t: Throwable) {
-                    android.util.Log.e("ChatFragment", "Failed to decode preview image: ${t.message}")
-                }
-            } else if (url.startsWith("/") && !url.startsWith("file://")) {
-                binding.imgPreviewPhoto.load(java.io.File(url)) {
-                    crossfade(true)
-                }
-            } else {
-                binding.imgPreviewPhoto.load(url) {
-                    crossfade(true)
-                }
+            binding.imgPreviewPhoto.visibility = View.VISIBLE
+            binding.imgPreviewPhoto.load(uri) {
+                crossfade(true)
             }
         }
+    }
+
+    private fun renderPreviewFromFile(file: java.io.File, isVideo: Boolean) {
+        binding.progressPreviewLoading.visibility = View.GONE
+        if (isVideo) {
+            binding.videoPreviewPlayer.visibility = View.VISIBLE
+            val mediaController = MediaController(requireContext())
+            mediaController.setAnchorView(binding.videoPreviewPlayer)
+            binding.videoPreviewPlayer.setMediaController(mediaController)
+            binding.videoPreviewPlayer.setVideoURI(Uri.fromFile(file))
+            binding.videoPreviewPlayer.setOnPreparedListener { mp ->
+                mp.isLooping = true
+                binding.videoPreviewPlayer.start()
+            }
+        } else {
+            binding.imgPreviewPhoto.visibility = View.VISIBLE
+            binding.imgPreviewPhoto.load(file) {
+                crossfade(true)
+            }
+        }
+    }
+
+    private fun openAttachmentWithCache(message: Message) {
+        val context = requireContext()
+        val localPath = message.localFilePath
+        if (!localPath.isNullOrBlank() && localPath.startsWith("content://")) {
+            val uri = Uri.parse(localPath)
+            if (com.msi.openchat.core.media.PersistableUriManager.isUriAccessible(context, uri)) {
+                com.msi.openchat.core.media.PersistableUriManager.openDocument(
+                    context = context,
+                    uri = uri,
+                    mimeType = null,
+                    displayName = message.content.orEmpty()
+                )
+                return
+            }
+        }
+
+        val cached = com.msi.openchat.core.media.MediaDownloadManager.getCachedFile(
+            context = context,
+            messageId = message.id,
+            remoteUrl = message.mediaUrl,
+            type = "file",
+            originalName = message.content
+        )
+        if (cached != null && cached.exists() && cached.length() > 0) {
+            openLocalFile(context, cached, message.content.orEmpty())
+            return
+        }
+
+        val remoteUrl = message.mediaUrl
+        if (remoteUrl.isNullOrBlank()) {
+            Toast.makeText(context, "Attachment file is unavailable", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        Toast.makeText(context, "Downloading attachment...", Toast.LENGTH_SHORT).show()
+        viewLifecycleOwner.lifecycleScope.launch {
+            val result = com.msi.openchat.core.media.MediaDownloadManager.downloadToCache(
+                context = context,
+                messageId = message.id,
+                remoteUrl = remoteUrl,
+                type = "file",
+                originalName = message.content
+            )
+            val file = result.getOrNull()
+            if (file != null && file.exists()) {
+                openLocalFile(context, file, message.content.orEmpty())
+            } else {
+                Toast.makeText(context, "Failed to download attachment: ${result.exceptionOrNull()?.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun openLocalFile(context: Context, file: java.io.File, displayName: String) {
+        val authority = "${context.packageName}.fileprovider"
+        val uri = try {
+            androidx.core.content.FileProvider.getUriForFile(context, authority, file)
+        } catch (_: Exception) {
+            Uri.fromFile(file)
+        }
+        com.msi.openchat.core.media.PersistableUriManager.openDocument(
+            context = context,
+            uri = uri,
+            mimeType = null,
+            displayName = displayName
+        )
     }
 
     private fun observeViewModel() {
