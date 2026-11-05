@@ -357,19 +357,19 @@
         app:backgroundTint="@color/color_primary"
         app:elevation="6dp" />
 
-    <!-- Material 3 Bottom Navigation Bar with balanced height, weights and labels -->
+    <!-- Material 3 Bottom Navigation Bar with balanced height and unlabeled icons -->
     <com.google.android.material.bottomnavigation.BottomNavigationView
         android:id="@+id/bottom_nav_home"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:minHeight="64dp"
+        android:minHeight="68dp"
         android:layout_gravity="bottom"
         android:background="@color/color_surface"
         app:elevation="8dp"
         app:itemIconTint="@color/color_bottom_nav_item"
         app:itemTextColor="@color/color_bottom_nav_item"
-        app:itemIconSize="24dp"
-        app:labelVisibilityMode="labeled"
+        app:itemIconSize="26dp"
+        app:labelVisibilityMode="unlabeled"
         app:menu="@menu/menu_bottom_nav" />
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

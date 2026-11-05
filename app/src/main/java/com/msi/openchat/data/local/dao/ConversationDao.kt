@@ -35,6 +35,9 @@ interface ConversationDao {
     @Query("UPDATE conversations SET last_message_text = :lastText, last_message_at = :lastAt, last_message_sender_id = :lastSenderId WHERE id = :conversationId")
     suspend fun updateLastMessage(conversationId: String, lastText: String?, lastAt: String?, lastSenderId: String?)
 
+    @Query("UPDATE conversations SET last_message_text = :lastText, last_message_at = :lastAt, last_message_sender_id = :lastSenderId, unread_count = :unreadCount WHERE id = :conversationId")
+    suspend fun updateLastMessageWithUnread(conversationId: String, lastText: String?, lastAt: String?, lastSenderId: String?, unreadCount: Int)
+
     @Query("DELETE FROM conversations WHERE id = :id")
     suspend fun deleteConversationById(id: String)
 

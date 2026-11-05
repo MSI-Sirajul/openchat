@@ -105,6 +105,10 @@ data class Message(
     @Json(name = "created_at") val createdAt: String? = null,
     // Offline local caching field
     @Json(name = "local_file_path") val localFilePath: String? = null,
+    val seq: Long = 0L,
+    @Json(name = "server_timestamp_ms") val serverTimestampMs: Long = 0L,
+    @Json(name = "outbox_status") val outboxStatus: String = "sent",
+    val uploadProgress: Float = 1.0f,
     // Transient fields for local recording/playback
     val isPlaying: Boolean = false,
     val playbackProgress: Float = 0f

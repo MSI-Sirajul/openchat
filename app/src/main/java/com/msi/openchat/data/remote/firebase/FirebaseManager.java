@@ -66,6 +66,20 @@ public class FirebaseManager {
 
     public static synchronized void init() {
         try {
+            android.content.Context ctx = com.msi.openchat.core.di.ServiceLocator.INSTANCE.getContext();
+            if (ctx != null && com.google.firebase.FirebaseApp.getApps(ctx).isEmpty()) {
+                com.google.firebase.FirebaseOptions options = new com.google.firebase.FirebaseOptions.Builder()
+                        .setApplicationId("1:610942504921:android:79c60acb8ad7a63f81d3c8")
+                        .setApiKey("AIzaSyAs5oHilVqw6a8K2bRk3l7tJZHEPZ-sZr4")
+                        .setProjectId("msi-dev-2705a")
+                        .setDatabaseUrl(DATABASE_URL)
+                        .setStorageBucket(STORAGE_BUCKET)
+                        .build();
+                com.google.firebase.FirebaseApp.initializeApp(ctx, options);
+            }
+        } catch (Exception ignored) {}
+
+        try {
             auth = FirebaseAuth.getInstance();
         } catch (Exception e) {
             Log.e(TAG, "Error initializing FirebaseAuth: " + e.getMessage());

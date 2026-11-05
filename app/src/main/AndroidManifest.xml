@@ -121,7 +121,8 @@
         <service
             android:name="com.msi.openchat.service.call.OpenChatKeepAliveService"
             android:exported="false"
-            android:stopWithTask="false" />
+            android:stopWithTask="false"
+            android:foregroundServiceType="dataSync" />
 
         <!-- Device Boot & Package Update Receiver for Data Sync & Keep-Alive -->
         <receiver

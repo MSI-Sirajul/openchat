@@ -12,6 +12,11 @@ import java.util.Locale
 object DateTimeUtils {
 
     /**
+     * Formats the current moment in ISO-8601 UTC format.
+     */
+    fun formatIsoCurrent(): String = Instant.now().toString()
+
+    /**
      * Parses ISO-8601 / Nhost / PostgreSQL timestamp strings into java.time.Instant safely.
      * Handles timezone offsets (e.g., +00:00, +06:00, Z), variable millisecond precision,
      * and space-separated timestamps.

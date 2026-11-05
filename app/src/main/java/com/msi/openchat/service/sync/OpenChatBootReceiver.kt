@@ -26,6 +26,7 @@ class OpenChatBootReceiver : BroadcastReceiver() {
                 DataSyncWorker.schedulePeriodicSync(context.applicationContext)
 
                 if (ServiceLocator.sessionManager.isAuthenticated()) {
+                    com.msi.openchat.core.backend.BackendManager.initialize(context.applicationContext)
                     OpenChatKeepAliveService.start(context.applicationContext)
                     Log.i("OpenChatBootReceiver", "Boot sync & keep-alive service started successfully")
                 }

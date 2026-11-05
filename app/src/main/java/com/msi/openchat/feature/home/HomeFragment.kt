@@ -48,10 +48,42 @@ class HomeFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
+        (activity as? com.example.MainActivity)?.syncStatusBarColor()
+        setupInsets()
         setupTabs()
         setupRecyclerViews()
         setupActions()
         observeState()
+
+        // Prompt for battery optimization exemption for background keep-alive reliability
+        context?.let { ctx ->
+            if (!com.msi.openchat.core.backend.battery.BatteryOptimizationHelper.isIgnoringBatteryOptimizations(ctx)) {
+                com.msi.openchat.core.backend.battery.BatteryOptimizationHelper.requestIgnoreBatteryOptimization(ctx)
+            }
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        (activity as? com.example.MainActivity)?.syncStatusBarColor()
+    }
+
+    private fun setupInsets() {
+        androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(binding.bottomNavHome) { navView, insets ->
+            val navBars = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.navigationBars())
+            navView.setPadding(navView.paddingLeft, navView.paddingTop, navView.paddingRight, navBars.bottom)
+            insets
+        }
+        androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(binding.fabHomeAction) { fab, insets ->
+            val navBars = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.navigationBars())
+            val params = fab.layoutParams as? androidx.coordinatorlayout.widget.CoordinatorLayout.LayoutParams
+            if (params != null) {
+                val density = resources.displayMetrics.density
+                params.bottomMargin = (84 * density).toInt() + navBars.bottom
+                fab.layoutParams = params
+            }
+            insets
+        }
     }
 
     private var isUpdatingTabs = false

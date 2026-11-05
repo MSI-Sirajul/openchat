@@ -11,13 +11,14 @@ import com.msi.openchat.data.local.entity.MessageEntity
 
 /**
  * Main Room Database for local caching of chat history and conversations.
+ * Version 4 includes per-conversation monotonic sequence ordering and outbox state tracking.
  */
 @Database(
     entities = [
         MessageEntity::class,
         ConversationEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class OpenChatDatabase : RoomDatabase() {
@@ -26,7 +27,7 @@ abstract class OpenChatDatabase : RoomDatabase() {
     abstract fun conversationDao(): ConversationDao
 
     companion object {
-        private const val DB_NAME = "openchat_v3.db"
+        private const val DB_NAME = "openchat_v4.db"
 
         @Volatile
         private var INSTANCE: OpenChatDatabase? = null

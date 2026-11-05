@@ -21,10 +21,24 @@ class OpenChatApplication : Application(), ImageLoaderFactory {
     override fun onCreate() {
         super.onCreate()
         try {
-            com.google.firebase.FirebaseApp.initializeApp(this)
-        } catch (_: Exception) {}
-        // Initialize lightweight app context reference in ServiceLocator
+            if (com.google.firebase.FirebaseApp.getApps(this).isEmpty()) {
+                val options = com.google.firebase.FirebaseOptions.Builder()
+                    .setApplicationId("1:610942504921:android:79c60acb8ad7a63f81d3c8")
+                    .setApiKey("AIzaSyAs5oHilVqw6a8K2bRk3l7tJZHEPZ-sZr4")
+                    .setProjectId("msi-dev-2705a")
+                    .setDatabaseUrl("https://msi-dev-2705a-default-rtdb.asia-southeast1.firebasedatabase.app/")
+                    .setStorageBucket("msi-dev-2705a.firebasestorage.app")
+                    .build()
+                com.google.firebase.FirebaseApp.initializeApp(this, options)
+            }
+        } catch (_: Exception) {
+            try {
+                com.google.firebase.FirebaseApp.initializeApp(this)
+            } catch (_: Exception) {}
+        }
+        // Initialize lightweight app context reference in ServiceLocator & BackendManager
         ServiceLocator.initialize(this)
+        com.msi.openchat.core.backend.BackendManager.initialize(this)
 
         // Schedule reliable periodic background data sync via WorkManager & start keep-alive service
         try {

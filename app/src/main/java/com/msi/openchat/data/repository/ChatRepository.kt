@@ -211,26 +211,8 @@ class ChatRepository(
         }
     }
 
-    fun observeRealtimeMessages(conversationId: String): Flow<Message> = callbackFlow {
-        val listener = object : ChildEventListener {
-            override fun onChildAdded(snapshot: DataSnapshot, previousChildName: String?) {
-                val msg = parseMessageSnapshot(snapshot, conversationId)
-                trySend(msg)
-            }
-
-            override fun onChildChanged(snapshot: DataSnapshot, previousChildName: String?) {
-                val msg = parseMessageSnapshot(snapshot, conversationId)
-                trySend(msg)
-            }
-
-            override fun onChildRemoved(snapshot: DataSnapshot) {}
-            override fun onChildMoved(snapshot: DataSnapshot, previousChildName: String?) {}
-            override fun onCancelled(error: DatabaseError) {}
-        }
-
-        val ref = messagesRef.child(conversationId)
-        ref.addChildEventListener(listener)
-        awaitClose { ref.removeEventListener(listener) }
+    fun observeRealtimeMessages(conversationId: String): Flow<Message> {
+        return com.msi.openchat.core.backend.BackendManager.subscribeConversation(conversationId)
     }
 
     suspend fun sendTextMessage(
@@ -238,58 +220,17 @@ class ChatRepository(
         content: String,
         recipientId: String? = null
     ): Resource<Message> = withContext(Dispatchers.IO) {
-        val senderId = sessionManager.getUserId() ?: FirebaseManager.auth.currentUser?.uid
-            ?: return@withContext Resource.Error("Not authenticated")
-
-        val targetRecipientId = recipientId ?: extractRecipientId(conversationId, senderId)
-        val messageId = messagesRef.child(conversationId).push().key ?: UUID.randomUUID().toString()
-        val now = getCurrentIsoTime()
-
-        val msgData = HashMap<String, Any?>()
-        msgData["id"] = messageId
-        msgData["conversation_id"] = conversationId
-        msgData["sender_id"] = senderId
-        msgData["type"] = "text"
-        msgData["content"] = content
-        msgData["status"] = "sent"
-        msgData["created_at"] = now
-        msgData["updated_at"] = now
-
-        val updates = HashMap<String, Any?>()
-        updates["/messages/$conversationId/$messageId"] = msgData
-
-        val convUpdatesUser = HashMap<String, Any?>()
-        convUpdatesUser["last_message_text"] = content
-        convUpdatesUser["last_message_at"] = now
-        convUpdatesUser["last_message_sender_id"] = senderId
-        updates["/conversations/$senderId/$targetRecipientId/last_message_text"] = content
-        updates["/conversations/$senderId/$targetRecipientId/last_message_at"] = now
-        updates["/conversations/$senderId/$targetRecipientId/last_message_sender_id"] = senderId
-
-        updates["/conversations/$targetRecipientId/$senderId/last_message_text"] = content
-        updates["/conversations/$targetRecipientId/$senderId/last_message_at"] = now
-        updates["/conversations/$targetRecipientId/$senderId/last_message_sender_id"] = senderId
-        updates["/conversations/$targetRecipientId/$senderId/unread_count"] = ServerValue.increment(1)
-
-        val success = FirebaseManager.database.reference.updateChildren(updates).awaitTask()
-        if (success) {
-            val message = Message(
-                id = messageId,
+        try {
+            val entity = com.msi.openchat.core.backend.BackendManager.sendMessage(
                 conversationId = conversationId,
-                senderId = senderId,
                 type = "text",
                 content = content,
-                status = "sent",
-                createdAt = now
+                recipientId = recipientId
             )
-            // Cache locally
-            try {
-                messageDao?.insertMessage(MessageEntity.fromDomain(message))
-            } catch (_: Exception) {}
-
-            Resource.Success(message)
-        } else {
-            Resource.Error("Failed to send message")
+            Resource.Success(entity.toDomain())
+        } catch (e: Exception) {
+            Log.e(tag, "sendTextMessage error: ${e.message}", e)
+            Resource.Error(e.message ?: "Failed to send message", e)
         }
     }
 
@@ -303,89 +244,21 @@ class ChatRepository(
         recipientId: String? = null,
         localFilePath: String? = null
     ): Resource<Message> = withContext(Dispatchers.IO) {
-        val senderId = sessionManager.getUserId() ?: FirebaseManager.auth.currentUser?.uid
-            ?: return@withContext Resource.Error("Not authenticated")
-
-        val targetRecipientId = recipientId ?: extractRecipientId(conversationId, senderId)
-        val messageId = messagesRef.child(conversationId).push().key ?: UUID.randomUUID().toString()
-        val now = getCurrentIsoTime()
-
-        val displaySummary = when (type) {
-            "image" -> "📷 Photo"
-            "audio" -> "🎤 Voice message"
-            "video" -> "📹 Video"
-            "file" -> "📎 Document"
-            else -> "Media"
-        }
-
-        val bucketId = com.msi.openchat.data.remote.storage.NhostStorageClient.getBucketForType(type)
-
-        val msgData = HashMap<String, Any?>()
-        msgData["id"] = messageId
-        msgData["conversation_id"] = conversationId
-        msgData["sender_id"] = senderId
-        msgData["type"] = type
-        msgData["content"] = content ?: displaySummary
-        msgData["media_url"] = mediaUrl
-        msgData["media_bucket"] = bucketId
-        msgData["media_duration_seconds"] = mediaDurationSeconds ?: 0
-        msgData["media_file_size"] = mediaFileSize ?: 0L
-        msgData["status"] = "sent"
-        msgData["created_at"] = now
-        msgData["updated_at"] = now
-
-        val updates = HashMap<String, Any?>()
-        updates["/messages/$conversationId/$messageId"] = msgData
-
-        updates["/conversations/$senderId/$targetRecipientId/last_message_text"] = displaySummary
-        updates["/conversations/$senderId/$targetRecipientId/last_message_at"] = now
-        updates["/conversations/$senderId/$targetRecipientId/last_message_sender_id"] = senderId
-
-        updates["/conversations/$targetRecipientId/$senderId/last_message_text"] = displaySummary
-        updates["/conversations/$targetRecipientId/$senderId/last_message_at"] = now
-        updates["/conversations/$targetRecipientId/$senderId/last_message_sender_id"] = senderId
-        updates["/conversations/$targetRecipientId/$senderId/unread_count"] = ServerValue.increment(1)
-
-        // Metadata indexes for user media and conversation media management ("grep metadata")
-        val mediaMeta = HashMap<String, Any?>().apply {
-            put("id", messageId)
-            put("conversation_id", conversationId)
-            put("sender_id", senderId)
-            put("recipient_id", targetRecipientId)
-            put("type", type)
-            put("bucket", bucketId)
-            put("media_url", mediaUrl)
-            put("content", content ?: displaySummary)
-            put("media_duration_seconds", mediaDurationSeconds ?: 0)
-            put("media_file_size", mediaFileSize ?: 0L)
-            put("created_at", now)
-            put("updated_at", now)
-        }
-        updates["/media_metadata/$senderId/$bucketId/$messageId"] = mediaMeta
-        updates["/conversation_media/$conversationId/$bucketId/$messageId"] = mediaMeta
-
-        val success = FirebaseManager.database.reference.updateChildren(updates).awaitTask()
-        if (success) {
-            val message = Message(
-                id = messageId,
+        try {
+            val entity = com.msi.openchat.core.backend.BackendManager.sendMessage(
                 conversationId = conversationId,
-                senderId = senderId,
                 type = type,
-                content = content ?: displaySummary,
+                content = content,
                 mediaUrl = mediaUrl,
                 localFilePath = localFilePath,
                 mediaDurationSeconds = mediaDurationSeconds ?: 0,
                 mediaFileSize = mediaFileSize ?: 0L,
-                status = "sent",
-                createdAt = now
+                recipientId = recipientId
             )
-            try {
-                messageDao?.insertMessage(MessageEntity.fromDomain(message))
-            } catch (_: Exception) {}
-
-            Resource.Success(message)
-        } else {
-            Resource.Error("Failed to send media message")
+            Resource.Success(entity.toDomain())
+        } catch (e: Exception) {
+            Log.e(tag, "sendMediaMessage error: ${e.message}", e)
+            Resource.Error(e.message ?: "Failed to send media message", e)
         }
     }
 
@@ -399,29 +272,21 @@ class ChatRepository(
         fileSize: Long,
         durationSeconds: Int = 0
     ): Resource<Message> = withContext(Dispatchers.IO) {
-        val bucketId = com.msi.openchat.data.remote.storage.NhostStorageClient.getBucketForType(type)
-        val uploadRes = storageClient.uploadUri(
-            contentResolver = context.contentResolver,
-            uri = uri,
-            fileName = fileName,
-            mimeType = mimeType,
-            bucketId = bucketId
-        )
-
-        val mediaUrl = when (uploadRes) {
-            is Resource.Success -> uploadRes.data
-            else -> uri.toString()
+        try {
+            val entity = com.msi.openchat.core.backend.BackendManager.sendMessage(
+                conversationId = conversationId,
+                type = type,
+                content = fileName,
+                localFilePath = uri.toString(),
+                mediaDurationSeconds = durationSeconds,
+                mediaFileSize = fileSize,
+                mediaMimeType = mimeType
+            )
+            Resource.Success(entity.toDomain())
+        } catch (e: Exception) {
+            Log.e(tag, "sendMediaFromUri error: ${e.message}", e)
+            Resource.Error(e.message ?: "Failed to send media", e)
         }
-
-        sendMediaMessage(
-            conversationId = conversationId,
-            type = type,
-            mediaUrl = mediaUrl,
-            content = fileName,
-            mediaDurationSeconds = durationSeconds,
-            mediaFileSize = fileSize,
-            localFilePath = uri.toString()
-        )
     }
 
     suspend fun uploadMedia(file: File, type: String, conversationId: String): Resource<String> = withContext(Dispatchers.IO) {

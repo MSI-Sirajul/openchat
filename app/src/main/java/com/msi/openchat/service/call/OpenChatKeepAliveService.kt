@@ -1,29 +1,44 @@
 package com.msi.openchat.service.call
 
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 import android.util.Log
+import androidx.core.app.NotificationCompat
+import com.example.MainActivity
+import com.example.R
 import com.google.firebase.database.ChildEventListener
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.ValueEventListener
+import com.msi.openchat.core.backend.BackendManager
+import com.msi.openchat.core.backend.ConnectionState
+import com.msi.openchat.core.common.Constants
 import com.msi.openchat.core.di.ServiceLocator
 import com.msi.openchat.data.remote.firebase.FirebaseManager
 import com.msi.openchat.service.notification.OpenChatNotificationManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 /**
- * Background Keep-Alive service that maintains the Firebase Realtime Database connection
- * alive while the app is backgrounded, idle, or when the screen is locked/off.
- * Ensures instant detection of incoming calls and chat messages at all times.
+ * OpenChat WhatsApp-Grade Always-On Foreground Keep-Alive & Data Sync Service.
+ *
+ * Capabilities:
+ * - Runs as a foreground service with FOREGROUND_SERVICE_TYPE_DATA_SYNC (Android 14+ compatible).
+ * - START_STICKY with stopWithTask = false to prevent OS termination when cleared from recents.
+ * - Maintains active WebSocket and Firebase Realtime Database connections for instant message and call delivery.
+ * - Integrates directly with BackendManager to ensure outbox synchronization and inbox processing.
  */
 class OpenChatKeepAliveService : Service() {
     private val tag = "OpenChat_KeepAlive"
@@ -35,13 +50,19 @@ class OpenChatKeepAliveService : Service() {
     companion object {
         const val ACTION_START = "com.msi.openchat.action.START_KEEP_ALIVE"
         const val ACTION_STOP = "com.msi.openchat.action.STOP_KEEP_ALIVE"
+        const val NOTIFICATION_ID_KEEP_ALIVE = 2026
+        const val CHANNEL_SYNC = "openchat_sync_persistent"
 
         fun start(context: Context) {
             val intent = Intent(context, OpenChatKeepAliveService::class.java).apply {
                 action = ACTION_START
             }
             try {
-                context.startService(intent)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    context.startForegroundService(intent)
+                } else {
+                    context.startService(intent)
+                }
             } catch (e: Exception) {
                 Log.w("OpenChat_KeepAlive", "Failed to start keep alive service: ${e.message}")
             }
@@ -62,6 +83,10 @@ class OpenChatKeepAliveService : Service() {
     override fun onCreate() {
         super.onCreate()
         Log.i(tag, "OpenChatKeepAliveService created")
+        createNotificationChannel()
+        promoteToForeground("Connecting to OpenChat...")
+        BackendManager.initialize(applicationContext)
+        observeConnectionState()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -72,26 +97,102 @@ class OpenChatKeepAliveService : Service() {
                 return START_NOT_STICKY
             }
             else -> {
-                observeFirebaseSignaling()
+                promoteToForeground("OpenChat active & syncing")
+                observeSignalingAndIncoming()
             }
         }
         return START_STICKY
     }
 
-    private fun observeFirebaseSignaling() {
+    private fun createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val manager = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
+            val channel = NotificationChannel(
+                CHANNEL_SYNC,
+                "Background Connection & Sync",
+                NotificationManager.IMPORTANCE_MIN
+            ).apply {
+                description = "Keeps OpenChat connected for instant message and call delivery"
+                setShowBadge(false)
+                enableLights(false)
+                enableVibration(false)
+                setSound(null, null)
+            }
+            manager.createNotificationChannel(channel)
+        }
+    }
+
+    private fun buildPersistentNotification(statusText: String): Notification {
+        val tapIntent = Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            this,
+            0,
+            tapIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val channelId = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) CHANNEL_SYNC else Constants.CHANNEL_NETWORK
+
+        return NotificationCompat.Builder(this, channelId)
+            .setSmallIcon(R.drawable.ic_chat_24)
+            .setContentTitle("OpenChat")
+            .setContentText(statusText)
+            .setOngoing(true)
+            .setPriority(NotificationCompat.PRIORITY_MIN)
+            .setContentIntent(pendingIntent)
+            .setCategory(NotificationCompat.CATEGORY_SERVICE)
+            .build()
+    }
+
+    private fun promoteToForeground(statusText: String) {
+        val notification = buildPersistentNotification(statusText)
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                startForeground(
+                    NOTIFICATION_ID_KEEP_ALIVE,
+                    notification,
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+                )
+            } else {
+                startForeground(NOTIFICATION_ID_KEEP_ALIVE, notification)
+            }
+        } catch (e: Exception) {
+            Log.w(tag, "Failed to startForeground: ${e.message}")
+        }
+    }
+
+    private fun updateForegroundNotification(statusText: String) {
+        val notification = buildPersistentNotification(statusText)
+        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+        manager?.notify(NOTIFICATION_ID_KEEP_ALIVE, notification)
+    }
+
+    private fun observeConnectionState() {
+        serviceScope.launch {
+            BackendManager.connectionState.collectLatest { state ->
+                val label = when (state) {
+                    is ConnectionState.Connected -> "Connected"
+                    is ConnectionState.Reconnecting -> state.reason
+                    is ConnectionState.Offline -> "Offline - reconnecting"
+                }
+                updateForegroundNotification(label)
+            }
+        }
+    }
+
+    private fun observeSignalingAndIncoming() {
         val uid = ServiceLocator.sessionManager.getUserId() ?: FirebaseManager.auth.currentUser?.uid
         if (uid.isNullOrBlank()) {
-            stopSelf()
             return
         }
 
         if (currentUserId == uid && callListener != null) return
         currentUserId = uid
 
-        // Remove old listeners if any
         removeListeners()
-
-        Log.i(tag, "Listening to background Firebase Realtime events for user: $uid")
+        Log.i(tag, "Listening to background events for user: $uid")
 
         // 1. Incoming Call listener on /users/{uid}/incoming_call
         val incomingCallNode = FirebaseManager.usersRef.child(uid).child("incoming_call")
@@ -103,7 +204,7 @@ class OpenChatKeepAliveService : Service() {
                     val callerName = snapshot.child("caller_name").getValue(String::class.java) ?: "Friend"
 
                     if (callId.isNotBlank()) {
-                        Log.i(tag, "Incoming background call detected: $callId from $callerId")
+                        Log.i(tag, "Incoming background call: $callId from $callerId")
                         serviceScope.launch {
                             try {
                                 ServiceLocator.callRepository.sendSignaling(callId, callerId, "ringing", "{}")
@@ -182,17 +283,17 @@ class OpenChatKeepAliveService : Service() {
 
     override fun onTaskRemoved(rootIntent: Intent?) {
         super.onTaskRemoved(rootIntent)
-        Log.i(tag, "App task cleared from recent apps - ensuring keep-alive service persistence")
+        Log.i(tag, "App cleared from recent apps - resurrecting keep-alive foreground service")
         try {
             val restartIntent = Intent(applicationContext, OpenChatKeepAliveService::class.java).apply {
                 action = ACTION_START
                 setPackage(packageName)
             }
-            val pendingIntent = android.app.PendingIntent.getService(
+            val pendingIntent = PendingIntent.getService(
                 applicationContext,
                 2026,
                 restartIntent,
-                android.app.PendingIntent.FLAG_ONE_SHOT or android.app.PendingIntent.FLAG_IMMUTABLE
+                PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_IMMUTABLE
             )
             val alarmManager = getSystemService(Context.ALARM_SERVICE) as? android.app.AlarmManager
             alarmManager?.set(
@@ -201,7 +302,7 @@ class OpenChatKeepAliveService : Service() {
                 pendingIntent
             )
         } catch (e: Exception) {
-            Log.w(tag, "Failed to schedule service resurrection on task removed: ${e.message}")
+            Log.w(tag, "Failed to schedule service resurrection: ${e.message}")
         }
     }
 
