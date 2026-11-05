@@ -8,6 +8,8 @@
         <item name="android:windowLightNavigationBar">true</item>
         <item name="colorPrimary">@color/color_primary</item>
         <item name="colorSecondary">@color/color_primary_accent</item>
+        <item name="colorSecondaryContainer">@color/color_nav_indicator</item>
+        <item name="colorOnSecondaryContainer">@color/color_nav_item_selected</item>
         <item name="colorSurface">@color/color_surface</item>
         <item name="colorError">@color/color_error</item>
     </style>

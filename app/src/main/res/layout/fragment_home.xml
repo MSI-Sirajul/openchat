@@ -357,7 +357,7 @@
         app:backgroundTint="@color/color_primary"
         app:elevation="6dp" />
 
-    <!-- Material 3 Bottom Navigation Bar with balanced height and unlabeled icons -->
+    <!-- Material 3 Bottom Navigation Bar with balanced height, soft matching pill, and visible icons -->
     <com.google.android.material.bottomnavigation.BottomNavigationView
         android:id="@+id/bottom_nav_home"
         android:layout_width="match_parent"
@@ -366,6 +366,7 @@
         android:layout_gravity="bottom"
         android:background="@color/color_surface"
         app:elevation="8dp"
+        app:itemRippleColor="@color/color_nav_ripple"
         app:itemIconTint="@color/color_bottom_nav_item"
         app:itemTextColor="@color/color_bottom_nav_item"
         app:itemIconSize="26dp"
