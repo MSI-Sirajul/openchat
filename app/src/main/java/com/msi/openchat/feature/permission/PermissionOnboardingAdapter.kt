@@ -2,14 +2,16 @@ package com.msi.openchat.feature.permission
 
 import android.view.LayoutInflater
 import android.view.ViewGroup
-import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
-import com.example.R
 import com.example.databinding.ItemPermissionOnboardingBinding
 import com.msi.openchat.core.permission.PermissionItemState
 
+/**
+ * Minimal AOSP-style Adapter for Permission Onboarding list.
+ * Flat classic rows: title + short description + checkbox with thin divider.
+ */
 class PermissionOnboardingAdapter(
     private val onItemClick: (PermissionItemState) -> Unit
 ) : ListAdapter<PermissionItemState, PermissionOnboardingAdapter.PermissionViewHolder>(DiffCallback) {
@@ -32,32 +34,17 @@ class PermissionOnboardingAdapter(
     ) : RecyclerView.ViewHolder(binding.root) {
 
         fun bind(item: PermissionItemState) {
-            val context = binding.root.context
             binding.textPermissionTitle.text = item.title
             binding.textPermissionDesc.text = item.description
-            binding.imgPermissionIcon.setImageResource(item.iconRes)
 
-            // Disallow direct checkbox toggle; state is strictly driven by item.isGranted
+            // State is strictly driven by item.isGranted
             binding.cbPermission.setOnCheckedChangeListener(null)
             binding.cbPermission.isChecked = item.isGranted
             binding.cbPermission.isClickable = false
             binding.cbPermission.isFocusable = false
 
-            val activeColor = ContextCompat.getColor(context, R.color.color_primary)
-            val neutralBorder = ContextCompat.getColor(context, R.color.color_divider)
-
-            if (item.isGranted) {
-                binding.cardPermissionItem.strokeColor = activeColor
-                binding.cardPermissionItem.strokeWidth = 2
-                binding.imgPermissionIcon.setColorFilter(activeColor)
-            } else {
-                binding.cardPermissionItem.strokeColor = neutralBorder
-                binding.cardPermissionItem.strokeWidth = 1
-                binding.imgPermissionIcon.setColorFilter(activeColor)
-            }
-
-            // Tapping either the card or the checkbox triggers the permission request
-            binding.root.setOnClickListener {
+            // Tapping anywhere on the row triggers the permission prompt
+            binding.layoutPermissionRow.setOnClickListener {
                 onItemClick(item)
             }
         }

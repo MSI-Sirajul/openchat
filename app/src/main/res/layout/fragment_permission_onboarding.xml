@@ -1,121 +1,105 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/color_background">
+    android:background="@color/color_background"
+    android:orientation="vertical">
 
-    <androidx.core.widget.NestedScrollView
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:fillViewport="true"
-        android:paddingBottom="96dp">
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:paddingTop="36dp">
-
-            <!-- Hero Header Icon -->
-            <FrameLayout
-                android:layout_width="80dp"
-                android:layout_height="80dp"
-                android:layout_gravity="center_horizontal"
-                android:background="@drawable/bg_avatar_circle">
-
-                <ImageView
-                    android:layout_width="44dp"
-                    android:layout_height="44dp"
-                    android:layout_gravity="center"
-                    android:contentDescription="@null"
-                    app:tint="@color/color_primary"
-                    android:src="@drawable/ic_lock_24" />
-            </FrameLayout>
-
-            <!-- Screen Title -->
-            <TextView
-                android:id="@+id/textOnboardingTitle"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="center_horizontal"
-                android:layout_marginTop="20dp"
-                android:text="@string/permissions_onboarding_title"
-                android:textColor="@color/color_primary_text"
-                android:textSize="24sp"
-                android:textStyle="bold" />
-
-            <!-- Subtitle Description -->
-            <TextView
-                android:id="@+id/textOnboardingSubtitle"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginHorizontal="28dp"
-                android:layout_marginTop="8dp"
-                android:gravity="center_horizontal"
-                android:lineSpacingExtra="3dp"
-                android:text="@string/permissions_onboarding_subtitle"
-                android:textColor="@color/color_secondary_text"
-                android:textSize="14sp" />
-
-            <!-- Permissions Recycler List -->
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/recyclerPermissions"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="24dp"
-                android:nestedScrollingEnabled="false"
-                tools:itemCount="4"
-                tools:listitem="@layout/item_permission_onboarding" />
-
-        </LinearLayout>
-    </androidx.core.widget.NestedScrollView>
-
-    <!-- Bottom Actions Bar -->
+    <!-- Minimal AOSP Header Section -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_gravity="bottom"
+        android:orientation="vertical"
+        android:paddingHorizontal="20dp"
+        android:paddingTop="36dp"
+        android:paddingBottom="16dp">
+
+        <TextView
+            android:id="@+id/textOnboardingTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/permissions_onboarding_title"
+            android:textColor="@color/color_primary_text"
+            android:textSize="22sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/textOnboardingSubtitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:lineSpacingExtra="3dp"
+            android:text="@string/permissions_onboarding_subtitle"
+            android:textColor="@color/color_secondary_text"
+            android:textSize="14sp" />
+
+    </LinearLayout>
+
+    <!-- Header Thin Divider -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="@color/color_divider" />
+
+    <!-- Flat Permissions List (No CardView, No Elevation) -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/recyclerPermissions"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:clipToPadding="false"
+        android:overScrollMode="never"
+        tools:itemCount="4"
+        tools:listitem="@layout/item_permission_onboarding" />
+
+    <!-- Bottom Actions Section (Flat, No Elevation, Thin Top Divider) -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="@color/color_divider" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
         android:background="@color/color_surface"
-        android:elevation="8dp"
         android:gravity="center_vertical"
         android:orientation="horizontal"
         android:paddingHorizontal="16dp"
-        android:paddingTop="12dp"
-        android:paddingBottom="20dp">
+        android:paddingVertical="12dp">
 
         <!-- Skip Button -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnSkipPermissions"
             style="@style/Widget.Material3.Button.TextButton"
             android:layout_width="0dp"
-            android:layout_height="52dp"
+            android:layout_height="48dp"
             android:layout_marginEnd="8dp"
             android:layout_weight="1"
             android:text="@string/permissions_btn_skip"
             android:textAllCaps="false"
             android:textColor="@color/color_secondary_text"
-            android:textSize="15sp"
+            android:textSize="14sp"
             android:textStyle="bold"
-            app:cornerRadius="14dp" />
+            app:cornerRadius="8dp" />
 
         <!-- Done Button -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnDonePermissions"
             style="@style/Widget.Material3.Button"
             android:layout_width="0dp"
-            android:layout_height="52dp"
+            android:layout_height="48dp"
             android:layout_marginStart="8dp"
             android:layout_weight="1"
             android:backgroundTint="@color/color_primary"
             android:text="@string/permissions_btn_done"
             android:textAllCaps="false"
             android:textColor="@color/white"
-            android:textSize="15sp"
+            android:textSize="14sp"
             android:textStyle="bold"
-            app:cornerRadius="14dp" />
+            app:cornerRadius="8dp" />
 
     </LinearLayout>
 
-</androidx.coordinatorlayout.widget.CoordinatorLayout>
+</LinearLayout>

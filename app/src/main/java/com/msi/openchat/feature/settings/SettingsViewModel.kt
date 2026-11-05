@@ -69,8 +69,8 @@ class SettingsViewModel(
         }
     }
 
-    fun selectThemeMode(mode: com.msi.openchat.core.theme.AppThemeMode) {
-        themeManager.setThemeMode(mode)
+    fun selectThemeMode(mode: com.msi.openchat.core.theme.AppThemeMode, activity: android.app.Activity? = null) {
+        themeManager.setThemeMode(mode, activity)
     }
 
     private fun loadCurrentProfile() {

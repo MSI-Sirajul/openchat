@@ -83,15 +83,35 @@ object PermissionManager {
         return getMissingPermissions(context).isEmpty()
     }
 
+    private const val PREFS_NAME = "openchat_permission_prefs"
+    private const val KEY_FIRST_LAUNCH_ONBOARDING_DONE = "first_launch_onboarding_done"
+
+    /**
+     * Checks if the user has completed or skipped permission onboarding.
+     * Persisted in dedicated SharedPreferences so clearing session/logout does not reset it.
+     */
+    fun hasCompletedOrSkippedOnboarding(context: Context): Boolean {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        return prefs.getBoolean(KEY_FIRST_LAUNCH_ONBOARDING_DONE, false) ||
+                ServiceLocator.sessionManager.isPermissionOnboardingCompleted()
+    }
+
+    /**
+     * Marks the permission onboarding as completed or skipped so it NEVER appears again.
+     */
+    fun markOnboardingCompletedOrSkipped(context: Context) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().putBoolean(KEY_FIRST_LAUNCH_ONBOARDING_DONE, true).commit()
+        ServiceLocator.sessionManager.setPermissionOnboardingCompleted(true)
+    }
+
     /**
      * Determines if the permission onboarding screen should be shown.
-     * Persisted onboarding completion prevents re-showing unless permissions are missing.
+     * Shows exactly ONCE after fresh install + first login — regardless of whether
+     * the user taps Done or Skip — and never appears again.
      */
     fun shouldShowOnboarding(context: Context): Boolean {
-        val sessionManager = ServiceLocator.sessionManager
-        val isCompleted = sessionManager.isPermissionOnboardingCompleted()
-        if (!isCompleted) return true
-        return getMissingPermissions(context).isNotEmpty()
+        return !hasCompletedOrSkippedOnboarding(context)
     }
 
     /**

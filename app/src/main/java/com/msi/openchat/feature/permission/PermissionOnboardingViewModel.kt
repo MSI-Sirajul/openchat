@@ -78,13 +78,15 @@ class PermissionOnboardingViewModel : ViewModel() {
         )
     }
 
-    fun onDoneClicked() {
-        ServiceLocator.sessionManager.setPermissionOnboardingCompleted(true)
+    fun onDoneClicked(context: Context? = null) {
+        context?.let { PermissionManager.markOnboardingCompletedOrSkipped(it) }
+            ?: ServiceLocator.sessionManager.setPermissionOnboardingCompleted(true)
         _uiState.value = _uiState.value.copy(isCompleted = true)
     }
 
-    fun onSkipClicked() {
-        ServiceLocator.sessionManager.setPermissionOnboardingCompleted(true)
+    fun onSkipClicked(context: Context? = null) {
+        context?.let { PermissionManager.markOnboardingCompletedOrSkipped(it) }
+            ?: ServiceLocator.sessionManager.setPermissionOnboardingCompleted(true)
         _uiState.value = _uiState.value.copy(isCompleted = true)
     }
 }

@@ -1,59 +1,42 @@
 <?xml version="1.0" encoding="utf-8"?>
-<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
-    android:id="@+id/cardPermissionItem"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginHorizontal="16dp"
-    android:layout_marginVertical="6dp"
-    android:clickable="true"
-    android:focusable="true"
-    app:cardBackgroundColor="@color/color_surface"
-    app:cardCornerRadius="16dp"
-    app:cardElevation="0dp"
-    app:strokeColor="@color/color_divider"
-    app:strokeWidth="1dp">
+    android:orientation="vertical">
 
+    <!-- Flat classic AOSP-style list row (No CardView, No Elevation) -->
     <LinearLayout
+        android:id="@+id/layoutPermissionRow"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:background="?attr/selectableItemBackground"
+        android:clickable="true"
+        android:focusable="true"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:padding="16dp">
-
-        <FrameLayout
-            android:layout_width="44dp"
-            android:layout_height="44dp"
-            android:background="@drawable/bg_avatar_circle">
-
-            <ImageView
-                android:id="@+id/imgPermissionIcon"
-                android:layout_width="24dp"
-                android:layout_height="24dp"
-                android:layout_gravity="center"
-                android:contentDescription="@null"
-                app:tint="@color/color_primary"
-                tools:srcCompat="@drawable/ic_mic_24" />
-        </FrameLayout>
+        android:paddingHorizontal="20dp"
+        android:paddingVertical="14dp">
 
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginStart="14dp"
-            android:layout_marginEnd="8dp"
+            android:layout_marginEnd="16dp"
             android:layout_weight="1"
             android:orientation="vertical">
 
+            <!-- Title -->
             <TextView
                 android:id="@+id/textPermissionTitle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:textColor="@color/color_primary_text"
                 android:textSize="16sp"
-                android:textStyle="bold"
+                android:textStyle="normal"
                 tools:text="Microphone" />
 
+            <!-- Short Description -->
             <TextView
                 android:id="@+id/textPermissionDesc"
                 android:layout_width="wrap_content"
@@ -62,9 +45,11 @@
                 android:lineSpacingExtra="2dp"
                 android:textColor="@color/color_secondary_text"
                 android:textSize="13sp"
-                tools:text="Record voice messages and speak during crystal-clear audio calls." />
+                tools:text="Record voice messages and speak during audio calls." />
+
         </LinearLayout>
 
+        <!-- AOSP Style Flat Checkbox -->
         <com.google.android.material.checkbox.MaterialCheckBox
             android:id="@+id/cbPermission"
             android:layout_width="wrap_content"
@@ -75,4 +60,12 @@
 
     </LinearLayout>
 
-</com.google.android.material.card.MaterialCardView>
+    <!-- Thin Divider -->
+    <View
+        android:id="@+id/dividerPermission"
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginStart="20dp"
+        android:background="@color/color_divider" />
+
+</LinearLayout>

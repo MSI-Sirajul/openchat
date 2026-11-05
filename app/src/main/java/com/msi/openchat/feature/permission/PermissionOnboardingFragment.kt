@@ -75,7 +75,7 @@ class PermissionOnboardingFragment : Fragment() {
             viewLifecycleOwner,
             object : OnBackPressedCallback(true) {
                 override fun handleOnBackPressed() {
-                    viewModel.onSkipClicked()
+                    viewModel.onSkipClicked(requireContext())
                 }
             }
         )
@@ -104,11 +104,11 @@ class PermissionOnboardingFragment : Fragment() {
 
     private fun setupButtons() {
         binding.btnDonePermissions.setOnClickListener {
-            viewModel.onDoneClicked()
+            viewModel.onDoneClicked(requireContext())
         }
 
         binding.btnSkipPermissions.setOnClickListener {
-            viewModel.onSkipClicked()
+            viewModel.onSkipClicked(requireContext())
         }
     }
 

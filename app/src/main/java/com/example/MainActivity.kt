@@ -44,7 +44,20 @@ class MainActivity : AppCompatActivity() {
     ) { /* Permissions evaluated */ }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Ensure saved theme mode is applied before inflating views
+        com.msi.openchat.core.theme.ThemeManager.applySavedTheme(this)
+
         super.onCreate(savedInstanceState)
+
+        // When activity is recreated (e.g. theme change), apply smooth fade transition
+        if (savedInstanceState != null) {
+            if (Build.VERSION.SDK_INT >= 34) {
+                overrideActivityTransition(android.app.Activity.OVERRIDE_TRANSITION_OPEN, R.anim.fade_in, R.anim.fade_out)
+            } else {
+                @Suppress("DEPRECATION")
+                overridePendingTransition(R.anim.fade_in, R.anim.fade_out)
+            }
+        }
 
         // Initialize core dependencies
         ServiceLocator.initialize(applicationContext)
@@ -122,7 +135,7 @@ class MainActivity : AppCompatActivity() {
             !ServiceLocator.sessionManager.isAuthenticated() -> AuthFragment.newInstance()
             ServiceLocator.sessionManager.secureStorage.isAppLockEnabled() &&
                     !ServiceLocator.sessionManager.secureStorage.isAppUnlocked() -> AppLockFragment.newInstance()
-            !ServiceLocator.sessionManager.isPermissionOnboardingCompleted() -> PermissionOnboardingFragment.newInstance()
+            PermissionManager.shouldShowOnboarding(this) -> PermissionOnboardingFragment.newInstance()
             else -> HomeFragment.newInstance()
         }
 

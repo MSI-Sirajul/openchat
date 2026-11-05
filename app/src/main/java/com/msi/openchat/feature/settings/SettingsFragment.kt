@@ -79,14 +79,19 @@ class SettingsFragment : Fragment() {
         }
     }
 
+    private var isUpdatingThemeRadio = false
+
     private fun setupThemeSection() {
         binding.radioGroupTheme.setOnCheckedChangeListener { _, checkedId ->
+            if (isUpdatingThemeRadio) return@setOnCheckedChangeListener
             val mode = when (checkedId) {
                 R.id.radio_theme_light -> AppThemeMode.LIGHT
                 R.id.radio_theme_dark -> AppThemeMode.DARK
                 else -> AppThemeMode.SYSTEM
             }
-            settingsViewModel.selectThemeMode(mode)
+            if (settingsViewModel.uiState.value.currentThemeMode != mode) {
+                settingsViewModel.selectThemeMode(mode, activity)
+            }
         }
     }
 
@@ -219,11 +224,13 @@ class SettingsFragment : Fragment() {
         binding.textSettingsUsername.text = if (state.username.isNotBlank()) "@${state.username}" else ""
 
         // Theme selection radio
+        isUpdatingThemeRadio = true
         when (state.currentThemeMode) {
             AppThemeMode.LIGHT -> binding.radioThemeLight.isChecked = true
             AppThemeMode.DARK -> binding.radioThemeDark.isChecked = true
             AppThemeMode.SYSTEM -> binding.radioThemeSystem.isChecked = true
         }
+        isUpdatingThemeRadio = false
 
         // App Lock switch state
         binding.switchAppLock.isChecked = state.isAppLockEnabled

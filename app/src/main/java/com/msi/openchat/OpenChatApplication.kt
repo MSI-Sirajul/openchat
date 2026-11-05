@@ -20,6 +20,8 @@ class OpenChatApplication : Application(), ImageLoaderFactory {
 
     override fun onCreate() {
         super.onCreate()
+        // Apply saved theme mode (System / Light / Dark) app-wide before UI inflation
+        com.msi.openchat.core.theme.ThemeManager.applySavedTheme(this)
         try {
             if (com.google.firebase.FirebaseApp.getApps(this).isEmpty()) {
                 val options = com.google.firebase.FirebaseOptions.Builder()
