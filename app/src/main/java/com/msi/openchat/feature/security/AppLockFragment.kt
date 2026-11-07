@@ -34,31 +34,56 @@ class AppLockFragment : Fragment() {
         return binding.root
     }
 
+    private var isBiometricPromptShowing = false
+
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
         setupKeypad()
         observeState()
-        checkBiometricOnLaunch()
+        view.post {
+            checkBiometricOnLaunch()
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        viewModel.reloadSecurityState()
     }
 
     private fun checkBiometricOnLaunch() {
         val state = viewModel.uiState.value
-        if (state.isBiometricEnabled && !state.isLockedOut) {
+        val context = context ?: return
+        if (state.isBiometricEnabled && !state.isLockedOut && BiometricAuthHelper.isBiometricAvailable(context)) {
             triggerBiometricPrompt()
         }
     }
 
     private fun triggerBiometricPrompt() {
+        if (!isAdded || isBiometricPromptShowing) return
+        val context = context ?: return
+        if (!BiometricAuthHelper.isBiometricAvailable(context)) {
+            android.util.Log.d("AppLockFragment", "Biometric not available on device")
+            return
+        }
+
+        isBiometricPromptShowing = true
         BiometricAuthHelper.promptBiometricAuthentication(
             activity = requireActivity(),
-            title = "OpenChat App Lock",
-            subtitle = "Authenticate with your fingerprint",
-            negativeButtonText = "Use PIN",
+            title = "OpenChat Privacy Lock",
+            subtitle = "Scan your fingerprint to unlock",
+            negativeButtonText = if (viewModel.hasPinSet()) "Use PIN" else "Use Password",
             onSuccess = {
+                isBiometricPromptShowing = false
                 viewModel.onBiometricSuccess()
             },
-            onError = { _, _ -> /* Keep keypad available */ },
+            onError = { errorCode, errString ->
+                isBiometricPromptShowing = false
+                if (errorCode == androidx.biometric.BiometricPrompt.ERROR_LOCKOUT ||
+                    errorCode == androidx.biometric.BiometricPrompt.ERROR_LOCKOUT_PERMANENT) {
+                    Toast.makeText(context, "Biometric locked out: $errString", Toast.LENGTH_SHORT).show()
+                }
+            },
             onFailed = {
                 viewModel.onBiometricFailed()
             }

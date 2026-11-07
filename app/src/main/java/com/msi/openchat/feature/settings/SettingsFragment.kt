@@ -96,13 +96,12 @@ class SettingsFragment : Fragment() {
     }
 
     private fun setupSecuritySection() {
-        binding.switchAppLock.setOnCheckedChangeListener { _, isChecked ->
-            if (isChecked != settingsViewModel.uiState.value.isAppLockEnabled) {
-                if (isChecked) {
-                    showSetPinDialog()
-                } else {
-                    settingsViewModel.onToggleAppLock(false)
-                }
+        binding.switchAppLock.setOnClickListener {
+            val isChecked = binding.switchAppLock.isChecked
+            if (isChecked) {
+                showSetPinDialog()
+            } else {
+                settingsViewModel.onToggleAppLock(false)
             }
         }
 
@@ -110,14 +109,64 @@ class SettingsFragment : Fragment() {
             showSetPinDialog()
         }
 
-        binding.switchBiometric.setOnCheckedChangeListener { _, isChecked ->
-            if (isChecked != settingsViewModel.uiState.value.isBiometricEnabled) {
-                settingsViewModel.onToggleBiometric(isChecked)
+        binding.switchBiometric.setOnClickListener {
+            val isChecked = binding.switchBiometric.isChecked
+            if (isChecked) {
+                val status = com.msi.openchat.core.security.BiometricAuthHelper.getBiometricStatus(requireContext())
+                if (status != com.msi.openchat.core.security.BiometricAuthHelper.BiometricStatus.AVAILABLE) {
+                    binding.switchBiometric.isChecked = false
+                    Toast.makeText(
+                        requireContext(),
+                        com.msi.openchat.core.security.BiometricAuthHelper.getBiometricStatusMessage(status),
+                        Toast.LENGTH_LONG
+                    ).show()
+                    return@setOnClickListener
+                }
+
+                if (!settingsViewModel.uiState.value.isAppLockEnabled) {
+                    MaterialAlertDialogBuilder(requireContext())
+                        .setTitle("Set Backup PIN")
+                        .setMessage("Please set a 4-digit backup PIN first, so you can always unlock OpenChat if your fingerprint cannot be recognized.")
+                        .setPositiveButton("Set PIN") { _, _ ->
+                            showSetPinDialog(onSuccess = {
+                                verifyAndEnableBiometric()
+                            })
+                        }
+                        .setNegativeButton("Cancel") { _, _ ->
+                            binding.switchBiometric.isChecked = false
+                        }
+                        .show()
+                } else {
+                    verifyAndEnableBiometric()
+                }
+            } else {
+                settingsViewModel.onToggleBiometric(false)
             }
         }
     }
 
-    private fun showSetPinDialog() {
+    private fun verifyAndEnableBiometric() {
+        com.msi.openchat.core.security.BiometricAuthHelper.promptBiometricAuthentication(
+            activity = requireActivity(),
+            title = "Verify Fingerprint",
+            subtitle = "Scan your fingerprint to enable biometric startup unlock",
+            negativeButtonText = "Cancel",
+            onSuccess = {
+                settingsViewModel.onToggleBiometric(true)
+                Toast.makeText(requireContext(), "Fingerprint startup unlock enabled!", Toast.LENGTH_SHORT).show()
+            },
+            onError = { _, errString ->
+                binding.switchBiometric.isChecked = false
+                Toast.makeText(requireContext(), "Biometric verification: $errString", Toast.LENGTH_SHORT).show()
+            },
+            onFailed = {
+                binding.switchBiometric.isChecked = false
+                Toast.makeText(requireContext(), "Fingerprint not recognized", Toast.LENGTH_SHORT).show()
+            }
+        )
+    }
+
+    private fun showSetPinDialog(onSuccess: (() -> Unit)? = null) {
         val dialogBinding = DialogSetPinBinding.inflate(layoutInflater)
         val dialog = MaterialAlertDialogBuilder(requireContext())
             .setView(dialogBinding.root)
@@ -146,6 +195,7 @@ class SettingsFragment : Fragment() {
                 settingsViewModel.onConfirmPinInputChanged(confirmPin)
                 settingsViewModel.savePin()
                 dialog.dismiss()
+                onSuccess?.invoke()
             }
         }
         dialog.show()
@@ -235,7 +285,7 @@ class SettingsFragment : Fragment() {
         // App Lock switch state
         binding.switchAppLock.isChecked = state.isAppLockEnabled
         binding.btnChangePin.visibility = if (state.isAppLockEnabled) View.VISIBLE else View.GONE
-        binding.layoutBiometricToggle.visibility = if (state.isAppLockEnabled) View.VISIBLE else View.GONE
+        binding.layoutBiometricToggle.visibility = View.VISIBLE
         binding.switchBiometric.isChecked = state.isBiometricEnabled
 
         state.message?.let { msg ->

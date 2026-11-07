@@ -208,15 +208,11 @@ class SettingsViewModel(
     }
 
     fun onToggleBiometric(enabled: Boolean) {
-        if (enabled && !_uiState.value.isAppLockEnabled) {
-            _uiState.value = _uiState.value.copy(message = "Please enable 4-digit PIN first")
-            return
-        }
         viewModelScope.launch {
             authRepository.updateBiometricEnabled(enabled)
             _uiState.value = _uiState.value.copy(
                 isBiometricEnabled = enabled,
-                message = if (enabled) "Biometric fingerprint unlock enabled" else "Biometric unlock disabled"
+                message = if (enabled) "Fingerprint unlock on startup enabled" else "Fingerprint unlock disabled"
             )
         }
     }

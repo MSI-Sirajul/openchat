@@ -54,8 +54,10 @@ class UserRepository(
         getUserProfile(uid)
     }
 
-    suspend fun getUserProfile(userId: String): Resource<Profile> = withContext(Dispatchers.IO) {
-        profileCache[userId]?.let { return@withContext Resource.Success(it) }
+    suspend fun getUserProfile(userId: String, forceRefresh: Boolean = false): Resource<Profile> = withContext(Dispatchers.IO) {
+        if (!forceRefresh) {
+            profileCache[userId]?.let { return@withContext Resource.Success(it) }
+        }
 
         try {
             val profile = fetchProfileFromFirebase(userId)
@@ -219,12 +221,14 @@ class UserRepository(
         displayName: String,
         username: String,
         bio: String,
-        statusMessage: String
+        statusMessage: String = "Available",
+        phoneNumber: String? = null,
+        avatarUrl: String? = null
     ): Resource<Profile> = withContext(Dispatchers.IO) {
         val uid = sessionManager.getUserId() ?: FirebaseManager.auth.currentUser?.uid
         if (uid.isNullOrBlank()) return@withContext Resource.Error("Not authenticated")
 
-        val currentProfile = when (val p = getUserProfile(uid)) {
+        val currentProfile = when (val p = getUserProfile(uid, forceRefresh = true)) {
             is Resource.Success -> p.data
             else -> Profile(id = uid)
         }
@@ -234,7 +238,10 @@ class UserRepository(
             name = displayName,
             username = username,
             bio = bio,
-            statusMessage = statusMessage
+            statusMessage = statusMessage,
+            phoneNumber = phoneNumber ?: currentProfile.phoneNumber,
+            avatarUrl = avatarUrl ?: currentProfile.avatarUrl,
+            avatar = avatarUrl ?: currentProfile.avatar
         )
 
         val success = saveProfileToFirebase(updated)
@@ -247,9 +254,90 @@ class UserRepository(
                 userId = uid,
                 username = username
             )
+
+            // Update Firebase Auth user display name and photoUrl
+            try {
+                val fbUser = FirebaseManager.auth.currentUser
+                val profileChangeBuilder = com.google.firebase.auth.UserProfileChangeRequest.Builder()
+                    .setDisplayName(displayName)
+                if (!updated.avatarUrl.isNullOrBlank()) {
+                    profileChangeBuilder.setPhotoUri(android.net.Uri.parse(updated.avatarUrl))
+                }
+                fbUser?.updateProfile(profileChangeBuilder.build())
+            } catch (_: Exception) {}
+
             Resource.Success(updated)
         } else {
             Resource.Error("Failed to update profile")
+        }
+    }
+
+    suspend fun uploadAvatar(
+        context: android.content.Context,
+        imageUri: android.net.Uri,
+        onProgress: (Float) -> Unit = {}
+    ): Resource<String> = withContext(Dispatchers.IO) {
+        try {
+            onProgress(0.1f)
+            // Compress image to a temporary file
+            val tempFile = com.msi.openchat.core.media.MediaCompressionManager.compressMedia(
+                context = context,
+                sourceUriString = imageUri.toString(),
+                type = "image",
+                mimeType = "image/jpeg"
+            ) ?: com.msi.openchat.core.media.MediaCompressionManager.copyUriToTempFile(
+                context = context,
+                uriString = imageUri.toString(),
+                mimeType = "image/jpeg"
+            ) ?: return@withContext Resource.Error("Could not process selected image")
+
+            onProgress(0.3f)
+            val storageClient = com.msi.openchat.core.di.ServiceLocator.nhostStorageClient
+            val uploadRes = storageClient.uploadFile(
+                file = tempFile,
+                mimeType = "image/jpeg",
+                bucketId = com.msi.openchat.data.remote.storage.NhostStorageClient.BUCKET_AVATARS
+            )
+
+            // Delete temporary scratch file
+            try { tempFile.delete() } catch (_: Exception) {}
+
+            when (uploadRes) {
+                is Resource.Success<String> -> {
+                    onProgress(1.0f)
+                    val avatarUrl = uploadRes.data
+                    Resource.Success(avatarUrl)
+                }
+                is Resource.Error -> {
+                    // Fallback: upload directly to Firebase Storage avatars directory
+                    suspendCancellableCoroutine<Resource<String>> { continuation ->
+                        val uid = sessionManager.getUserId() ?: FirebaseManager.auth.currentUser?.uid ?: "user"
+                        val fbRef = FirebaseManager.getAvatarsStorageRef().child("${uid}_${System.currentTimeMillis()}.jpg")
+                        fbRef.putFile(imageUri)
+                            .addOnProgressListener { taskSnapshot ->
+                                val total = taskSnapshot.totalByteCount
+                                if (total > 0) {
+                                    val progress = taskSnapshot.bytesTransferred.toFloat() / total.toFloat()
+                                    onProgress(0.3f + progress * 0.7f)
+                                }
+                            }
+                            .addOnSuccessListener {
+                                fbRef.downloadUrl.addOnSuccessListener { uri ->
+                                    onProgress(1.0f)
+                                    continuation.resume(Resource.Success(uri.toString()))
+                                }.addOnFailureListener { e ->
+                                    continuation.resume(Resource.Error(e.message ?: "Failed to get download URL"))
+                                }
+                            }
+                            .addOnFailureListener { e ->
+                                continuation.resume(Resource.Error(uploadRes.message ?: e.message ?: "Avatar upload failed"))
+                            }
+                    }
+                }
+                else -> Resource.Error("Upload incomplete")
+            }
+        } catch (e: Exception) {
+            Resource.Error("Failed to upload avatar: ${e.message}", e)
         }
     }
 

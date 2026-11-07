@@ -271,10 +271,16 @@ class SecureStorageManager(context: Context) {
 
     fun isLockedOut(): Boolean = getFailedAttempts() >= MAX_FAILED_ATTEMPTS
 
+    fun isBiometricOrAppLockEnabled(): Boolean {
+        return (isAppLockEnabled() && !getAppPin().isNullOrBlank()) || isBiometricEnabled()
+    }
+
+    fun isAppLockRequired(): Boolean = isBiometricOrAppLockEnabled()
+
     // Session-based in-memory unlock status
     fun isAppUnlocked(): Boolean {
-        // If app lock is not enabled, consider it always unlocked
-        if (!isAppLockEnabled() || getAppPin().isNullOrBlank()) {
+        // If app lock / biometric is not enabled, consider it always unlocked
+        if (!isAppLockRequired()) {
             return true
         }
         return sessionAppUnlocked

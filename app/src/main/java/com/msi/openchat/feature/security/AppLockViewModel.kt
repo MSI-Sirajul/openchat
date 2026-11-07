@@ -17,6 +17,7 @@ data class AppLockUiState(
     val isLockedOut: Boolean = false,
     val isUnlocked: Boolean = false,
     val isBiometricEnabled: Boolean = false,
+    val hasPinSet: Boolean = true,
     
     // Reset PIN Modal state
     val showResetModal: Boolean = false,
@@ -39,10 +40,22 @@ class AppLockViewModel(
             failedAttempts = sessionManager.secureStorage.getFailedAttempts(),
             isLockedOut = sessionManager.secureStorage.isLockedOut(),
             isBiometricEnabled = sessionManager.secureStorage.isBiometricEnabled(),
+            hasPinSet = !sessionManager.secureStorage.getAppPin().isNullOrBlank(),
             resetEmail = sessionManager.getUserEmail() ?: sessionManager.secureStorage.getCachedEmail().orEmpty()
         )
     )
     val uiState: StateFlow<AppLockUiState> = _uiState.asStateFlow()
+
+    fun hasPinSet(): Boolean = !sessionManager.secureStorage.getAppPin().isNullOrBlank()
+
+    fun reloadSecurityState() {
+        _uiState.value = _uiState.value.copy(
+            failedAttempts = sessionManager.secureStorage.getFailedAttempts(),
+            isLockedOut = sessionManager.secureStorage.isLockedOut(),
+            isBiometricEnabled = sessionManager.secureStorage.isBiometricEnabled(),
+            hasPinSet = hasPinSet()
+        )
+    }
 
     fun onDigitEntered(digit: Char) {
         val current = _uiState.value.enteredPin

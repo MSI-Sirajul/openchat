@@ -12,29 +12,32 @@
         android:layout_height="wrap_content"
         android:orientation="vertical">
 
-        <!-- Top M3 App Bar -->
+        <!-- Top M3 App Bar with Save Button in Edit Mode -->
         <com.google.android.material.appbar.MaterialToolbar
             android:id="@+id/toolbar_profile"
             android:layout_width="match_parent"
             android:layout_height="64dp"
             android:background="@color/color_surface"
-            app:title="User Profile"
+            app:title="Profile"
             app:titleTextColor="@color/color_primary_text"
             app:titleTextAppearance="@style/TextAppearance.Material3.TitleLarge"
             app:navigationIcon="@drawable/ic_arrow_back_24"
             app:navigationIconTint="@color/color_primary_text"
             app:elevation="0dp">
 
-            <ImageButton
-                android:id="@+id/btn_profile_edit_toolbar"
-                android:layout_width="44dp"
-                android:layout_height="44dp"
+            <!-- Save button: visible only in edit mode -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_profile_save"
+                android:layout_width="wrap_content"
+                android:layout_height="40dp"
                 android:layout_gravity="end"
-                android:layout_marginEnd="12dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:src="@drawable/ic_settings_24"
-                android:contentDescription="Edit Profile"
-                app:tint="@color/color_primary_text"
+                android:layout_marginEnd="16dp"
+                android:text="Save"
+                android:textColor="#FFFFFF"
+                android:textSize="14sp"
+                android:fontFamily="sans-serif-bold"
+                app:backgroundTint="@color/color_primary"
+                app:cornerRadius="20dp"
                 android:visibility="gone" />
         </com.google.android.material.appbar.MaterialToolbar>
 
@@ -44,200 +47,414 @@
             android:layout_width="40dp"
             android:layout_height="40dp"
             android:layout_gravity="center"
-            android:layout_marginTop="48dp"
+            android:layout_marginTop="32dp"
             android:indeterminateTint="@color/color_primary"
             android:visibility="gone" />
 
-        <!-- Main Content Column -->
+        <!-- Main Content (Left-aligned, clean M3 layout) -->
         <LinearLayout
             android:id="@+id/layout_profile_content"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:paddingHorizontal="20dp"
-            android:paddingTop="16dp"
-            android:paddingBottom="40dp">
+            android:paddingHorizontal="24dp"
+            android:paddingTop="20dp"
+            android:paddingBottom="48dp">
 
-            <!-- Hero Avatar Card -->
-            <com.google.android.material.card.MaterialCardView
+            <!-- Section 1: Header Row (Avatar on Left, Name & Username in Middle, Edit Pencil on Right) -->
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                app:cardCornerRadius="28dp"
-                app:cardElevation="1dp"
-                app:strokeWidth="1dp"
-                app:strokeColor="@color/color_divider"
-                app:cardBackgroundColor="@color/color_surface">
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
 
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:gravity="center_horizontal"
-                    android:padding="24dp">
+                <!-- Avatar Container -->
+                <FrameLayout
+                    android:id="@+id/layout_avatar_container"
+                    android:layout_width="80dp"
+                    android:layout_height="80dp"
+                    android:layout_gravity="center_vertical">
 
+                    <!-- First-letter Avatar fallback -->
+                    <TextView
+                        android:id="@+id/text_profile_avatar"
+                        android:layout_width="80dp"
+                        android:layout_height="80dp"
+                        android:background="@drawable/bg_avatar_circle"
+                        android:backgroundTint="@color/color_avatar_bg"
+                        android:gravity="center"
+                        android:text="U"
+                        android:textColor="@color/color_avatar_text"
+                        android:textSize="32sp"
+                        android:fontFamily="sans-serif-bold" />
+
+                    <!-- Uploaded Image Avatar -->
+                    <com.google.android.material.imageview.ShapeableImageView
+                        android:id="@+id/img_profile_avatar"
+                        android:layout_width="80dp"
+                        android:layout_height="80dp"
+                        android:scaleType="centerCrop"
+                        app:shapeAppearanceOverlay="@style/ShapeAppearance.Material3.Corner.Full"
+                        android:visibility="gone" />
+
+                    <!-- Online status dot -->
+                    <View
+                        android:id="@+id/dot_profile_online"
+                        android:layout_width="16dp"
+                        android:layout_height="16dp"
+                        android:layout_gravity="bottom|end"
+                        android:layout_marginEnd="2dp"
+                        android:layout_marginBottom="2dp"
+                        android:background="@drawable/bg_online_dot"
+                        android:visibility="gone" />
+
+                    <!-- Camera overlay badge for avatar picking (visible in edit mode) -->
                     <FrameLayout
-                        android:layout_width="104dp"
-                        android:layout_height="104dp">
+                        android:id="@+id/badge_edit_avatar"
+                        android:layout_width="28dp"
+                        android:layout_height="28dp"
+                        android:layout_gravity="bottom|end"
+                        android:background="@drawable/bg_avatar_circle"
+                        android:backgroundTint="@color/color_primary"
+                        android:visibility="gone">
 
-                        <TextView
-                            android:id="@+id/text_profile_avatar"
-                            android:layout_width="match_parent"
-                            android:layout_height="match_parent"
-                            android:background="@drawable/bg_avatar_circle"
-                            android:backgroundTint="@color/color_avatar_bg"
-                            android:gravity="center"
-                            android:text="U"
-                            android:textColor="@color/color_avatar_text"
-                            android:textSize="40sp"
-                            android:fontFamily="sans-serif-bold" />
-
-                        <View
-                            android:id="@+id/dot_profile_online"
-                            android:layout_width="18dp"
-                            android:layout_height="18dp"
-                            android:layout_gravity="bottom|end"
-                            android:layout_marginEnd="4dp"
-                            android:layout_marginBottom="4dp"
-                            android:background="@drawable/bg_online_dot"
-                            android:visibility="gone" />
+                        <ImageView
+                            android:layout_width="16dp"
+                            android:layout_height="16dp"
+                            android:layout_gravity="center"
+                            android:src="@drawable/ic_camera_24"
+                            android:contentDescription="Change avatar"
+                            app:tint="#FFFFFF" />
                     </FrameLayout>
 
-                    <TextView
-                        android:id="@+id/text_profile_name"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="16dp"
-                        android:text="Display Name"
-                        android:textColor="@color/color_primary_text"
-                        android:textSize="24sp"
-                        android:fontFamily="sans-serif-bold"
-                        android:gravity="center" />
+                    <!-- Avatar Upload Progress Spinner Overlay -->
+                    <FrameLayout
+                        android:id="@+id/layout_avatar_upload_progress"
+                        android:layout_width="80dp"
+                        android:layout_height="80dp"
+                        android:background="#99000000"
+                        android:visibility="gone">
 
-                    <TextView
-                        android:id="@+id/text_profile_username"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:text="@username"
-                        android:textColor="@color/color_secondary_text"
-                        android:textSize="14sp"
-                        android:fontFamily="sans-serif-medium" />
+                        <ProgressBar
+                            android:layout_width="32dp"
+                            android:layout_height="32dp"
+                            android:layout_gravity="center"
+                            android:indeterminate="true"
+                            android:indeterminateTint="#FFFFFF" />
+                    </FrameLayout>
+                </FrameLayout>
 
-                    <TextView
-                        android:id="@+id/text_profile_status"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:text="Online"
-                        android:textColor="@color/color_status_online"
-                        android:textSize="13sp"
-                        android:fontFamily="sans-serif-medium"
-                        android:paddingHorizontal="12dp"
-                        android:paddingVertical="4dp"
-                        android:background="@drawable/bg_bubble_incoming" />
+                <!-- Middle: Name & Username (Row layout, Left-aligned) -->
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="16dp"
+                    android:layout_marginEnd="8dp"
+                    android:orientation="vertical">
 
-                    <!-- Action Buttons: Message & Call -->
+                    <!-- View Mode (Normal) -->
                     <LinearLayout
+                        android:id="@+id/layout_header_view_mode"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="20dp"
-                        android:orientation="horizontal"
-                        android:gravity="center">
+                        android:orientation="vertical">
 
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/btn_profile_chat"
-                            android:layout_width="0dp"
-                            android:layout_height="50dp"
-                            android:layout_weight="1"
-                            android:layout_marginEnd="8dp"
-                            android:text="Message"
-                            android:textColor="#FFFFFF"
-                            android:textSize="14sp"
-                            android:fontFamily="sans-serif-bold"
-                            app:icon="@drawable/ic_chat_24"
-                            app:iconTint="#FFFFFF"
-                            app:cornerRadius="25dp"
-                            app:backgroundTint="@color/color_primary" />
+                        <TextView
+                            android:id="@+id/text_profile_name"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="User Name"
+                            android:textColor="@color/color_primary_text"
+                            android:textSize="20sp"
+                            android:fontFamily="sans-serif-bold" />
 
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/btn_profile_call"
-                            android:layout_width="0dp"
-                            android:layout_height="50dp"
-                            android:layout_weight="1"
-                            android:layout_marginStart="8dp"
-                            android:text="Call"
-                            android:textColor="#FFFFFF"
+                        <TextView
+                            android:id="@+id/text_profile_username"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="@username"
+                            android:textColor="@color/color_secondary_text"
                             android:textSize="14sp"
-                            android:fontFamily="sans-serif-bold"
-                            app:icon="@drawable/ic_call_24"
-                            app:iconTint="#FFFFFF"
-                            app:cornerRadius="25dp"
-                            app:backgroundTint="@color/color_status_online" />
+                            android:fontFamily="sans-serif" />
+
+                        <TextView
+                            android:id="@+id/text_profile_status"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:text="Available"
+                            android:textColor="@color/color_status_online"
+                            android:textSize="12sp"
+                            android:fontFamily="sans-serif-medium" />
+                    </LinearLayout>
+
+                    <!-- Edit Mode Inline Fields -->
+                    <LinearLayout
+                        android:id="@+id/layout_header_edit_mode"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:visibility="gone">
+
+                        <com.google.android.material.textfield.TextInputLayout
+                            android:id="@+id/til_edit_name"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:hint="Full Name"
+                            style="@style/Widget.Material3.TextInputLayout.OutlinedBox.Dense">
+
+                            <com.google.android.material.textfield.TextInputEditText
+                                android:id="@+id/et_edit_name"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:singleLine="true"
+                                android:maxLines="1"
+                                android:textSize="15sp" />
+                        </com.google.android.material.textfield.TextInputLayout>
+
+                        <com.google.android.material.textfield.TextInputLayout
+                            android:id="@+id/til_edit_username"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="6dp"
+                            android:hint="Username"
+                            app:prefixText="@"
+                            style="@style/Widget.Material3.TextInputLayout.OutlinedBox.Dense">
+
+                            <com.google.android.material.textfield.TextInputEditText
+                                android:id="@+id/et_edit_username"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:singleLine="true"
+                                android:maxLines="1"
+                                android:textSize="14sp" />
+                        </com.google.android.material.textfield.TextInputLayout>
                     </LinearLayout>
                 </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
 
-            <!-- Details Section Card -->
-            <com.google.android.material.card.MaterialCardView
+                <!-- Right: Edit Pencil Icon (enables inline edit mode) -->
+                <ImageButton
+                    android:id="@+id/btn_profile_edit"
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:src="@drawable/ic_edit_24"
+                    android:contentDescription="Edit profile"
+                    app:tint="@color/color_primary" />
+            </LinearLayout>
+
+            <!-- Action Buttons for Other Users (Message / Call) -->
+            <LinearLayout
+                android:id="@+id/layout_other_user_actions"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                app:cardCornerRadius="24dp"
-                app:cardElevation="1dp"
-                app:strokeWidth="1dp"
-                app:strokeColor="@color/color_divider"
-                app:cardBackgroundColor="@color/color_surface">
+                android:layout_marginTop="20dp"
+                android:orientation="horizontal"
+                android:visibility="gone">
 
-                <LinearLayout
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_profile_chat"
+                    android:layout_width="0dp"
+                    android:layout_height="48dp"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="8dp"
+                    android:text="Message"
+                    android:textColor="#FFFFFF"
+                    android:textSize="14sp"
+                    android:fontFamily="sans-serif-bold"
+                    app:icon="@drawable/ic_chat_24"
+                    app:iconTint="#FFFFFF"
+                    app:cornerRadius="24dp"
+                    app:backgroundTint="@color/color_primary" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_profile_call"
+                    android:layout_width="0dp"
+                    android:layout_height="48dp"
+                    android:layout_weight="1"
+                    android:layout_marginStart="8dp"
+                    android:text="Call"
+                    android:textColor="#FFFFFF"
+                    android:textSize="14sp"
+                    android:fontFamily="sans-serif-bold"
+                    app:icon="@drawable/ic_call_24"
+                    app:iconTint="#FFFFFF"
+                    app:cornerRadius="24dp"
+                    app:backgroundTint="@color/color_status_online" />
+            </LinearLayout>
+
+            <!-- Subtle Section Divider -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginTop="24dp"
+                android:layout_marginBottom="24dp"
+                android:background="@color/color_divider" />
+
+            <!-- Section 2: Details Section (Left-aligned, About, Phone, Locked Email) -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Profile Details"
+                android:textColor="@color/color_secondary_text"
+                android:textSize="13sp"
+                android:fontFamily="sans-serif-bold"
+                android:textAllCaps="true"
+                android:letterSpacing="0.05"
+                android:layout_marginBottom="18dp" />
+
+            <!-- About / Bio Item -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="About &amp; Bio"
+                    android:textColor="@color/color_secondary_text"
+                    android:textSize="13sp"
+                    android:fontFamily="sans-serif-medium" />
+
+                <!-- Bio View Mode -->
+                <TextView
+                    android:id="@+id/text_profile_bio"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:padding="20dp">
+                    android:layout_marginTop="4dp"
+                    android:text="Hey there! I am using OpenChat."
+                    android:textColor="@color/color_primary_text"
+                    android:textSize="15sp"
+                    android:lineSpacingExtra="3dp" />
 
-                    <!-- Bio -->
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="About &amp; Bio"
-                        android:textColor="@color/color_secondary_text"
-                        android:textSize="12sp"
-                        android:fontFamily="sans-serif-medium" />
+                <!-- Bio Edit Mode -->
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/til_edit_bio"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:hint="About / Bio"
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                    android:visibility="gone">
 
-                    <TextView
-                        android:id="@+id/text_profile_bio"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="6dp"
-                        android:text="Hey there! I am using OpenChat."
-                        android:textColor="@color/color_primary_text"
-                        android:textSize="15sp"
-                        android:lineSpacingExtra="3dp" />
-
-                    <View
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/et_edit_bio"
                         android:layout_width="match_parent"
-                        android:layout_height="1dp"
-                        android:layout_marginVertical="14dp"
-                        android:background="@color/color_divider" />
+                        android:layout_height="wrap_content"
+                        android:minLines="2"
+                        android:maxLines="4"
+                        android:gravity="top|start"
+                        android:textSize="15sp" />
+                </com.google.android.material.textfield.TextInputLayout>
+            </LinearLayout>
 
-                    <!-- Phone Number -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginVertical="16dp"
+                android:background="@color/color_divider" />
+
+            <!-- Phone Number Item -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Phone Number"
+                    android:textColor="@color/color_secondary_text"
+                    android:textSize="13sp"
+                    android:fontFamily="sans-serif-medium" />
+
+                <!-- Phone View Mode -->
+                <TextView
+                    android:id="@+id/text_profile_phone"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="Not provided"
+                    android:textColor="@color/color_primary_text"
+                    android:textSize="15sp" />
+
+                <!-- Phone Edit Mode -->
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/til_edit_phone"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:hint="Phone Number"
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                    android:visibility="gone">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/et_edit_phone"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="phone"
+                        android:singleLine="true"
+                        android:maxLines="1"
+                        android:textSize="15sp" />
+                </com.google.android.material.textfield.TextInputLayout>
+            </LinearLayout>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginVertical="16dp"
+                android:background="@color/color_divider" />
+
+            <!-- Email Address Item (READ-ONLY, Locked) -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Phone Number"
+                        android:text="Email Address"
                         android:textColor="@color/color_secondary_text"
-                        android:textSize="12sp"
+                        android:textSize="13sp"
                         android:fontFamily="sans-serif-medium" />
 
-                    <TextView
-                        android:id="@+id/text_profile_phone"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="6dp"
-                        android:text="Not provided"
-                        android:textColor="@color/color_primary_text"
-                        android:textSize="15sp" />
+                    <!-- Lock Icon indicating read-only -->
+                    <ImageView
+                        android:layout_width="14dp"
+                        android:layout_height="14dp"
+                        android:layout_marginStart="6dp"
+                        android:src="@drawable/ic_lock_24"
+                        app:tint="@color/color_secondary_text"
+                        android:contentDescription="Read only" />
                 </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
+
+                <TextView
+                    android:id="@+id/text_profile_email"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="Not provided"
+                    android:textColor="@color/color_primary_text"
+                    android:textSize="15sp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="Email is locked to your account and cannot be changed"
+                    android:textColor="@color/color_secondary_text"
+                    android:textSize="12sp" />
+            </LinearLayout>
 
         </LinearLayout>
     </LinearLayout>

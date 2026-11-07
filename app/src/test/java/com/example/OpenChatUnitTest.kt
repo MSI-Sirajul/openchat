@@ -420,4 +420,139 @@ class OpenChatUnitTest {
         com.msi.openchat.core.di.ServiceLocator.onUserLoggedOut()
         assertNull(com.msi.openchat.core.di.ServiceLocator.userRepository.getCachedProfile("user_test_99"))
     }
+
+    @Test
+    fun testBiometricStatusAndMessages() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val status = com.msi.openchat.core.security.BiometricAuthHelper.getBiometricStatus(context)
+        assertNotNull(status)
+
+        // Status message should be non-empty and descriptive for all enum values
+        com.msi.openchat.core.security.BiometricAuthHelper.BiometricStatus.values().forEach { s ->
+            val msg = com.msi.openchat.core.security.BiometricAuthHelper.getBiometricStatusMessage(s)
+            assertTrue(msg.isNotBlank())
+        }
+    }
+
+    @Test
+    fun testBiometricStartupLockRequirementAndUnlock() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val sessionManager = SessionManager(context)
+        val secureStorage = sessionManager.secureStorage
+
+        // When neither PIN nor biometric is enabled, startup lock is not required
+        secureStorage.setAppLockEnabled(false)
+        secureStorage.setBiometricEnabled(false)
+        assertFalse(secureStorage.isBiometricEnabled())
+        assertFalse(secureStorage.isAppLockRequired())
+        assertTrue(secureStorage.isAppUnlocked())
+
+        // When biometric is enabled, app lock is required on startup
+        secureStorage.setBiometricEnabled(true)
+        assertTrue(secureStorage.isBiometricEnabled())
+        assertTrue(secureStorage.isAppLockRequired())
+
+        // Initial session status on cold startup is locked
+        secureStorage.setAppUnlocked(false)
+        assertFalse(secureStorage.isAppUnlocked())
+
+        // Simulating successful biometric authentication unlocks the session
+        secureStorage.setAppUnlocked(true)
+        assertTrue(secureStorage.isAppUnlocked())
+
+        // Reset
+        secureStorage.setBiometricEnabled(false)
+        secureStorage.setAppUnlocked(true)
+    }
+
+    @Test
+    fun testAppLockViewModelBiometricFlow() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        com.msi.openchat.core.di.ServiceLocator.initialize(context)
+
+        val sessionManager = com.msi.openchat.core.di.ServiceLocator.sessionManager
+        sessionManager.secureStorage.setBiometricEnabled(true)
+        sessionManager.secureStorage.setAppUnlocked(false)
+        sessionManager.secureStorage.resetFailedAttempts()
+
+        val viewModel = com.msi.openchat.feature.security.AppLockViewModel()
+        val initialState = viewModel.uiState.value
+        assertTrue(initialState.isBiometricEnabled)
+        assertFalse(initialState.isUnlocked)
+        assertEquals(0, initialState.failedAttempts)
+
+        // Simulating biometric failure updates attempt counter
+        viewModel.onBiometricFailed()
+        assertEquals(1, viewModel.uiState.value.failedAttempts)
+        assertFalse(viewModel.uiState.value.isUnlocked)
+
+        // Simulating biometric success resets attempts and marks unlocked
+        viewModel.onBiometricSuccess()
+        assertTrue(viewModel.uiState.value.isUnlocked)
+        assertEquals(0, viewModel.uiState.value.failedAttempts)
+        assertTrue(sessionManager.secureStorage.isAppUnlocked())
+
+        // Reset
+        sessionManager.secureStorage.setBiometricEnabled(false)
+    }
+
+    @Test
+    fun testAppLockFragmentLayoutInflation() {
+        val baseContext = ApplicationProvider.getApplicationContext<Context>()
+        val themedContext = androidx.appcompat.view.ContextThemeWrapper(baseContext, com.example.R.style.Theme_MyApplication)
+        val inflater = android.view.LayoutInflater.from(themedContext)
+
+        val lockBinding = com.example.databinding.FragmentAppLockBinding.inflate(inflater)
+        assertNotNull(lockBinding.root)
+        assertNotNull(lockBinding.imgLockIcon)
+        assertNotNull(lockBinding.textLockTitle)
+        assertNotNull(lockBinding.textLockSubtitle)
+        assertNotNull(lockBinding.btnKeyBiometric)
+        assertNotNull(lockBinding.tableKeypad)
+        assertNotNull(lockBinding.btnForgotPin)
+    }
+
+    @Test
+    fun testProfileFragmentLayoutInflation() {
+        val baseContext = ApplicationProvider.getApplicationContext<Context>()
+        val themedContext = androidx.appcompat.view.ContextThemeWrapper(baseContext, com.example.R.style.Theme_MyApplication)
+        val inflater = android.view.LayoutInflater.from(themedContext)
+
+        val profileBinding = com.example.databinding.FragmentProfileBinding.inflate(inflater)
+        assertNotNull(profileBinding.root)
+        assertNotNull(profileBinding.toolbarProfile)
+        assertNotNull(profileBinding.btnProfileSave)
+        assertNotNull(profileBinding.layoutAvatarContainer)
+        assertNotNull(profileBinding.textProfileAvatar)
+        assertNotNull(profileBinding.imgProfileAvatar)
+        assertNotNull(profileBinding.badgeEditAvatar)
+        assertNotNull(profileBinding.layoutAvatarUploadProgress)
+        assertNotNull(profileBinding.textProfileName)
+        assertNotNull(profileBinding.textProfileUsername)
+        assertNotNull(profileBinding.btnProfileEdit)
+        assertNotNull(profileBinding.textProfileBio)
+        assertNotNull(profileBinding.tilEditBio)
+        assertNotNull(profileBinding.textProfilePhone)
+        assertNotNull(profileBinding.tilEditPhone)
+        assertNotNull(profileBinding.textProfileEmail)
+    }
+
+    @Test
+    fun testProfileViewModelEditModeAndUpdates() = kotlinx.coroutines.runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        com.msi.openchat.core.di.ServiceLocator.initialize(context)
+
+        val sessionManager = com.msi.openchat.core.di.ServiceLocator.sessionManager
+        sessionManager.saveSession("token_abc", "refresh_def", "user_self_1", "self@openchat.app")
+
+        val viewModel = com.msi.openchat.feature.profile.ProfileViewModel("user_self_1")
+        assertTrue(viewModel.uiState.value.isSelf)
+        assertFalse(viewModel.uiState.value.isEditMode)
+
+        viewModel.setEditMode(true)
+        assertTrue(viewModel.uiState.value.isEditMode)
+
+        viewModel.toggleEditMode()
+        assertFalse(viewModel.uiState.value.isEditMode)
+    }
 }

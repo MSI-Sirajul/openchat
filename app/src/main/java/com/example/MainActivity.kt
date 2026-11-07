@@ -158,10 +158,12 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private var lastBackgroundTimestamp: Long = 0L
+
     private fun setupInitialFragment() {
         val initialFragment = when {
             !ServiceLocator.sessionManager.isAuthenticated() -> AuthFragment.newInstance()
-            ServiceLocator.sessionManager.secureStorage.isAppLockEnabled() &&
+            ServiceLocator.sessionManager.secureStorage.isAppLockRequired() &&
                     !ServiceLocator.sessionManager.secureStorage.isAppUnlocked() -> AppLockFragment.newInstance()
             PermissionManager.shouldShowOnboarding(this) -> PermissionOnboardingFragment.newInstance()
             else -> HomeFragment.newInstance()
@@ -331,6 +333,20 @@ class MainActivity : AppCompatActivity() {
         if (ServiceLocator.sessionManager.isAuthenticated()) {
             com.msi.openchat.service.call.OpenChatKeepAliveService.start(applicationContext)
         }
+        if (lastBackgroundTimestamp > 0L &&
+            ServiceLocator.sessionManager.isAuthenticated() &&
+            ServiceLocator.sessionManager.secureStorage.isAppLockRequired() &&
+            System.currentTimeMillis() - lastBackgroundTimestamp > 60_000L) {
+            ServiceLocator.sessionManager.secureStorage.setAppUnlocked(false)
+            val currentFragment = supportFragmentManager.findFragmentById(R.id.fragment_container)
+            if (currentFragment !is AppLockFragment && currentFragment !is AuthFragment) {
+                supportFragmentManager.commit {
+                    setCustomAnimations(R.anim.fade_in, R.anim.fade_out)
+                    replace(R.id.fragment_container, AppLockFragment.newInstance())
+                }
+            }
+        }
+        lastBackgroundTimestamp = 0L
     }
 
     override fun onResume() {
@@ -341,6 +357,10 @@ class MainActivity : AppCompatActivity() {
     override fun onStop() {
         super.onStop()
         ServiceLocator.presenceManager.onAppBackgrounded()
+        if (ServiceLocator.sessionManager.isAuthenticated() &&
+            ServiceLocator.sessionManager.secureStorage.isAppLockRequired()) {
+            lastBackgroundTimestamp = System.currentTimeMillis()
+        }
     }
 
     fun syncStatusBarColor() {
