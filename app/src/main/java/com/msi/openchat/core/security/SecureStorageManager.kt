@@ -201,6 +201,10 @@ class SecureStorageManager(context: Context) {
     }
 
     fun clearCredentials() {
+        clearAllAuthData()
+    }
+
+    fun clearAllAuthData() {
         prefs.edit()
             .remove(KEY_ENCRYPTED_IDENTIFIER)
             .remove(KEY_ENCRYPTED_PASSWORD)
@@ -210,12 +214,16 @@ class SecureStorageManager(context: Context) {
             .remove(KEY_ENCRYPTED_DISPLAY_NAME)
             .remove(KEY_ENCRYPTED_ACCESS_TOKEN)
             .remove(KEY_ENCRYPTED_REFRESH_TOKEN)
-            .apply()
+            .remove("remember_me_enabled")
+            .remove("auto_login")
+            .putBoolean("remember_me_enabled", false)
+            .putBoolean("auto_login", false)
+            .commit()
         sessionAppUnlocked = false
-        Log.i(tag, "Cleared cached user credentials")
+        Log.i(tag, "Cleared cached user credentials and auto-login / remember-me flags")
     }
 
-    fun isRememberMeEnabled(): Boolean = prefs.getBoolean("remember_me_enabled", true)
+    fun isRememberMeEnabled(): Boolean = prefs.getBoolean("remember_me_enabled", false)
 
     fun setRememberMeEnabled(enabled: Boolean) {
         prefs.edit().putBoolean("remember_me_enabled", enabled).apply()

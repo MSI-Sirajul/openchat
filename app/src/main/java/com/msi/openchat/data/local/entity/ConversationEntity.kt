@@ -14,6 +14,7 @@ import com.msi.openchat.data.model.Profile
 @Entity(
     tableName = "conversations",
     indices = [
+        Index(value = ["user_id"]),
         Index(value = ["participant1_id"]),
         Index(value = ["participant2_id"]),
         Index(value = ["last_message_at"])
@@ -22,6 +23,9 @@ import com.msi.openchat.data.model.Profile
 data class ConversationEntity(
     @PrimaryKey
     val id: String,
+
+    @ColumnInfo(name = "user_id")
+    val userId: String = "",
 
     @ColumnInfo(name = "type")
     val type: String = "direct",
@@ -85,6 +89,7 @@ data class ConversationEntity(
 
             return ConversationEntity(
                 id = domain.id,
+                userId = currentUserId,
                 type = domain.type,
                 participant1Id = domain.participant1Id,
                 participant2Id = domain.participant2Id,

@@ -9,10 +9,17 @@ import com.example.R
 import com.example.databinding.ItemUserSearchBinding
 import com.msi.openchat.data.model.Profile
 
+enum class RelationshipStatus {
+    NONE,
+    REQUESTED,
+    FRIENDS
+}
+
 data class UserSearchItem(
     val profile: Profile,
-    val isAlreadyFriend: Boolean = false,
-    val isPendingRequest: Boolean = false
+    val status: RelationshipStatus = RelationshipStatus.NONE,
+    val isAlreadyFriend: Boolean = (status == RelationshipStatus.FRIENDS),
+    val isPendingRequest: Boolean = (status == RelationshipStatus.REQUESTED)
 )
 
 class UserSearchAdapter(
@@ -39,22 +46,22 @@ class UserSearchAdapter(
             binding.textUserHandle.text = if (!profile.username.isNullOrBlank()) "@${profile.username}" else profile.phoneNumber ?: ""
             binding.textUserAvatar.text = profile.displayName.take(1).ifBlank { "U" }.uppercase()
 
-            when {
-                item.isAlreadyFriend -> {
+            when (item.status) {
+                RelationshipStatus.FRIENDS -> {
                     binding.btnActionFriend.isEnabled = false
                     binding.btnActionFriend.text = "Friends"
                     binding.btnActionFriend.setBackgroundColor(binding.root.context.getColor(R.color.color_surface_variant))
                     binding.btnActionFriend.setTextColor(binding.root.context.getColor(R.color.color_secondary_text))
                 }
-                item.isPendingRequest -> {
+                RelationshipStatus.REQUESTED -> {
                     binding.btnActionFriend.isEnabled = false
-                    binding.btnActionFriend.text = "Pending"
+                    binding.btnActionFriend.text = "Requested"
                     binding.btnActionFriend.setBackgroundColor(binding.root.context.getColor(R.color.color_surface_variant))
                     binding.btnActionFriend.setTextColor(binding.root.context.getColor(R.color.color_secondary_text))
                 }
-                else -> {
+                RelationshipStatus.NONE -> {
                     binding.btnActionFriend.isEnabled = true
-                    binding.btnActionFriend.text = "Add Friend"
+                    binding.btnActionFriend.text = "Add"
                     binding.btnActionFriend.setBackgroundColor(binding.root.context.getColor(R.color.color_primary))
                     binding.btnActionFriend.setTextColor(0xFFFFFFFF.toInt())
                     binding.btnActionFriend.setOnClickListener {

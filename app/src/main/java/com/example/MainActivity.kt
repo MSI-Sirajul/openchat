@@ -105,10 +105,38 @@ class MainActivity : AppCompatActivity() {
         } catch (_: Exception) {}
 
         observeNetwork()
+        observeAuthState()
 
         if (savedInstanceState == null) {
             setupInitialFragment()
             handleIntent(intent)
+        }
+    }
+
+    private fun observeAuthState() {
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                ServiceLocator.authRepository.authState.collect { authState ->
+                    when (authState) {
+                        is com.msi.openchat.core.security.AuthState.LoggedOut,
+                        is com.msi.openchat.core.security.AuthState.Unauthenticated,
+                        is com.msi.openchat.core.security.AuthState.SessionExpired -> {
+                            navigateToAuth()
+                        }
+                        is com.msi.openchat.core.security.AuthState.Authenticated -> {
+                            val currentFragment = supportFragmentManager.findFragmentById(R.id.fragment_container)
+                            if (currentFragment is AuthFragment) {
+                                if (PermissionManager.shouldShowOnboarding(this@MainActivity)) {
+                                    navigateToPermissionOnboarding()
+                                } else {
+                                    navigateToHome()
+                                }
+                            }
+                        }
+                        else -> Unit
+                    }
+                }
+            }
         }
     }
 
@@ -145,7 +173,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     fun navigateToPermissionOnboarding() {
-        supportFragmentManager.popBackStack(null, androidx.fragment.app.FragmentManager.POP_BACK_STACK_INCLUSIVE)
+        try {
+            while (supportFragmentManager.backStackEntryCount > 0) {
+                supportFragmentManager.popBackStackImmediate()
+            }
+        } catch (_: Exception) {
+            supportFragmentManager.popBackStack(null, androidx.fragment.app.FragmentManager.POP_BACK_STACK_INCLUSIVE)
+        }
         supportFragmentManager.commit {
             setCustomAnimations(R.anim.fade_in, R.anim.fade_out)
             replace(R.id.fragment_container, PermissionOnboardingFragment.newInstance())
@@ -153,7 +187,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     fun navigateToHome() {
-        supportFragmentManager.popBackStack(null, androidx.fragment.app.FragmentManager.POP_BACK_STACK_INCLUSIVE)
+        try {
+            while (supportFragmentManager.backStackEntryCount > 0) {
+                supportFragmentManager.popBackStackImmediate()
+            }
+        } catch (_: Exception) {
+            supportFragmentManager.popBackStack(null, androidx.fragment.app.FragmentManager.POP_BACK_STACK_INCLUSIVE)
+        }
         supportFragmentManager.commit {
             setCustomAnimations(R.anim.fade_in, R.anim.fade_out)
             replace(R.id.fragment_container, HomeFragment.newInstance())
@@ -161,14 +201,28 @@ class MainActivity : AppCompatActivity() {
     }
 
     fun navigateToAuth() {
-        supportFragmentManager.popBackStack(null, androidx.fragment.app.FragmentManager.POP_BACK_STACK_INCLUSIVE)
-        supportFragmentManager.commit {
-            setCustomAnimations(R.anim.fade_in, R.anim.fade_out)
-            replace(R.id.fragment_container, AuthFragment.newInstance())
+        try {
+            while (supportFragmentManager.backStackEntryCount > 0) {
+                supportFragmentManager.popBackStackImmediate()
+            }
+        } catch (_: Exception) {
+            supportFragmentManager.popBackStack(null, androidx.fragment.app.FragmentManager.POP_BACK_STACK_INCLUSIVE)
+        }
+        val currentFragment = supportFragmentManager.findFragmentById(R.id.fragment_container)
+        if (currentFragment !is AuthFragment) {
+            supportFragmentManager.commit(allowStateLoss = true) {
+                setCustomAnimations(R.anim.fade_in, R.anim.fade_out)
+                replace(R.id.fragment_container, AuthFragment.newInstance())
+            }
         }
     }
 
-    fun navigateToChat(conversationId: String, contactName: String, contactId: String) {
+    fun navigateToChat(
+        conversationId: String,
+        contactName: String,
+        contactId: String,
+        autoSendHi: Boolean = false
+    ) {
         supportFragmentManager.commit {
             setCustomAnimations(
                 R.anim.slide_in_right,
@@ -176,7 +230,10 @@ class MainActivity : AppCompatActivity() {
                 R.anim.slide_in_left,
                 R.anim.slide_out_right
             )
-            replace(R.id.fragment_container, ChatFragment.newInstance(conversationId, contactName, contactId))
+            replace(
+                R.id.fragment_container,
+                ChatFragment.newInstance(conversationId, contactName, contactId, autoSendHi)
+            )
             addToBackStack("chat")
         }
     }
@@ -356,12 +413,22 @@ class MainActivity : AppCompatActivity() {
             ?: intent.getStringExtra("contact_id")
             ?: ""
 
+        val autoSendHi = intent.getBooleanExtra(OpenChatNotificationManager.EXTRA_AUTO_SEND_HI, false)
         if (!conversationId.isNullOrBlank()) {
             navigateToChat(
                 conversationId = conversationId,
                 contactName = contactName,
-                contactId = contactId
+                contactId = contactId,
+                autoSendHi = autoSendHi
             )
+            return
+        }
+
+        // Handle navigation to Friend Requests screen
+        val navigateFriendRequests = intent.getBooleanExtra(OpenChatNotificationManager.EXTRA_NAVIGATE_FRIEND_REQUESTS, false)
+            || intent.getBooleanExtra("navigate_friend_requests", false)
+        if (navigateFriendRequests) {
+            navigateToFriendRequests()
             return
         }
 

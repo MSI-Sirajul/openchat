@@ -7,7 +7,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-class SessionManager(context: Context) {
+class SessionManager(val context: Context) {
     val secureStorage = SecureStorageManager(context)
 
     private val prefs: SharedPreferences =
@@ -110,9 +110,25 @@ class SessionManager(context: Context) {
         _isSessionValid.value = true
     }
 
+    fun getUserScopedPrefs(userId: String?): SharedPreferences {
+        val safeId = if (userId.isNullOrBlank()) "guest" else userId.replace("[^a-zA-Z0-9_]".toRegex(), "_")
+        return context.getSharedPreferences("openchat_user_${safeId}_prefs", Context.MODE_PRIVATE)
+    }
+
+    fun clearUserScopedPrefs(userId: String) {
+        val safeId = userId.replace("[^a-zA-Z0-9_]".toRegex(), "_")
+        try {
+            context.getSharedPreferences("openchat_user_${safeId}_prefs", Context.MODE_PRIVATE).edit().clear().commit()
+        } catch (_: Exception) {}
+    }
+
     fun clearSession() {
-        prefs.edit().clear().apply()
-        secureStorage.clearCredentials()
+        val uid = getUserId()
+        if (!uid.isNullOrBlank()) {
+            clearUserScopedPrefs(uid)
+        }
+        prefs.edit().clear().commit()
+        secureStorage.clearAllAuthData()
         _accessToken.value = null
         _currentUserId.value = null
         _isSessionValid.value = false

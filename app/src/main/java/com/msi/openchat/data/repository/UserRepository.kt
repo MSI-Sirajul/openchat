@@ -29,6 +29,19 @@ class UserRepository(
     private val tag = "OpenChat_UserRepo"
     private val profileCache = ConcurrentHashMap<String, Profile>()
 
+    fun clearCache() {
+        profileCache.clear()
+        Log.i(tag, "Cleared in-memory profile cache")
+    }
+
+    fun cacheProfile(profile: Profile) {
+        profileCache[profile.id] = profile
+    }
+
+    fun getCachedProfile(userId: String): Profile? {
+        return profileCache[userId]
+    }
+
     private val usersRef get() = FirebaseManager.usersRef
     private val usernamesRef get() = FirebaseManager.usernamesRef
     private val phoneNumbersRef get() = FirebaseManager.phoneNumbersRef

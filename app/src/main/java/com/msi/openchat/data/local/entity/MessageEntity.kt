@@ -14,6 +14,7 @@ import java.time.Instant
 @Entity(
     tableName = "messages",
     indices = [
+        Index(value = ["user_id"]),
         Index(value = ["conversation_id"]),
         Index(value = ["created_at"]),
         Index(value = ["timestamp_ms"]),
@@ -24,6 +25,9 @@ import java.time.Instant
 data class MessageEntity(
     @PrimaryKey
     val id: String, // Client-generated UUID
+
+    @ColumnInfo(name = "user_id")
+    val userId: String = "",
 
     @ColumnInfo(name = "conversation_id")
     val conversationId: String,
@@ -98,11 +102,12 @@ data class MessageEntity(
     )
 
     companion object {
-        fun fromDomain(domain: Message, monotonicSeq: Long = 0L): MessageEntity {
+        fun fromDomain(domain: Message, monotonicSeq: Long = 0L, userId: String = ""): MessageEntity {
             val parsedMs = parseIsoToEpochMs(domain.createdAt) ?: System.currentTimeMillis()
             val effectiveSeq = if (domain.seq > 0L) domain.seq else monotonicSeq
             return MessageEntity(
                 id = domain.id,
+                userId = userId,
                 conversationId = domain.conversationId,
                 senderId = domain.senderId,
                 type = domain.type,

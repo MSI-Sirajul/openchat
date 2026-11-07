@@ -17,6 +17,7 @@ import com.msi.openchat.data.model.AuthUser
 import com.msi.openchat.data.model.Profile
 import com.msi.openchat.data.remote.firebase.FirebaseManager
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.resume
@@ -33,6 +34,8 @@ class AuthRepository(
 ) {
     private val tag = "OpenChat_AuthRepo"
     private val auth: FirebaseAuth get() = FirebaseManager.auth
+
+    val authState: StateFlow<com.msi.openchat.core.security.AuthState> get() = authManager.authState
 
     fun isUserLoggedIn(): Boolean {
         return auth.currentUser != null || sessionManager.isAuthenticated()
@@ -85,6 +88,8 @@ class AuthRepository(
                     userId = userId,
                     email = email.trim()
                 )
+
+                com.msi.openchat.core.di.ServiceLocator.onUserLoggedIn(userId)
 
                 sessionManager.saveFullCredentials(
                     identifier = cleanUsername,
@@ -216,6 +221,8 @@ class AuthRepository(
                 email = userEmail
             )
 
+            com.msi.openchat.core.di.ServiceLocator.onUserLoggedIn(userId)
+
             if (rememberMe) {
                 sessionManager.saveFullCredentials(
                     identifier = trimmed,
@@ -279,6 +286,8 @@ class AuthRepository(
             userId = userId,
             email = userEmail
         )
+
+        com.msi.openchat.core.di.ServiceLocator.onUserLoggedIn(userId)
 
         val profile = Profile(
             id = userId,
@@ -440,15 +449,54 @@ class AuthRepository(
         }
     }
 
-    suspend fun signOut() = withContext(Dispatchers.IO) {
+    suspend fun logout() = withContext(Dispatchers.IO) {
+        val currentUserId = sessionManager.getUserId()
         try {
-            userRepository.updateOnlineStatus("offline")
-            auth.signOut()
+            // 1. Mark presence offline on remote if possible
+            if (!currentUserId.isNullOrBlank()) {
+                try {
+                    userRepository.updateOnlineStatus("offline")
+                } catch (e: Exception) {
+                    Log.w(tag, "Failed to update offline status on logout: ${e.message}")
+                }
+            }
+
+            // 2. Stop keep alive background service & cancel outbox/sync jobs
+            try {
+                com.msi.openchat.service.call.OpenChatKeepAliveService.stop(sessionManager.context)
+                com.msi.openchat.core.backend.BackendManager.cancelAllSync()
+                androidx.work.WorkManager.getInstance(sessionManager.context).cancelAllWork()
+            } catch (_: Exception) {}
+
+            // 3. Clear Firebase Auth session
+            try {
+                auth.signOut()
+            } catch (e: Exception) {
+                Log.w(tag, "Firebase signOut error: ${e.message}")
+            }
+
+            // 4. Delete that user's temp/media cache files
+            if (!currentUserId.isNullOrBlank()) {
+                try {
+                    com.msi.openchat.data.local.OfflineMediaManager.deleteUserMedia(sessionManager.context, currentUserId)
+                } catch (_: Exception) {}
+            }
+
+            // 5. Clear session, tokens, cached login email & password, remember-me flags from SharedPreferences & SecureStorage
             sessionManager.clearSession()
+
+            // 6. Reset Room database and ServiceLocator user state, clear memory cache & Coil image cache
+            com.msi.openchat.core.di.ServiceLocator.onUserLoggedOut()
+
         } catch (e: Exception) {
-            Log.e(tag, "Sign out error: ${e.message}")
+            Log.e(tag, "Logout error: ${e.message}", e)
+        } finally {
+            // 7. Always drive immediate navigation by setting AuthState.LoggedOut
+            authManager.setLoggedOut()
         }
     }
+
+    suspend fun signOut() = logout()
 
     fun updateAppPin(pin: String): Resource<Unit> {
         sessionManager.secureStorage.setAppPin(pin)

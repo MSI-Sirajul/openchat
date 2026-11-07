@@ -130,6 +130,47 @@ object BackendManager {
         }
     }
 
+    fun onUserLoggedOut() {
+        synchronized(this) {
+            activeConversationListeners.clear()
+            outboxQueue?.clearAllQueues()
+            _connectionState.value = ConnectionState.Offline
+            Log.i(TAG, "BackendManager listeners and outbox cleared on user logout")
+        }
+    }
+
+    fun onUserLoggedIn(context: Context, newUserId: String) {
+        synchronized(this) {
+            val database = OpenChatDatabase.getInstance(context, newUserId)
+            val sessionManager = SessionManager(context)
+
+            inboxProcessor = ConversationInboxProcessor(
+                context = context,
+                messageDao = database.messageDao(),
+                conversationDao = database.conversationDao(),
+                currentUserIdProvider = { sessionManager.getUserId() ?: FirebaseManager.auth.currentUser?.uid }
+            )
+
+            outboxQueue = ConversationOutboxQueue(
+                context = context,
+                messageDao = database.messageDao(),
+                currentUserIdProvider = { sessionManager.getUserId() ?: FirebaseManager.auth.currentUser?.uid },
+                fileUploader = { file, mimeType, bucket, onProgress ->
+                    uploadFileInternal(file, mimeType, bucket, onProgress)
+                },
+                serverDispatcher = { messageEntity ->
+                    dispatchMessageToServer(messageEntity)
+                }
+            )
+            recomputeConnectionState()
+            Log.i(TAG, "BackendManager re-bound to user: $newUserId")
+        }
+    }
+
+    fun cancelAllSync() {
+        onUserLoggedOut()
+    }
+
     val outbox: ConversationOutboxQueue
         get() = outboxQueue ?: throw IllegalStateException("BackendManager not initialized. Call initialize(context) first.")
 

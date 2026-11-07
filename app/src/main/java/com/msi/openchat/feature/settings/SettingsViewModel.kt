@@ -253,7 +253,7 @@ class SettingsViewModel(
 
     fun logout() {
         viewModelScope.launch {
-            authRepository.signOut()
+            authRepository.logout()
             _uiState.value = _uiState.value.copy(isLoggedOut = true)
         }
     }
@@ -261,7 +261,7 @@ class SettingsViewModel(
     fun deleteAccount() {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isSaving = true, isDeleteDialogOpen = false)
-            authRepository.signOut()
+            authRepository.logout()
             _uiState.value = _uiState.value.copy(
                 isSaving = false,
                 isAccountDeleted = true,

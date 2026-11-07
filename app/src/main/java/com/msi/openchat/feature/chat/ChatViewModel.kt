@@ -260,6 +260,27 @@ class ChatViewModel(
         }
     }
 
+    fun sendDirectMessage(text: String) {
+        if (text.isBlank()) return
+        viewModelScope.launch {
+            when (val res = chatRepository.sendTextMessage(conversationId, text.trim())) {
+                is Resource.Success -> {
+                    _uiState.value = _uiState.value.copy(
+                        messages = _uiState.value.messages + res.data,
+                        isSending = false
+                    )
+                }
+                is Resource.Error -> {
+                    _uiState.value = _uiState.value.copy(
+                        isSending = false,
+                        errorMessage = res.message
+                    )
+                }
+                else -> Unit
+            }
+        }
+    }
+
     fun startVoiceRecording() {
         audioRecorderHelper.startRecording()
     }

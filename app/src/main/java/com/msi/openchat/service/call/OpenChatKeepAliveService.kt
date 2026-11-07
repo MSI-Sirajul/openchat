@@ -45,6 +45,7 @@ class OpenChatKeepAliveService : Service() {
     private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var callListener: ValueEventListener? = null
     private var convListener: ChildEventListener? = null
+    private var notifListener: ChildEventListener? = null
     private var currentUserId: String? = null
 
     companion object {
@@ -267,6 +268,49 @@ class OpenChatKeepAliveService : Service() {
         }
         convNode.addChildEventListener(cnListener)
         convListener = cnListener
+
+        // 3. Incoming Notifications listener on /notifications/{uid}
+        val notifNode = FirebaseManager.database.reference.child("notifications").child(uid)
+        val nListener = object : ChildEventListener {
+            override fun onChildAdded(snapshot: DataSnapshot, previousChildName: String?) {
+                val notifKey = snapshot.key.orEmpty()
+                val type = snapshot.child("type").getValue(String::class.java).orEmpty()
+                when (type) {
+                    "friend_request" -> {
+                        val requestId = snapshot.child("request_id").getValue(String::class.java).orEmpty()
+                        val senderId = snapshot.child("sender_id").getValue(String::class.java).orEmpty()
+                        val senderName = snapshot.child("sender_name").getValue(String::class.java) ?: "Someone"
+                        OpenChatNotificationManager.showFriendRequestNotification(
+                            context = applicationContext,
+                            requestId = requestId,
+                            senderId = senderId,
+                            senderName = senderName
+                        )
+                    }
+                    "friend_accepted" -> {
+                        val conversationId = snapshot.child("conversation_id").getValue(String::class.java).orEmpty()
+                        val accepterId = snapshot.child("accepter_id").getValue(String::class.java).orEmpty()
+                        val accepterName = snapshot.child("accepter_name").getValue(String::class.java) ?: "Friend"
+                        OpenChatNotificationManager.showFriendAcceptedNotification(
+                            context = applicationContext,
+                            conversationId = conversationId,
+                            friendId = accepterId,
+                            friendName = accepterName
+                        )
+                    }
+                }
+                if (notifKey.isNotBlank()) {
+                    snapshot.ref.removeValue()
+                }
+            }
+
+            override fun onChildChanged(snapshot: DataSnapshot, previousChildName: String?) {}
+            override fun onChildRemoved(snapshot: DataSnapshot) {}
+            override fun onChildMoved(snapshot: DataSnapshot, previousChildName: String?) {}
+            override fun onCancelled(error: DatabaseError) {}
+        }
+        notifNode.addChildEventListener(nListener)
+        notifListener = nListener
     }
 
     private fun removeListeners() {
@@ -277,8 +321,12 @@ class OpenChatKeepAliveService : Service() {
         convListener?.let { l: ChildEventListener ->
             FirebaseManager.conversationsRef.child(uid).removeEventListener(l)
         }
+        notifListener?.let { l: ChildEventListener ->
+            FirebaseManager.database.reference.child("notifications").child(uid).removeEventListener(l)
+        }
         callListener = null
         convListener = null
+        notifListener = null
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {

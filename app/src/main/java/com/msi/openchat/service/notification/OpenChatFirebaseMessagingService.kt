@@ -70,9 +70,25 @@ class OpenChatFirebaseMessagingService : FirebaseMessagingService() {
                 )
             }
             "friend_request" -> {
+                val requestId = remoteMessage.data["request_id"] ?: remoteMessage.data["id"].orEmpty()
+                val reqSenderId = remoteMessage.data["sender_id"].orEmpty()
+                val reqSenderName = remoteMessage.data["sender_name"] ?: title
                 OpenChatNotificationManager.showFriendRequestNotification(
                     context = applicationContext,
-                    senderName = title
+                    requestId = requestId,
+                    senderId = reqSenderId,
+                    senderName = reqSenderName
+                )
+            }
+            "friend_accepted" -> {
+                val convId = remoteMessage.data["conversation_id"].orEmpty()
+                val accepterId = remoteMessage.data["accepter_id"] ?: remoteMessage.data["friend_id"].orEmpty()
+                val accepterName = remoteMessage.data["accepter_name"] ?: remoteMessage.data["friend_name"] ?: title
+                OpenChatNotificationManager.showFriendAcceptedNotification(
+                    context = applicationContext,
+                    conversationId = convId,
+                    friendId = accepterId,
+                    friendName = accepterName
                 )
             }
             else -> {
@@ -84,7 +100,7 @@ class OpenChatFirebaseMessagingService : FirebaseMessagingService() {
                     content = body
                 )
             }
+        }
     }
-}
 }
 

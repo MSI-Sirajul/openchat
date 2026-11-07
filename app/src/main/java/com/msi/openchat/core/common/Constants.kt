@@ -37,6 +37,8 @@ object Constants {
     const val CHANNEL_MESSAGES = "openchat_messages"
     const val CHANNEL_CALLS = "openchat_calls"
     const val CHANNEL_FRIENDS = "openchat_friends"
+    const val CHANNEL_FRIEND_REQUESTS = "openchat_friend_requests"
+    const val CHANNEL_FRIEND_ACCEPTED = "openchat_friend_accepted"
     const val CHANNEL_NETWORK = "openchat_network"
 
     const val NOTIFICATION_ID_CALL = 2001

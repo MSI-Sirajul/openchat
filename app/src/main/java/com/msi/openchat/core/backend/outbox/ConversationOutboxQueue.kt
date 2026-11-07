@@ -319,4 +319,12 @@ class ConversationOutboxQueue(
             null
         }
     }
+
+    fun clearAllQueues() {
+        conversationJobs.values.forEach { it.cancel() }
+        conversationJobs.clear()
+        conversationSignals.clear()
+        conversationLocks.clear()
+        Log.i(tag, "Cleared all outbox queue jobs and lanes")
+    }
 }

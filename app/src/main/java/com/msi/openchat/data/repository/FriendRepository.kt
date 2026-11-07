@@ -5,8 +5,12 @@ import com.google.android.gms.tasks.Task
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.ValueEventListener
+import com.google.firebase.database.ServerValue
+import com.msi.openchat.core.backend.BackendManager
 import com.msi.openchat.core.common.Resource
 import com.msi.openchat.core.security.SessionManager
+import com.msi.openchat.core.ui.adapter.RelationshipStatus
+import com.msi.openchat.core.ui.adapter.UserSearchItem
 import com.msi.openchat.data.model.FriendRequest
 import com.msi.openchat.data.model.Friendship
 import com.msi.openchat.data.model.Profile
@@ -65,6 +69,85 @@ open class FriendRepository(
             }
         }
 
+    suspend fun getFriendIds(userId: String): Set<String> = withContext(Dispatchers.IO) {
+        try {
+            val snapshot = getSingleSnapshot(friendsRef.child(userId)) ?: return@withContext emptySet()
+            val ids = mutableSetOf<String>()
+            for (child in snapshot.children) {
+                val fid = child.key ?: continue
+                if (child.getValue(Boolean::class.java) == true) {
+                    ids.add(fid)
+                }
+            }
+            ids
+        } catch (e: Exception) {
+            Log.e(tag, "getFriendIds error: ${e.message}", e)
+            emptySet()
+        }
+    }
+
+    suspend fun getPendingRequestUserIds(userId: String): Pair<Set<String>, Set<String>> = withContext(Dispatchers.IO) {
+        try {
+            val snapshot = getSingleSnapshot(friendRequestsRef.child(userId)) ?: return@withContext Pair(emptySet(), emptySet())
+            val sentPending = mutableSetOf<String>()
+            val receivedPending = mutableSetOf<String>()
+            for (child in snapshot.children) {
+                val senderId = child.child("sender_id").getValue(String::class.java).orEmpty()
+                val receiverId = child.child("receiver_id").getValue(String::class.java).orEmpty()
+                val status = child.child("status").getValue(String::class.java) ?: "pending"
+                if (status == "pending") {
+                    if (senderId == userId && receiverId.isNotBlank()) {
+                        sentPending.add(receiverId)
+                    } else if (receiverId == userId && senderId.isNotBlank()) {
+                        receivedPending.add(senderId)
+                    }
+                }
+            }
+            Pair(sentPending, receivedPending)
+        } catch (e: Exception) {
+            Log.e(tag, "getPendingRequestUserIds error: ${e.message}", e)
+            Pair(emptySet(), emptySet())
+        }
+    }
+
+    /**
+     * Search users excluding current friends and current user.
+     * Enforces backend exclusion of already-friends from search results.
+     */
+    suspend fun searchNonFriendUsers(query: String): Resource<List<UserSearchItem>> = withContext(Dispatchers.IO) {
+        val currentUserId = sessionManager.getUserId() ?: FirebaseManager.auth.currentUser?.uid
+            ?: return@withContext Resource.Error("Not authenticated")
+
+        try {
+            val friendIds = getFriendIds(currentUserId)
+            val (sentPending, receivedPending) = getPendingRequestUserIds(currentUserId)
+
+            val searchRes = userRepository.searchUsers(query)
+            if (searchRes is Resource.Error) {
+                return@withContext Resource.Error(searchRes.message)
+            }
+            val allUsers = (searchRes as? Resource.Success)?.data ?: emptyList()
+
+            // Backend exclusion: Already-friends and current user are completely excluded from results!
+            val nonFriends = allUsers.filter { user ->
+                user.id != currentUserId && !friendIds.contains(user.id)
+            }
+
+            val items = nonFriends.map { user ->
+                val status = when {
+                    sentPending.contains(user.id) -> RelationshipStatus.REQUESTED
+                    receivedPending.contains(user.id) -> RelationshipStatus.REQUESTED
+                    else -> RelationshipStatus.NONE
+                }
+                UserSearchItem(profile = user, status = status)
+            }
+            Resource.Success(items)
+        } catch (e: Exception) {
+            Log.e(tag, "searchNonFriendUsers error: ${e.message}", e)
+            Resource.Error(e.message ?: "Failed to search users", e)
+        }
+    }
+
     suspend fun sendFriendRequest(receiverId: String): Resource<FriendRequest> = withContext(Dispatchers.IO) {
         val senderId = sessionManager.getUserId() ?: FirebaseManager.auth.currentUser?.uid
             ?: return@withContext Resource.Error("Not authenticated")
@@ -74,6 +157,44 @@ open class FriendRepository(
         }
 
         try {
+            // 1. Backend check: reject if already friends
+            val friendSnapshot = getSingleSnapshot(friendsRef.child(senderId).child(receiverId))
+            if (friendSnapshot != null && friendSnapshot.exists() && friendSnapshot.getValue(Boolean::class.java) == true) {
+                return@withContext Resource.Error("Already friends")
+            }
+
+            // 2. Backend check: reject duplicate requests server-side (idempotent, return existing status)
+            val requestsSnapshot = getSingleSnapshot(friendRequestsRef.child(senderId))
+            if (requestsSnapshot != null && requestsSnapshot.exists()) {
+                for (child in requestsSnapshot.children) {
+                    val sId = child.child("sender_id").getValue(String::class.java).orEmpty()
+                    val rId = child.child("receiver_id").getValue(String::class.java).orEmpty()
+                    val reqStatus = child.child("status").getValue(String::class.java) ?: "pending"
+
+                    if (sId == senderId && rId == receiverId && reqStatus == "pending") {
+                        // Idempotent: return existing pending request
+                        return@withContext Resource.Success(
+                            FriendRequest(
+                                id = child.key ?: child.child("id").getValue(String::class.java).orEmpty(),
+                                senderId = sId,
+                                receiverId = rId,
+                                status = reqStatus,
+                                createdAt = child.child("created_at").getValue(String::class.java)
+                            )
+                        )
+                    }
+
+                    if (sId == receiverId && rId == senderId && reqStatus == "pending") {
+                        return@withContext Resource.Error("This user has already sent you a friend request")
+                    }
+
+                    if ((sId == senderId && rId == receiverId || sId == receiverId && rId == senderId) && reqStatus == "accepted") {
+                        return@withContext Resource.Error("Already friends")
+                    }
+                }
+            }
+
+            // 3. Create fresh request
             val requestId = friendRequestsRef.child(receiverId).push().key
                 ?: UUID.randomUUID().toString()
             val now = getCurrentIsoTime()
@@ -86,12 +207,40 @@ open class FriendRepository(
             reqData["created_at"] = now
             reqData["updated_at"] = now
 
+            val senderProfile = when (val p = userRepository.getUserProfile(senderId)) {
+                is Resource.Success -> p.data
+                else -> null
+            }
+            val senderName = senderProfile?.displayName?.ifBlank { senderProfile.username ?: "Someone" } ?: "Someone"
+
             val updates = HashMap<String, Any?>()
             updates["/friend_requests/$receiverId/$requestId"] = reqData
             updates["/friend_requests/$senderId/$requestId"] = reqData
 
+            // Realtime push notification node for receiver
+            val notifData = HashMap<String, Any?>()
+            notifData["type"] = "friend_request"
+            notifData["request_id"] = requestId
+            notifData["sender_id"] = senderId
+            notifData["sender_name"] = senderName
+            notifData["timestamp"] = ServerValue.TIMESTAMP
+            updates["/notifications/$receiverId/$requestId"] = notifData
+
             val success = FirebaseManager.database.reference.updateChildren(updates).awaitTask()
             if (success) {
+                // Dispatch FCM Push Notification (arrives even when app is closed)
+                BackendManager.sendPushNotification(
+                    recipientId = receiverId,
+                    title = "Friend Request",
+                    body = "$senderName sent you a friend request",
+                    data = mapOf(
+                        "type" to "friend_request",
+                        "request_id" to requestId,
+                        "sender_id" to senderId,
+                        "sender_name" to senderName
+                    )
+                )
+
                 Resource.Success(
                     FriendRequest(
                         id = requestId,
@@ -149,6 +298,12 @@ open class FriendRepository(
             convData2["last_message_at"] = now
             convData2["unread_count"] = 0
 
+            val currentUserProfile = when (val p = userRepository.getUserProfile(currentUserId)) {
+                is Resource.Success -> p.data
+                else -> null
+            }
+            val currentUserName = currentUserProfile?.displayName?.ifBlank { currentUserProfile.username ?: "Friend" } ?: "Friend"
+
             val updates = HashMap<String, Any?>()
             // Mark friendship bidirectionally
             updates["/friends/$currentUserId/$senderId"] = true
@@ -160,8 +315,30 @@ open class FriendRepository(
             updates["/conversations/$currentUserId/$senderId"] = convData1
             updates["/conversations/$senderId/$currentUserId"] = convData2
 
+            // Realtime push notification node for original sender (Channel B: Friend Accepted)
+            val notifData = HashMap<String, Any?>()
+            notifData["type"] = "friend_accepted"
+            notifData["conversation_id"] = conversationId
+            notifData["accepter_id"] = currentUserId
+            notifData["accepter_name"] = currentUserName
+            notifData["timestamp"] = ServerValue.TIMESTAMP
+            updates["/notifications/$senderId/${requestId}_accepted"] = notifData
+
             val success = FirebaseManager.database.reference.updateChildren(updates).awaitTask()
             if (success) {
+                // Dispatch FCM Push Notification (Channel B: Friend Accepted, arrives even when app is closed)
+                BackendManager.sendPushNotification(
+                    recipientId = senderId,
+                    title = "Friend Request Accepted",
+                    body = "$currentUserName accepted your friend request",
+                    data = mapOf(
+                        "type" to "friend_accepted",
+                        "conversation_id" to conversationId,
+                        "accepter_id" to currentUserId,
+                        "accepter_name" to currentUserName
+                    )
+                )
+
                 Resource.Success(conversationId)
             } else {
                 Resource.Error("Failed to accept friend request")

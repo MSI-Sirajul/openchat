@@ -11,6 +11,7 @@ sealed class AuthState {
     object Initializing : AuthState()
     data class Authenticated(val userId: String, val email: String?, val accessToken: String) : AuthState()
     object Unauthenticated : AuthState()
+    object LoggedOut : AuthState()
     data class SessionExpired(val reason: String) : AuthState()
     data class NetworkError(val message: String) : AuthState()
 }
@@ -50,10 +51,14 @@ class FirebaseAuthManager(
                         accessToken = sessionManager.getAccessToken().orEmpty()
                     )
                 } else {
-                    _authState.value = AuthState.Unauthenticated
+                    _authState.value = AuthState.LoggedOut
                 }
             }
         }
+    }
+
+    fun setLoggedOut() {
+        _authState.value = AuthState.LoggedOut
     }
 
     fun getValidAccessToken(): String? {

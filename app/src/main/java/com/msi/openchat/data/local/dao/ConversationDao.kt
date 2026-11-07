@@ -17,8 +17,14 @@ interface ConversationDao {
     @Query("SELECT * FROM conversations ORDER BY last_message_at DESC, created_at DESC")
     fun getAllConversations(): Flow<List<ConversationEntity>>
 
+    @Query("SELECT * FROM conversations WHERE user_id = :userId OR user_id = '' ORDER BY last_message_at DESC, created_at DESC")
+    fun getConversationsForUser(userId: String): Flow<List<ConversationEntity>>
+
     @Query("SELECT * FROM conversations ORDER BY last_message_at DESC, created_at DESC")
     suspend fun getAllConversationsList(): List<ConversationEntity>
+
+    @Query("SELECT * FROM conversations WHERE user_id = :userId OR user_id = '' ORDER BY last_message_at DESC, created_at DESC")
+    suspend fun getConversationsForUserList(userId: String): List<ConversationEntity>
 
     @Query("SELECT * FROM conversations WHERE id = :id LIMIT 1")
     suspend fun getConversationById(id: String): ConversationEntity?
@@ -40,6 +46,9 @@ interface ConversationDao {
 
     @Query("DELETE FROM conversations WHERE id = :id")
     suspend fun deleteConversationById(id: String)
+
+    @Query("DELETE FROM conversations WHERE user_id = :userId")
+    suspend fun clearConversationsForUser(userId: String)
 
     @Query("DELETE FROM conversations")
     suspend fun clearAllConversations()

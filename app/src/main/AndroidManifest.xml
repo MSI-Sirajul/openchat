@@ -111,6 +111,16 @@
             </intent-filter>
         </receiver>
 
+        <!-- Friend Request Notification Actions BroadcastReceiver (Channel A) -->
+        <receiver
+            android:name="com.msi.openchat.service.notification.FriendActionReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.msi.openchat.action.ACCEPT_FRIEND_REQUEST" />
+                <action android:name="com.msi.openchat.action.CANCEL_FRIEND_REQUEST" />
+            </intent-filter>
+        </receiver>
+
         <!-- Active Voice Call Foreground Service -->
         <service
             android:name="com.msi.openchat.service.call.OpenChatCallService"

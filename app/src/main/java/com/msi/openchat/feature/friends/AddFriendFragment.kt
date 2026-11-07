@@ -70,16 +70,10 @@ class AddFriendFragment : Fragment() {
                     addFriendViewModel.uiState.collect { state ->
                         binding.progressUserSearch.visibility = if (state.isSearching) View.VISIBLE else View.GONE
 
-                        val items = state.searchResults.map { profile ->
-                            UserSearchItem(
-                                profile = profile,
-                                isPendingRequest = state.sentRequestUserIds.contains(profile.id)
-                            )
-                        }
-                        searchAdapter.submitList(items)
+                        searchAdapter.submitList(state.searchResults)
 
                         binding.textEmptySearch.visibility =
-                            if (!state.isSearching && items.isEmpty()) View.VISIBLE else View.GONE
+                            if (!state.isSearching && state.searchResults.isEmpty()) View.VISIBLE else View.GONE
 
                         state.errorMessage?.let { error ->
                             Toast.makeText(requireContext(), error, Toast.LENGTH_SHORT).show()

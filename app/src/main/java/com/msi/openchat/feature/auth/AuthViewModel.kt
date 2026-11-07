@@ -41,10 +41,11 @@ class AuthViewModel(
         )
     )
     val uiState: StateFlow<AuthUiState> = _uiState.asStateFlow()
+    val authState: StateFlow<com.msi.openchat.core.security.AuthState> = authRepository.authState
 
     init {
         viewModelScope.launch {
-            ServiceLocator.authManager.authState.collect { state ->
+            authRepository.authState.collect { state ->
                 when (state) {
                     is com.msi.openchat.core.security.AuthState.SessionExpired -> {
                         _uiState.value = _uiState.value.copy(
@@ -58,10 +59,49 @@ class AuthViewModel(
                             _uiState.value = _uiState.value.copy(isAuthenticated = true)
                         }
                     }
+                    is com.msi.openchat.core.security.AuthState.LoggedOut -> {
+                        _uiState.value = AuthUiState(
+                            isLogin = true,
+                            email = "",
+                            password = "",
+                            username = "",
+                            displayName = "",
+                            phoneNumber = "",
+                            rememberMe = false,
+                            isAuthenticated = false,
+                            hasOfflineCachedSession = false
+                        )
+                    }
+                    is com.msi.openchat.core.security.AuthState.Unauthenticated -> {
+                        _uiState.value = _uiState.value.copy(
+                            isAuthenticated = false,
+                            isLogin = true
+                        )
+                    }
                     else -> Unit
                 }
             }
         }
+    }
+
+    fun logout() {
+        viewModelScope.launch {
+            authRepository.logout()
+        }
+    }
+
+    fun resetForm() {
+        _uiState.value = AuthUiState(
+            isLogin = true,
+            email = "",
+            password = "",
+            username = "",
+            displayName = "",
+            phoneNumber = "",
+            rememberMe = false,
+            isAuthenticated = false,
+            hasOfflineCachedSession = false
+        )
     }
 
     fun toggleAuthMode() {

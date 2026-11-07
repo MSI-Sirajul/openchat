@@ -38,6 +38,11 @@ class AuthFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
 
         setupListeners()
+        if (!viewModel.uiState.value.isAuthenticated) {
+            binding.etIdentifier.setText("")
+            binding.etPassword.setText("")
+            binding.cbRememberMe.isChecked = viewModel.uiState.value.rememberMe
+        }
         observeState()
     }
 

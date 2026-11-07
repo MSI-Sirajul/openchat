@@ -30,6 +30,8 @@ object OpenChatNotificationManager {
     const val EXTRA_CONVERSATION_ID = "navigate_conversation_id"
     const val EXTRA_CONTACT_NAME = "contact_name"
     const val EXTRA_CONTACT_ID = "contact_id"
+    const val EXTRA_AUTO_SEND_HI = "extra_auto_send_hi"
+    const val EXTRA_NAVIGATE_FRIEND_REQUESTS = "navigate_friend_requests"
 
     fun initChannels(context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -92,13 +94,35 @@ object OpenChatNotificationManager {
                 setShowBadge(true)
             }
 
-            // 5. Channel for Social & Friend Requests
+            // 5. Channel for Social & Friend Updates
             val friendsChannel = NotificationChannel(
                 Constants.CHANNEL_FRIENDS,
-                "Friend Requests & Updates",
+                "Friend Updates",
                 NotificationManager.IMPORTANCE_DEFAULT
             ).apply {
-                description = "Alerts for incoming friend requests and acceptances"
+                description = "Alerts for friend updates"
+                setShowBadge(true)
+            }
+
+            // 5a. Channel A: "Friend Requests" (High Importance, Accept & Cancel Actions)
+            val friendRequestsChannel = NotificationChannel(
+                Constants.CHANNEL_FRIEND_REQUESTS,
+                "Friend Requests",
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "Alerts for incoming friend requests with instant Accept and Cancel options"
+                enableVibration(true)
+                setShowBadge(true)
+            }
+
+            // 5b. Channel B: "Friend Accepted" (High Importance, Say Hi Action)
+            val friendAcceptedChannel = NotificationChannel(
+                Constants.CHANNEL_FRIEND_ACCEPTED,
+                "Friend Accepted",
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "Alerts when someone accepts your friend request with Say Hi shortcut"
+                enableVibration(true)
                 setShowBadge(true)
             }
 
@@ -116,6 +140,8 @@ object OpenChatNotificationManager {
             manager.createNotificationChannel(missedCallChannel)
             manager.createNotificationChannel(messageChannel)
             manager.createNotificationChannel(friendsChannel)
+            manager.createNotificationChannel(friendRequestsChannel)
+            manager.createNotificationChannel(friendAcceptedChannel)
             manager.createNotificationChannel(networkChannel)
 
             Log.d(TAG, "All OpenChat notification channels initialized.")
@@ -338,32 +364,143 @@ object OpenChatNotificationManager {
         Log.d(TAG, "Dispatched message notification with inline Reply action for conversation $conversationId from $senderName")
     }
 
+    /**
+     * Channel A "Friend Requests":
+     * When someone sends a request -> notification "X sent you a friend request"
+     * with Accept and Cancel action buttons, handled directly from notification
+     * (via FriendActionReceiver, no app open required). On Accept -> accepted; on Cancel -> cancelled (no notif).
+     */
     fun showFriendRequestNotification(
         context: Context,
+        requestId: String,
+        senderId: String,
         senderName: String
     ) {
         initChannels(context)
         val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
 
-        val intent = Intent(context, MainActivity::class.java).apply {
+        val notifId = (if (requestId.isNotBlank()) requestId.hashCode() else senderId.hashCode())
+            .let { (it and 0x7FFFFFFF).coerceAtLeast(3000) }
+
+        val contentIntent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra(EXTRA_NAVIGATE_FRIEND_REQUESTS, true)
         }
-        val pendingIntent = PendingIntent.getActivity(
+        val contentPendingIntent = PendingIntent.getActivity(
             context,
-            301,
-            intent,
+            notifId,
+            contentIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val notification = NotificationCompat.Builder(context, Constants.CHANNEL_FRIENDS)
-            .setContentTitle("New Friend Request")
+        // Accept Action via FriendActionReceiver (BroadcastReceiver, no app open required)
+        val acceptIntent = Intent(context, FriendActionReceiver::class.java).apply {
+            action = FriendActionReceiver.ACTION_ACCEPT_FRIEND_REQUEST
+            putExtra(FriendActionReceiver.EXTRA_REQUEST_ID, requestId)
+            putExtra(FriendActionReceiver.EXTRA_SENDER_ID, senderId)
+            putExtra(FriendActionReceiver.EXTRA_SENDER_NAME, senderName)
+            putExtra(FriendActionReceiver.EXTRA_NOTIFICATION_ID, notifId)
+        }
+        val acceptPendingIntent = PendingIntent.getBroadcast(
+            context,
+            notifId * 3 + 1,
+            acceptIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        // Cancel Action via FriendActionReceiver (BroadcastReceiver, no app open required)
+        val cancelIntent = Intent(context, FriendActionReceiver::class.java).apply {
+            action = FriendActionReceiver.ACTION_CANCEL_FRIEND_REQUEST
+            putExtra(FriendActionReceiver.EXTRA_REQUEST_ID, requestId)
+            putExtra(FriendActionReceiver.EXTRA_SENDER_ID, senderId)
+            putExtra(FriendActionReceiver.EXTRA_NOTIFICATION_ID, notifId)
+        }
+        val cancelPendingIntent = PendingIntent.getBroadcast(
+            context,
+            notifId * 3 + 2,
+            cancelIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val notification = NotificationCompat.Builder(context, Constants.CHANNEL_FRIEND_REQUESTS)
+            .setContentTitle("Friend Request")
             .setContentText("$senderName sent you a friend request")
             .setSmallIcon(android.R.drawable.stat_notify_more)
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-            .setContentIntent(pendingIntent)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_SOCIAL)
+            .setContentIntent(contentPendingIntent)
             .setAutoCancel(true)
+            .addAction(android.R.drawable.ic_input_add, "Accept", acceptPendingIntent)
+            .addAction(android.R.drawable.ic_delete, "Cancel", cancelPendingIntent)
             .build()
 
-        manager.notify(301, notification)
+        manager.notify(notifId, notification)
+        Log.d(TAG, "Dispatched friend request notification (Channel A) for requestId=$requestId from $senderName")
+    }
+
+    fun showFriendRequestNotification(
+        context: Context,
+        senderName: String
+    ) {
+        showFriendRequestNotification(context, requestId = "", senderId = "", senderName = senderName)
+    }
+
+    /**
+     * Channel B "Friend Accepted":
+     * When a request is accepted, notify original sender "X accepted your friend request"
+     * with a "Say Hi" action button; tapping it opens chat and sends an initial "Hi" message.
+     */
+    fun showFriendAcceptedNotification(
+        context: Context,
+        conversationId: String,
+        friendId: String,
+        friendName: String
+    ) {
+        initChannels(context)
+        val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
+
+        val notifId = (conversationId.hashCode() and 0x7FFFFFFF).coerceAtLeast(4000)
+
+        val contentIntent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra(EXTRA_CONVERSATION_ID, conversationId)
+            putExtra(EXTRA_CONTACT_NAME, friendName)
+            putExtra(EXTRA_CONTACT_ID, friendId)
+        }
+        val contentPendingIntent = PendingIntent.getActivity(
+            context,
+            notifId,
+            contentIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        // "Say Hi" Action button: opens chat with autoSendHi = true
+        val sayHiIntent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra(EXTRA_CONVERSATION_ID, conversationId)
+            putExtra(EXTRA_CONTACT_NAME, friendName)
+            putExtra(EXTRA_CONTACT_ID, friendId)
+            putExtra(EXTRA_AUTO_SEND_HI, true)
+        }
+        val sayHiPendingIntent = PendingIntent.getActivity(
+            context,
+            notifId * 3 + 1,
+            sayHiIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val notification = NotificationCompat.Builder(context, Constants.CHANNEL_FRIEND_ACCEPTED)
+            .setContentTitle("Friend Request Accepted")
+            .setContentText("$friendName accepted your friend request")
+            .setSmallIcon(android.R.drawable.stat_notify_more)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_SOCIAL)
+            .setContentIntent(contentPendingIntent)
+            .setAutoCancel(true)
+            .addAction(android.R.drawable.ic_menu_send, "Say Hi", sayHiPendingIntent)
+            .build()
+
+        manager.notify(notifId, notification)
+        Log.d(TAG, "Dispatched friend accepted notification (Channel B) for friend $friendName (conv=$conversationId)")
     }
 }

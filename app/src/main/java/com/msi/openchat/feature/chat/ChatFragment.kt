@@ -48,6 +48,7 @@ class ChatFragment : Fragment() {
     private lateinit var conversationId: String
     private lateinit var contactName: String
     private lateinit var contactId: String
+    private var autoSendHi: Boolean = false
     private var typingAnimator: AnimatorSet? = null
 
     private val chatViewModel: ChatViewModel by viewModels {
@@ -153,6 +154,7 @@ class ChatFragment : Fragment() {
             conversationId = it.getString(ARG_CONVERSATION_ID, "")
             contactName = it.getString(ARG_CONTACT_NAME, "Contact")
             contactId = it.getString(ARG_CONTACT_ID, "")
+            autoSendHi = it.getBoolean(ARG_AUTO_SEND_HI, false)
         }
     }
 
@@ -174,6 +176,11 @@ class ChatFragment : Fragment() {
         setupRecordingBar()
         setupPreviewOverlay()
         observeViewModel()
+
+        if (autoSendHi) {
+            autoSendHi = false
+            chatViewModel.sendDirectMessage("Hi")
+        }
     }
 
     private fun setupToolbar() {
@@ -752,17 +759,20 @@ class ChatFragment : Fragment() {
         private const val ARG_CONVERSATION_ID = "conversation_id"
         private const val ARG_CONTACT_NAME = "contact_name"
         private const val ARG_CONTACT_ID = "contact_id"
+        private const val ARG_AUTO_SEND_HI = "auto_send_hi"
 
         fun newInstance(
             conversationId: String,
             contactName: String,
-            contactId: String
+            contactId: String,
+            autoSendHi: Boolean = false
         ): ChatFragment {
             return ChatFragment().apply {
                 arguments = Bundle().apply {
                     putString(ARG_CONVERSATION_ID, conversationId)
                     putString(ARG_CONTACT_NAME, contactName)
                     putString(ARG_CONTACT_ID, contactId)
+                    putBoolean(ARG_AUTO_SEND_HI, autoSendHi)
                 }
             }
         }

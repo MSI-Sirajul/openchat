@@ -71,17 +71,33 @@ object ServiceLocator {
         FriendsRepository(sessionManager, userRepository)
     }
 
-    val database: com.msi.openchat.data.local.OpenChatDatabase by lazy {
-        com.msi.openchat.data.local.OpenChatDatabase.getInstance(appContext ?: throw IllegalStateException("ServiceLocator not initialized"))
-    }
+    @Volatile
+    private var activeUserId: String? = null
+    @Volatile
+    private var activeDatabase: com.msi.openchat.data.local.OpenChatDatabase? = null
+    @Volatile
+    private var activeChatRepository: ChatRepository? = null
 
-    val messageDao: com.msi.openchat.data.local.dao.MessageDao by lazy {
-        database.messageDao()
-    }
+    val database: com.msi.openchat.data.local.OpenChatDatabase
+        get() {
+            val uid = try { sessionManager.getUserId() } catch (_: Exception) { null }
+            if (activeDatabase == null || activeUserId != uid) {
+                synchronized(this) {
+                    if (activeDatabase == null || activeUserId != uid) {
+                        activeUserId = uid
+                        activeDatabase = com.msi.openchat.data.local.OpenChatDatabase.getInstance(context, uid)
+                        activeChatRepository = null
+                    }
+                }
+            }
+            return activeDatabase!!
+        }
 
-    val conversationDao: com.msi.openchat.data.local.dao.ConversationDao by lazy {
-        database.conversationDao()
-    }
+    val messageDao: com.msi.openchat.data.local.dao.MessageDao
+        get() = database.messageDao()
+
+    val conversationDao: com.msi.openchat.data.local.dao.ConversationDao
+        get() = database.conversationDao()
 
     val nhostStorageClient: com.msi.openchat.data.remote.storage.NhostStorageClient by lazy {
         val secret = try {
@@ -96,14 +112,64 @@ object ServiceLocator {
         )
     }
 
-    val chatRepository: ChatRepository by lazy {
-        ChatRepository(
-            sessionManager = sessionManager,
-            userRepository = userRepository,
-            messageDao = messageDao,
-            conversationDao = conversationDao,
-            storageClient = nhostStorageClient
-        )
+    val chatRepository: ChatRepository
+        get() {
+            val uid = try { sessionManager.getUserId() } catch (_: Exception) { null }
+            val db = database
+            if (activeChatRepository == null || activeUserId != uid) {
+                synchronized(this) {
+                    if (activeChatRepository == null || activeUserId != uid) {
+                        activeUserId = uid
+                        activeChatRepository = ChatRepository(
+                            sessionManager = sessionManager,
+                            userRepository = userRepository,
+                            messageDao = db.messageDao(),
+                            conversationDao = db.conversationDao(),
+                            storageClient = nhostStorageClient
+                        )
+                    }
+                }
+            }
+            return activeChatRepository!!
+        }
+
+    fun onUserLoggedIn(userId: String) {
+        synchronized(this) {
+            activeUserId = userId
+            activeDatabase = com.msi.openchat.data.local.OpenChatDatabase.getInstance(context, userId)
+            activeChatRepository = ChatRepository(
+                sessionManager = sessionManager,
+                userRepository = userRepository,
+                messageDao = activeDatabase!!.messageDao(),
+                conversationDao = activeDatabase!!.conversationDao(),
+                storageClient = nhostStorageClient
+            )
+            com.msi.openchat.core.backend.BackendManager.onUserLoggedIn(context, userId)
+        }
+    }
+
+    fun onUserLoggedOut() {
+        val oldUserId = activeUserId
+        synchronized(this) {
+            activeUserId = null
+            activeChatRepository = null
+            activeDatabase = null
+            if (!oldUserId.isNullOrBlank()) {
+                com.msi.openchat.data.local.OpenChatDatabase.closeDatabaseForUser(oldUserId)
+            }
+            userRepository.clearCache()
+            com.msi.openchat.core.backend.BackendManager.onUserLoggedOut()
+            try {
+                coil.Coil.imageLoader(context).memoryCache?.clear()
+            } catch (_: Exception) {}
+        }
+    }
+
+    fun clearAllInMemoryCaches() {
+        userRepository.clearCache()
+        try {
+            coil.Coil.imageLoader(context).memoryCache?.clear()
+        } catch (_: Exception) {}
     }
 
     val callRepository: CallRepository by lazy {

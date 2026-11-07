@@ -32,12 +32,37 @@ object OfflineMediaManager {
     private const val TAG = "OfflineMediaManager"
     private const val MEDIA_DIR_NAME = "openchat_offline_media"
 
-    fun getMediaDirectory(context: Context): File {
-        val dir = File(context.filesDir, MEDIA_DIR_NAME)
-        if (!dir.exists()) {
-            dir.mkdirs()
+    fun getUserMediaDirectory(context: Context, userId: String? = null): File {
+        val uid = userId ?: try {
+            ServiceLocator.sessionManager.getUserId()
+        } catch (_: Exception) {
+            null
+        } ?: "shared"
+        val cleanUid = sanitizeFileName(uid)
+        val baseDir = context.getExternalFilesDir(null) ?: context.filesDir
+        val userDir = File(baseDir, "user_media/$cleanUid")
+        if (!userDir.exists()) {
+            userDir.mkdirs()
         }
-        return dir
+        return userDir
+    }
+
+    fun getMediaDirectory(context: Context): File {
+        return getUserMediaDirectory(context)
+    }
+
+    fun deleteUserMedia(context: Context, userId: String) {
+        val cleanUid = sanitizeFileName(userId)
+        val baseDir = context.getExternalFilesDir(null) ?: context.filesDir
+        val externalUserDir = File(baseDir, "user_media/$cleanUid")
+        if (externalUserDir.exists()) {
+            externalUserDir.deleteRecursively()
+        }
+        val internalUserDir = File(context.filesDir, "user_media/$cleanUid")
+        if (internalUserDir.exists()) {
+            internalUserDir.deleteRecursively()
+        }
+        Log.i(TAG, "Deleted offline media cache for user $userId")
     }
 
     /**

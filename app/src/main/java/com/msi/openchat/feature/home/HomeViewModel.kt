@@ -62,11 +62,11 @@ class HomeViewModel(
     private fun observeLocalConversations() {
         viewModelScope.launch {
             chatRepository.observeLocalConversations().collect { localChats ->
+                _uiState.value = _uiState.value.copy(
+                    conversations = localChats,
+                    isLoadingChats = false
+                )
                 if (localChats.isNotEmpty()) {
-                    _uiState.value = _uiState.value.copy(
-                        conversations = localChats,
-                        isLoadingChats = false
-                    )
                     refreshObservedContactProfiles()
                 }
             }
@@ -205,32 +205,52 @@ class HomeViewModel(
         }
     }
 
+    private var attachedUserId: String? = null
+    private var convListener: ValueEventListener? = null
+    private var friendListener: ValueEventListener? = null
+    private var reqListener: ValueEventListener? = null
+    private var callListener: ValueEventListener? = null
+
     private fun observeRealtime() {
         val currentUserId = sessionManager.getUserId() ?: FirebaseManager.auth.currentUser?.uid.orEmpty()
         if (currentUserId.isBlank()) return
 
+        removeFirebaseListeners()
+        attachedUserId = currentUserId
+
         // 1. Observe real-time conversation changes
-        val convListener = object : ValueEventListener {
+        val cl = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 loadConversations()
             }
             override fun onCancelled(error: DatabaseError) {}
         }
-        FirebaseManager.conversationsRef.child(currentUserId).addValueEventListener(convListener)
+        convListener = cl
+        FirebaseManager.conversationsRef.child(currentUserId).addValueEventListener(cl)
 
         // 2. Observe real-time friend requests and friendships
-        val friendListener = object : ValueEventListener {
+        val fl = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 loadFriends()
                 loadPendingRequests()
             }
             override fun onCancelled(error: DatabaseError) {}
         }
-        FirebaseManager.friendsRef.child(currentUserId).addValueEventListener(friendListener)
-        FirebaseManager.friendRequestsRef.child(currentUserId).addValueEventListener(friendListener)
+        friendListener = fl
+        FirebaseManager.friendsRef.child(currentUserId).addValueEventListener(fl)
+
+        val rl = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                loadFriends()
+                loadPendingRequests()
+            }
+            override fun onCancelled(error: DatabaseError) {}
+        }
+        reqListener = rl
+        FirebaseManager.friendRequestsRef.child(currentUserId).addValueEventListener(rl)
 
         // 3. Observe real-time incoming call signaling alerts
-        val callListener = object : ValueEventListener {
+        val callL = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 if (snapshot.exists()) {
                     val callId = snapshot.child("call_id").getValue(String::class.java).orEmpty()
@@ -250,7 +270,23 @@ class HomeViewModel(
             }
             override fun onCancelled(error: DatabaseError) {}
         }
-        FirebaseManager.usersRef.child(currentUserId).child("incoming_call").addValueEventListener(callListener)
+        callListener = callL
+        FirebaseManager.usersRef.child(currentUserId).child("incoming_call").addValueEventListener(callL)
+    }
+
+    private fun removeFirebaseListeners() {
+        val uid = attachedUserId
+        if (!uid.isNullOrBlank()) {
+            convListener?.let { FirebaseManager.conversationsRef.child(uid).removeEventListener(it) }
+            friendListener?.let { FirebaseManager.friendsRef.child(uid).removeEventListener(it) }
+            reqListener?.let { FirebaseManager.friendRequestsRef.child(uid).removeEventListener(it) }
+            callListener?.let { FirebaseManager.usersRef.child(uid).child("incoming_call").removeEventListener(it) }
+            convListener = null
+            friendListener = null
+            reqListener = null
+            callListener = null
+            attachedUserId = null
+        }
     }
 
     fun startConversationWithFriend(friendId: String, onConversationReady: (String, String) -> Unit) {
@@ -273,5 +309,6 @@ class HomeViewModel(
     override fun onCleared() {
         super.onCleared()
         observedProfilesJob?.cancel()
+        removeFirebaseListeners()
     }
 }
