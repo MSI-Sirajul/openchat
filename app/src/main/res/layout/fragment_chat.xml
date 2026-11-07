@@ -46,11 +46,12 @@
                         android:textSize="16sp"
                         android:textStyle="bold" />
 
-                    <ImageView
+                    <com.google.android.material.imageview.ShapeableImageView
                         android:id="@+id/img_chat_avatar"
                         android:layout_width="match_parent"
                         android:layout_height="match_parent"
                         android:scaleType="centerCrop"
+                        app:shapeAppearanceOverlay="@style/ShapeAppearance.Material3.Corner.Full"
                         android:visibility="gone" />
 
                     <View

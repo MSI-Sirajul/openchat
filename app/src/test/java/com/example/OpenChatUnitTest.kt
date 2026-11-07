@@ -555,4 +555,66 @@ class OpenChatUnitTest {
         viewModel.toggleEditMode()
         assertFalse(viewModel.uiState.value.isEditMode)
     }
+
+    @Test
+    fun testAvatarHelperResolutionAndInitials() {
+        val helper = com.msi.openchat.core.ui.AvatarHelper
+        assertEquals("J", helper.extractInitial("John Doe"))
+        assertEquals("A", helper.extractInitial("alice"))
+        assertEquals("U", helper.extractInitial(null))
+        assertEquals("U", helper.extractInitial("   "))
+
+        assertNull(helper.resolveAvatarUrl(null as String?))
+        assertNull(helper.resolveAvatarUrl("   "))
+        assertEquals("https://example.com/avatar.jpg", helper.resolveAvatarUrl("https://example.com/avatar.jpg"))
+
+        val profileWithUrl = com.msi.openchat.data.model.Profile(
+            id = "u1",
+            displayName = "Alice",
+            avatarUrl = "https://example.com/alice.jpg"
+        )
+        assertEquals("https://example.com/alice.jpg", helper.resolveAvatarUrl(profileWithUrl))
+
+        val profileWithoutUrl = com.msi.openchat.data.model.Profile(
+            id = "u2",
+            displayName = "Bob",
+            avatarUrl = null,
+            avatar = null
+        )
+        assertNull(helper.resolveAvatarUrl(profileWithoutUrl))
+
+        // BackendManager and UserRepository helpers
+        assertEquals("https://example.com/alice.jpg", com.msi.openchat.core.backend.BackendManager.getAvatarUrl(profileWithUrl))
+        assertNull(com.msi.openchat.core.backend.BackendManager.getAvatarUrl(profileWithoutUrl))
+    }
+
+    @Test
+    fun testAvatarLayoutViewsInflation() {
+        val baseContext = ApplicationProvider.getApplicationContext<Context>()
+        val themedContext = androidx.appcompat.view.ContextThemeWrapper(baseContext, com.example.R.style.Theme_MyApplication)
+        val inflater = android.view.LayoutInflater.from(themedContext)
+
+        // 1. Home header avatar image view
+        val homeBinding = com.example.databinding.FragmentHomeBinding.inflate(inflater)
+        assertNotNull(homeBinding.btnHomeProfile)
+        assertNotNull(homeBinding.textHomeProfileAvatar)
+        assertNotNull(homeBinding.imgHomeProfileAvatar)
+
+        // 2. Friend item avatar
+        val friendBinding = com.example.databinding.ItemFriendBinding.inflate(inflater)
+        assertNotNull(friendBinding.avatarContainer)
+        assertNotNull(friendBinding.textAvatar)
+        assertNotNull(friendBinding.imgAvatar)
+
+        // 3. Conversation item avatar
+        val convBinding = com.example.databinding.ItemConversationBinding.inflate(inflater)
+        assertNotNull(convBinding.avatarContainer)
+        assertNotNull(convBinding.textAvatar)
+        assertNotNull(convBinding.imgAvatar)
+
+        // 4. Chat header avatar
+        val chatBinding = com.example.databinding.FragmentChatBinding.inflate(inflater)
+        assertNotNull(chatBinding.textChatAvatar)
+        assertNotNull(chatBinding.imgChatAvatar)
+    }
 }

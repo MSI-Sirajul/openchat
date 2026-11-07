@@ -630,7 +630,12 @@ class ChatFragment : Fragment() {
     private fun renderState(state: ChatUiState) {
         // Toolbar header info
         binding.textChatContactName.text = state.contactName
-        binding.textChatAvatar.text = state.contactName.take(1).uppercase()
+        com.msi.openchat.core.ui.AvatarHelper.loadAvatar(
+            imageView = binding.imgChatAvatar,
+            letterTextView = binding.textChatAvatar,
+            avatarUrl = state.contactProfile?.avatarUrl ?: state.contactProfile?.avatar,
+            displayName = state.contactName
+        )
 
         val isOnline = PresenceHelper.isUserOnline(state.contactProfile)
         binding.dotChatOnline.visibility = if (isOnline) View.VISIBLE else View.GONE

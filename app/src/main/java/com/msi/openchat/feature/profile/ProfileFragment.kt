@@ -165,25 +165,12 @@ class ProfileFragment : Fragment() {
             ?: (ServiceLocator.sessionManager.getUserEmail() ?: "Not provided")
 
         // 1. Avatar rendering (with image loading & fallback to initial letter)
-        val avatarUrl = profile.avatarUrl ?: profile.avatar
-        if (!avatarUrl.isNullOrBlank()) {
-            binding.imgProfileAvatar.visibility = View.VISIBLE
-            binding.textProfileAvatar.visibility = View.GONE
-            binding.imgProfileAvatar.load(avatarUrl) {
-                crossfade(true)
-                listener(
-                    onError = { _, _ ->
-                        binding.imgProfileAvatar.visibility = View.GONE
-                        binding.textProfileAvatar.visibility = View.VISIBLE
-                        binding.textProfileAvatar.text = name.take(1).uppercase()
-                    }
-                )
-            }
-        } else {
-            binding.imgProfileAvatar.visibility = View.GONE
-            binding.textProfileAvatar.visibility = View.VISIBLE
-            binding.textProfileAvatar.text = name.take(1).uppercase()
-        }
+        com.msi.openchat.core.ui.AvatarHelper.loadAvatar(
+            imageView = binding.imgProfileAvatar,
+            letterTextView = binding.textProfileAvatar,
+            avatarUrl = profile.avatarUrl ?: profile.avatar,
+            displayName = name
+        )
 
         // Presence indicator
         val isOnline = PresenceHelper.isUserOnline(profile)

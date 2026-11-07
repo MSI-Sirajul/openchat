@@ -54,6 +54,7 @@ class HomeFragment : Fragment() {
         setupRecyclerViews()
         setupActions()
         observeState()
+        observeCurrentUserProfile()
 
         // Prompt for battery optimization exemption for background keep-alive reliability
         context?.let { ctx ->
@@ -237,15 +238,21 @@ class HomeFragment : Fragment() {
         }
 
         // 3. Friends
-        friendAdapter = FriendAdapter(isDark = isDark) { friendship ->
-            val friend = friendship.friendProfile
-            if (friend != null) {
-                val currentUid = com.msi.openchat.core.di.ServiceLocator.sessionManager.getUserId().orEmpty()
-                val convId = if (currentUid < friend.id) "direct_${currentUid}_${friend.id}" else "direct_${friend.id}_${currentUid}"
-                val name = friend.displayName.ifBlank { friend.username ?: "Friend" }
-                (activity as? MainActivity)?.navigateToChat(convId, name, friend.id)
+        friendAdapter = FriendAdapter(
+            isDark = isDark,
+            onAvatarClick = { friendProfile ->
+                (activity as? MainActivity)?.navigateToProfile(friendProfile.id)
+            },
+            onFriendClick = { friendship ->
+                val friend = friendship.friendProfile
+                if (friend != null) {
+                    val currentUid = com.msi.openchat.core.di.ServiceLocator.sessionManager.getUserId().orEmpty()
+                    val convId = if (currentUid < friend.id) "direct_${currentUid}_${friend.id}" else "direct_${friend.id}_${currentUid}"
+                    val name = friend.displayName.ifBlank { friend.username ?: "Friend" }
+                    (activity as? MainActivity)?.navigateToChat(convId, name, friend.id)
+                }
             }
-        }
+        )
         binding.recyclerFriends.apply {
             layoutManager = LinearLayoutManager(requireContext())
             adapter = friendAdapter
@@ -358,24 +365,33 @@ class HomeFragment : Fragment() {
                     binding.layoutEmptyFriendsContainer.visibility = if (filteredFriends.isEmpty()) View.VISIBLE else View.GONE
                     binding.textEmptyFriends.visibility = if (filteredFriends.isEmpty()) View.VISIBLE else View.GONE
 
-                    // User Profile Avatar Initial
-                    val currentUid = com.msi.openchat.core.di.ServiceLocator.sessionManager.getUserId()
-                    if (!currentUid.isNullOrBlank()) {
-                        viewLifecycleOwner.lifecycleScope.launch {
-                            val res = com.msi.openchat.core.di.ServiceLocator.userRepository.getCurrentUserProfile()
-                            if (res is com.msi.openchat.core.common.Resource.Success) {
-                                val name = res.data.displayName.ifBlank { res.data.username ?: "U" }
-                                binding.textHomeProfileAvatar.text = name.take(1).uppercase()
-                            }
-                        }
-                    }
-
                     // Pending Requests Badge
                     if (state.pendingRequestCount > 0) {
                         binding.badgeRequestCount.text = state.pendingRequestCount.toString()
                         binding.badgeRequestCount.visibility = View.VISIBLE
                     } else {
                         binding.badgeRequestCount.visibility = View.GONE
+                    }
+                }
+            }
+        }
+    }
+
+    private fun observeCurrentUserProfile() {
+        val currentUid = com.msi.openchat.core.di.ServiceLocator.sessionManager.getUserId()
+        if (currentUid.isNullOrBlank()) return
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                com.msi.openchat.core.di.ServiceLocator.userRepository.observeUserProfile(currentUid).collect { profile ->
+                    if (profile != null) {
+                        val name = profile.displayName.ifBlank { profile.username ?: "U" }
+                        com.msi.openchat.core.ui.AvatarHelper.loadAvatar(
+                            imageView = binding.imgHomeProfileAvatar,
+                            letterTextView = binding.textHomeProfileAvatar,
+                            avatarUrl = profile.avatarUrl ?: profile.avatar,
+                            displayName = name
+                        )
                     }
                 }
             }

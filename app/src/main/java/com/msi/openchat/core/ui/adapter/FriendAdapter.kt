@@ -13,6 +13,7 @@ import com.msi.openchat.data.model.Friendship
 
 class FriendAdapter(
     private val isDark: Boolean = false,
+    private val onAvatarClick: ((com.msi.openchat.data.model.Profile) -> Unit)? = null,
     private val onFriendClick: (Friendship) -> Unit
 ) : ListAdapter<Friendship, FriendAdapter.FriendViewHolder>(DiffCallback) {
 
@@ -22,7 +23,7 @@ class FriendAdapter(
             parent,
             false
         )
-        return FriendViewHolder(binding, isDark, onFriendClick)
+        return FriendViewHolder(binding, isDark, onFriendClick, onAvatarClick)
     }
 
     override fun onBindViewHolder(holder: FriendViewHolder, position: Int) {
@@ -32,7 +33,8 @@ class FriendAdapter(
     class FriendViewHolder(
         private val binding: ItemFriendBinding,
         private val isDark: Boolean,
-        private val onFriendClick: (Friendship) -> Unit
+        private val onFriendClick: (Friendship) -> Unit,
+        private val onAvatarClick: ((com.msi.openchat.data.model.Profile) -> Unit)?
     ) : RecyclerView.ViewHolder(binding.root) {
 
         fun bind(friendship: Friendship) {
@@ -53,13 +55,25 @@ class FriendAdapter(
                 val bg = (binding.avatarContainer.background?.mutate() as? GradientDrawable)
                 bg?.setColor(avatarBgColor)
 
-                binding.textAvatar.text = displayName.take(1).uppercase()
+                // Avatar image loading with initials fallback
+                com.msi.openchat.core.ui.AvatarHelper.loadAvatar(
+                    imageView = binding.imgAvatar,
+                    letterTextView = binding.textAvatar,
+                    avatarUrl = friend?.avatarUrl ?: friend?.avatar,
+                    displayName = displayName
+                )
+
                 binding.textDisplayName.text = displayName
                 binding.textUsername.text = "@$username"
 
                 // Online status indicator
                 val isOnline = friend?.onlineStatus == "online"
                 binding.viewOnlineStatus.visibility = if (isOnline) View.VISIBLE else View.GONE
+
+                // Clicking the avatar opens that friend's profile
+                binding.avatarContainer.setOnClickListener {
+                    friend?.let { onAvatarClick?.invoke(it) }
+                }
 
                 binding.root.setOnClickListener {
                     onFriendClick(friendship)

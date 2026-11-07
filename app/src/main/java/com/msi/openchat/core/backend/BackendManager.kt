@@ -529,4 +529,13 @@ object BackendManager {
             false
         }
     }
+
+    /**
+     * Resolves avatar URL for a profile or user, returning null if missing so UI falls back to initials.
+     */
+    fun getAvatarUrl(profile: com.msi.openchat.data.model.Profile?): String? {
+        return profile?.avatarUrl?.trim()?.takeIf { it.isNotBlank() }
+            ?: profile?.avatar?.trim()?.takeIf { it.isNotBlank() }
+    }
 }
+

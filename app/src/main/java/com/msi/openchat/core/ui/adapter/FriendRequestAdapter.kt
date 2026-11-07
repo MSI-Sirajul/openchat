@@ -38,7 +38,12 @@ class FriendRequestAdapter(
             val user = if (isReceivedTab) request.sender else request.receiver
             val displayName = user?.displayName?.ifBlank { user.username ?: "User" } ?: "User"
             binding.textRequestName.text = displayName
-            binding.textRequestAvatar.text = displayName.take(1).uppercase()
+            com.msi.openchat.core.ui.AvatarHelper.loadAvatar(
+                imageView = binding.imgRequestAvatar,
+                letterTextView = binding.textRequestAvatar,
+                avatarUrl = user?.avatarUrl ?: user?.avatar,
+                displayName = displayName
+            )
             binding.textRequestTime.text = DateTimeUtils.formatRelativeTime(request.createdAt)
 
             if (isReceivedTab) {

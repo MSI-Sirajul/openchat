@@ -114,7 +114,8 @@ class ProfileViewModel(
             when (result) {
                 is Resource.Success -> {
                     val newUrl = result.data
-                    val updatedProfile = _uiState.value.profile?.copy(
+                    val current = _uiState.value.profile
+                    val updatedProfile = current?.copy(
                         avatarUrl = newUrl,
                         avatar = newUrl
                     )
@@ -123,6 +124,18 @@ class ProfileViewModel(
                         profile = updatedProfile,
                         successMessage = "Avatar uploaded successfully"
                     )
+
+                    // Immediately persist public URL to Firebase and NHost backend user record
+                    if (current != null) {
+                        userRepository.updateProfile(
+                            displayName = current.displayName.ifBlank { current.username ?: "User" },
+                            username = current.username.orEmpty(),
+                            bio = current.bio.orEmpty(),
+                            statusMessage = current.statusMessage ?: "Available",
+                            phoneNumber = current.phoneNumber,
+                            avatarUrl = newUrl
+                        )
+                    }
                 }
                 is Resource.Error -> {
                     _uiState.value = _uiState.value.copy(

@@ -459,4 +459,19 @@ class UserRepository(
             showReadReceipts = showReadReceipts
         )
     }
+
+    /**
+     * Resolves avatar URL for a profile or cached user, returning null if missing so UI falls back to initials.
+     */
+    fun getAvatarUrl(userId: String): String? {
+        val p = profileCache[userId]
+        return p?.avatarUrl?.trim()?.takeIf { it.isNotBlank() }
+            ?: p?.avatar?.trim()?.takeIf { it.isNotBlank() }
+    }
+
+    fun getAvatarUrl(profile: Profile?): String? {
+        return profile?.avatarUrl?.trim()?.takeIf { it.isNotBlank() }
+            ?: profile?.avatar?.trim()?.takeIf { it.isNotBlank() }
+    }
 }
+

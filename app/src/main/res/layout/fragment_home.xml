@@ -53,6 +53,15 @@
                         android:textColor="@color/color_primary"
                         android:textSize="17sp"
                         android:fontFamily="sans-serif-bold" />
+
+                    <com.google.android.material.imageview.ShapeableImageView
+                        android:id="@+id/img_home_profile_avatar"
+                        android:layout_width="38dp"
+                        android:layout_height="38dp"
+                        android:layout_gravity="center"
+                        android:scaleType="centerCrop"
+                        app:shapeAppearanceOverlay="@style/ShapeAppearance.Material3.Corner.Full"
+                        android:visibility="gone" />
                 </FrameLayout>
 
                 <!-- App Name Title -->

@@ -54,7 +54,12 @@ class ConversationAdapter(
             val bg = (binding.avatarContainer.background?.mutate() as? GradientDrawable)
             bg?.setColor(avatarBgColor)
 
-            binding.textAvatar.text = initial
+            com.msi.openchat.core.ui.AvatarHelper.loadAvatar(
+                imageView = binding.imgAvatar,
+                letterTextView = binding.textAvatar,
+                avatarUrl = other?.avatarUrl ?: other?.avatar,
+                displayName = displayName
+            )
             binding.textName.text = displayName
             binding.textLastMessage.text = conversation.lastMessageText ?: "Started conversation"
             binding.textTime.text = DateTimeUtils.formatConversationTime(
