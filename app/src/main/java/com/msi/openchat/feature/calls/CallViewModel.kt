@@ -73,6 +73,8 @@ class CallViewModel(
 
     // Deduplication set for processed signaling messages
     private val processedSignalingIds = ConcurrentHashMap.newKeySet<String>()
+    @Volatile private var hasProcessedOffer = false
+    @Volatile private var hasProcessedAnswer = false
 
     init {
         initWebRtc()
@@ -347,6 +349,11 @@ class CallViewModel(
                     }
                 }
                 "offer" -> {
+                    if (hasProcessedOffer) {
+                        android.util.Log.w("CallViewModel", "Ignoring duplicate offer message")
+                        return
+                    }
+                    hasProcessedOffer = true
                     callTimeoutJob?.cancel()
                     val sdp = payload.optString("sdp")
                     if (sdp.isNotBlank()) {
@@ -357,6 +364,11 @@ class CallViewModel(
                     }
                 }
                 "answer" -> {
+                    if (hasProcessedAnswer) {
+                        android.util.Log.w("CallViewModel", "Ignoring duplicate answer message")
+                        return
+                    }
+                    hasProcessedAnswer = true
                     callTimeoutJob?.cancel()
                     val sdp = payload.optString("sdp")
                     if (sdp.isNotBlank()) {
@@ -467,6 +479,9 @@ class CallViewModel(
         durationTimerJob?.cancel()
         signalingJob?.cancel()
         callSessionJob?.cancel()
+        hasProcessedOffer = false
+        hasProcessedAnswer = false
+        processedSignalingIds.clear()
         webRtcManager?.endCall()
         CallSessionCoordinator.unregisterActiveCall(_uiState.value.callId)
         OpenChatCallService.stopCallService(context)

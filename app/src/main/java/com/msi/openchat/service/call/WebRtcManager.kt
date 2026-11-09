@@ -72,6 +72,8 @@ class WebRtcManager(
     companion object {
         @Volatile
         private var isFactoryInitialized = false
+        private var sharedAdm: JavaAudioDeviceModule? = null
+        private var sharedFactory: PeerConnectionFactory? = null
 
         @Synchronized
         fun initializeWebRtc(context: Context) {
@@ -88,10 +90,39 @@ class WebRtcManager(
                 }
             }
         }
+
+        @Synchronized
+        fun getSharedFactory(context: Context): PeerConnectionFactory? {
+            initializeWebRtc(context)
+            if (sharedFactory == null) {
+                try {
+                    val adm = try {
+                        JavaAudioDeviceModule.builder(context.applicationContext)
+                            .setUseHardwareAcousticEchoCanceler(false)
+                            .setUseHardwareNoiseSuppressor(false)
+                            .setAudioSource(android.media.MediaRecorder.AudioSource.VOICE_COMMUNICATION)
+                            .setUseStereoInput(false)
+                            .setUseStereoOutput(false)
+                            .createAudioDeviceModule()
+                    } catch (t: Throwable) {
+                        Log.w("OpenChatWebRtc", "Custom ADM init failed: ${t.message}, fallback to default", t)
+                        JavaAudioDeviceModule.builder(context.applicationContext).createAudioDeviceModule()
+                    }
+                    sharedAdm = adm
+
+                    sharedFactory = PeerConnectionFactory.builder()
+                        .setAudioDeviceModule(adm)
+                        .createPeerConnectionFactory()
+                    Log.i("OpenChatWebRtc", "Shared PeerConnectionFactory created successfully")
+                } catch (t: Throwable) {
+                    Log.e("OpenChatWebRtc", "Error creating shared PeerConnectionFactory: ${t.message}", t)
+                }
+            }
+            return sharedFactory
+        }
     }
 
-    private var audioDeviceModule: JavaAudioDeviceModule? = null
-    private var peerConnectionFactory: PeerConnectionFactory? = null
+    private var currentObserver: OpenChatPeerConnectionObserver? = null
     private var peerConnection: PeerConnection? = null
     private var localAudioSource: AudioSource? = null
     private var localAudioTrack: AudioTrack? = null
@@ -123,7 +154,7 @@ class WebRtcManager(
     private val teardownLock = Any()
 
     init {
-        initializePeerConnectionFactory()
+        getSharedFactory(context)
     }
 
     private fun executeOnRtcThread(action: () -> Unit) {
@@ -137,71 +168,6 @@ class WebRtcManager(
             }
         } else {
             Log.w(tag, "executeOnRtcThread skipped: executor is shut down")
-        }
-    }
-
-    @Synchronized
-    private fun initializePeerConnectionFactory() {
-        if (peerConnectionFactory != null) return
-
-        initializeWebRtc(context)
-
-        try {
-            // Software AEC/NS prevents vendor HAL native crashes across different Android devices
-            val adm = try {
-                JavaAudioDeviceModule.builder(context.applicationContext)
-                    .setUseHardwareAcousticEchoCanceler(false)
-                    .setUseHardwareNoiseSuppressor(false)
-                    .setAudioSource(android.media.MediaRecorder.AudioSource.VOICE_COMMUNICATION)
-                    .setUseStereoInput(false)
-                    .setUseStereoOutput(false)
-                    .setAudioRecordErrorCallback(object : JavaAudioDeviceModule.AudioRecordErrorCallback {
-                        override fun onWebRtcAudioRecordInitError(errorMessage: String?) {
-                            Log.e(tag, "AudioRecord init error: $errorMessage")
-                        }
-                        override fun onWebRtcAudioRecordStartError(
-                            errorCode: JavaAudioDeviceModule.AudioRecordStartErrorCode?,
-                            errorMessage: String?
-                        ) {
-                            Log.e(tag, "AudioRecord start error: $errorCode - $errorMessage")
-                        }
-                        override fun onWebRtcAudioRecordError(errorMessage: String?) {
-                            Log.e(tag, "AudioRecord runtime error: $errorMessage")
-                        }
-                    })
-                    .setAudioTrackErrorCallback(object : JavaAudioDeviceModule.AudioTrackErrorCallback {
-                        override fun onWebRtcAudioTrackInitError(errorMessage: String?) {
-                            Log.e(tag, "AudioTrack init error: $errorMessage")
-                        }
-                        override fun onWebRtcAudioTrackStartError(
-                            errorCode: JavaAudioDeviceModule.AudioTrackStartErrorCode?,
-                            errorMessage: String?
-                        ) {
-                            Log.e(tag, "AudioTrack start error: $errorCode - $errorMessage")
-                        }
-                        override fun onWebRtcAudioTrackError(errorMessage: String?) {
-                            Log.e(tag, "AudioTrack runtime error: $errorMessage")
-                        }
-                    })
-                    .createAudioDeviceModule()
-            } catch (t: Throwable) {
-                Log.w(tag, "Failed to create custom JavaAudioDeviceModule: ${t.message}. Falling back to default adm", t)
-                JavaAudioDeviceModule.builder(context.applicationContext).createAudioDeviceModule()
-            }
-
-            audioDeviceModule = adm
-
-            val factory = PeerConnectionFactory.builder()
-                .setAudioDeviceModule(adm)
-                .setOptions(PeerConnectionFactory.Options().apply {
-                    networkIgnoreMask = 0
-                })
-                .createPeerConnectionFactory()
-
-            peerConnectionFactory = factory
-            Log.d(tag, "PeerConnectionFactory created successfully with safe software audio processing")
-        } catch (t: Throwable) {
-            Log.e(tag, "Failed to create PeerConnectionFactory: ${t.message}", t)
         }
     }
 
@@ -219,40 +185,33 @@ class WebRtcManager(
 
                 hasRemoteDescriptionSet = false
 
-                if (peerConnectionFactory == null) {
-                    initializePeerConnectionFactory()
-                }
-
-                val factory = peerConnectionFactory
+                val factory = getSharedFactory(context)
                 if (factory == null) {
                     Log.e(tag, "PeerConnectionFactory is null during startCall")
                     updateCallState(WebRtcCallState.FAILED)
                     return@executeOnRtcThread
                 }
 
-                // Combine provided ICE servers with reliable fallback Google STUN servers
-                val allIceServers = mutableListOf<IceServerConfig>().apply {
-                    addAll(iceServers)
-                    add(IceServerConfig(urls = listOf("stun:stun.l.google.com:19302")))
-                    add(IceServerConfig(urls = listOf("stun:stun1.l.google.com:19302")))
-                    add(IceServerConfig(urls = listOf("stun:stun2.l.google.com:19302")))
-                    add(IceServerConfig(urls = listOf("stun:stun3.l.google.com:19302")))
-                }
-
-                val rtcIceServers = allIceServers.mapNotNull { server ->
-                    try {
-                        val builder = PeerConnection.IceServer.builder(server.urls)
-                        if (!server.username.isNullOrBlank()) {
-                            builder.setUsername(server.username)
+                val distinctUrls = mutableSetOf<String>()
+                val rtcIceServers = mutableListOf<PeerConnection.IceServer>()
+                for (server in iceServers) {
+                    for (url in server.urls) {
+                        if (distinctUrls.add(url)) {
+                            try {
+                                val builder = PeerConnection.IceServer.builder(url)
+                                if (!server.username.isNullOrBlank()) {
+                                    builder.setUsername(server.username)
+                                }
+                                if (!server.credential.isNullOrBlank()) {
+                                    builder.setPassword(server.credential)
+                                }
+                                rtcIceServers.add(builder.createIceServer())
+                            } catch (_: Throwable) {}
                         }
-                        if (!server.credential.isNullOrBlank()) {
-                            builder.setPassword(server.credential)
-                        }
-                        builder.createIceServer()
-                    } catch (t: Throwable) {
-                        Log.w(tag, "Failed to create IceServer: ${t.message}")
-                        null
                     }
+                }
+                if (distinctUrls.add("stun:stun.l.google.com:19302")) {
+                    rtcIceServers.add(PeerConnection.IceServer.builder("stun:stun.l.google.com:19302").createIceServer())
                 }
 
                 val rtcConfig = PeerConnection.RTCConfiguration(rtcIceServers).apply {
@@ -261,7 +220,6 @@ class WebRtcManager(
                     bundlePolicy = PeerConnection.BundlePolicy.MAXBUNDLE
                     rtcpMuxPolicy = PeerConnection.RtcpMuxPolicy.REQUIRE
                     tcpCandidatePolicy = PeerConnection.TcpCandidatePolicy.ENABLED
-                    candidateNetworkPolicy = PeerConnection.CandidateNetworkPolicy.ALL
                 }
 
                 val observer = OpenChatPeerConnectionObserver(
@@ -274,7 +232,7 @@ class WebRtcManager(
                             PeerConnection.IceConnectionState.CONNECTED,
                             PeerConnection.IceConnectionState.COMPLETED -> {
                                 updateCallState(WebRtcCallState.CONNECTED)
-                                statsCollector.start({ peerConnection }, intervalMs = 1500L)
+                                statsCollector.start({ peerConnection }, ::executeOnRtcThread, intervalMs = 1500L)
                             }
                             PeerConnection.IceConnectionState.DISCONNECTED -> {
                                 updateCallState(WebRtcCallState.RECONNECTING)
@@ -298,7 +256,7 @@ class WebRtcManager(
                         when (newState) {
                             PeerConnection.PeerConnectionState.CONNECTED -> {
                                 updateCallState(WebRtcCallState.CONNECTED)
-                                statsCollector.start({ peerConnection }, intervalMs = 1500L)
+                                statsCollector.start({ peerConnection }, ::executeOnRtcThread, intervalMs = 1500L)
                             }
                             PeerConnection.PeerConnectionState.FAILED -> {
                                 updateCallState(WebRtcCallState.FAILED)
@@ -317,11 +275,13 @@ class WebRtcManager(
                     onTrackAddedCallback = { track ->
                         Log.i(tag, "Remote audio track received via onTrackAdded: ${track.id()}")
                         remoteAudioTrack = track
-                        track.setEnabled(true)
-                        track.setVolume(1.0)
+                        try {
+                            track.setEnabled(true)
+                        } catch (_: Throwable) {}
                     }
                 )
 
+                currentObserver = observer
                 peerConnection = factory.createPeerConnection(rtcConfig, observer)
 
                 // Create and attach local audio track with safe optional constraints
@@ -448,15 +408,29 @@ class WebRtcManager(
 
     fun handleRemoteOffer(offerDesc: SessionDescription, onAnswerCreated: (SessionDescription) -> Unit) {
         executeOnRtcThread {
-            val pc = peerConnection
-            if (pc == null || pc.signalingState() == PeerConnection.SignalingState.CLOSED) {
-                Log.i(tag, "PeerConnection not yet ready for remote offer. Queuing offer...")
-                pendingRemoteOffer = offerDesc
-                pendingOnAnswerCreated = onAnswerCreated
-                return@executeOnRtcThread
-            }
+            try {
+                if (isDisposing.get() || isDisposed.get()) {
+                    Log.w(tag, "handleRemoteOffer ignored: call is disposing or disposed")
+                    return@executeOnRtcThread
+                }
+                val pc = peerConnection
+                if (pc == null || pc.signalingState() == PeerConnection.SignalingState.CLOSED) {
+                    Log.i(tag, "PeerConnection not yet ready for remote offer. Queuing offer...")
+                    pendingRemoteOffer = offerDesc
+                    pendingOnAnswerCreated = onAnswerCreated
+                    return@executeOnRtcThread
+                }
 
-            handleRemoteOfferInternal(offerDesc, onAnswerCreated)
+                val currentState = pc.signalingState()
+                if (hasRemoteDescriptionSet || currentState != PeerConnection.SignalingState.STABLE) {
+                    Log.w(tag, "handleRemoteOffer ignored: already set or state is $currentState (expected STABLE)")
+                    return@executeOnRtcThread
+                }
+
+                handleRemoteOfferInternal(offerDesc, onAnswerCreated)
+            } catch (t: Throwable) {
+                Log.e(tag, "Exception in handleRemoteOffer: ${t.message}", t)
+            }
         }
     }
 
@@ -466,7 +440,8 @@ class WebRtcManager(
             val currentState = pc.signalingState()
             Log.d(tag, "Setting remote offer in state: $currentState")
             if (currentState != PeerConnection.SignalingState.STABLE) {
-                Log.w(tag, "handleRemoteOffer warning: state is $currentState")
+                Log.w(tag, "handleRemoteOfferInternal warning: state is $currentState")
+                return
             }
 
             pc.setRemoteDescription(object : SdpObserver {
@@ -475,9 +450,13 @@ class WebRtcManager(
                     try {
                         Log.d(tag, "Remote offer set successfully. Dispatching answer creation to worker thread...")
                         executeOnRtcThread {
-                            hasRemoteDescriptionSet = true
-                            drainPendingRemoteCandidatesInternal()
-                            createAnswerInternal(onAnswerCreated)
+                            try {
+                                hasRemoteDescriptionSet = true
+                                drainPendingRemoteCandidatesInternal()
+                                createAnswerInternal(onAnswerCreated)
+                            } catch (t: Throwable) {
+                                Log.e(tag, "Error post-remote-offer: ${t.message}", t)
+                            }
                         }
                     } catch (t: Throwable) {
                         Log.e(tag, "Exception in onSetSuccess (RemoteOffer): ${t.message}", t)
@@ -505,6 +484,7 @@ class WebRtcManager(
         val currentState = pc.signalingState()
         if (currentState != PeerConnection.SignalingState.HAVE_REMOTE_OFFER) {
             Log.w(tag, "createAnswer warning: expected HAVE_REMOTE_OFFER, found $currentState")
+            return
         }
 
         val sdpConstraints = MediaConstraints().apply {
@@ -572,6 +552,10 @@ class WebRtcManager(
     fun handleRemoteAnswer(answerDesc: SessionDescription) {
         executeOnRtcThread {
             try {
+                if (isDisposing.get() || isDisposed.get()) {
+                    Log.w(tag, "handleRemoteAnswer ignored: call is disposing or disposed")
+                    return@executeOnRtcThread
+                }
                 val pc = peerConnection
                 if (pc == null || pc.signalingState() == PeerConnection.SignalingState.CLOSED) {
                     Log.w(tag, "handleRemoteAnswer ignored: PeerConnection is null or closed")
@@ -579,7 +563,14 @@ class WebRtcManager(
                 }
 
                 val currentState = pc.signalingState()
-                Log.d(tag, "Handling remote answer in state: $currentState")
+                Log.d(tag, "Handling remote answer in state: $currentState (hasRemoteDesc=$hasRemoteDescriptionSet)")
+
+                // Guard: Remote answer can ONLY be set in HAVE_LOCAL_OFFER state
+                // Duplicate answers arriving from Firebase in STABLE or other states MUST be safely ignored
+                if (hasRemoteDescriptionSet || currentState != PeerConnection.SignalingState.HAVE_LOCAL_OFFER) {
+                    Log.w(tag, "Ignoring duplicate or unexpected remote answer: state=$currentState, hasRemoteDesc=$hasRemoteDescriptionSet")
+                    return@executeOnRtcThread
+                }
 
                 pc.setRemoteDescription(object : SdpObserver {
                     override fun onCreateSuccess(p0: SessionDescription?) {}
@@ -587,8 +578,12 @@ class WebRtcManager(
                         try {
                             Log.d(tag, "Remote answer set successfully. Dispatching candidate drain to worker thread...")
                             executeOnRtcThread {
-                                hasRemoteDescriptionSet = true
-                                drainPendingRemoteCandidatesInternal()
+                                try {
+                                    hasRemoteDescriptionSet = true
+                                    drainPendingRemoteCandidatesInternal()
+                                } catch (t: Throwable) {
+                                    Log.e(tag, "Error post-remote-answer: ${t.message}", t)
+                                }
                             }
                         } catch (t: Throwable) {
                             Log.e(tag, "Exception in onSetSuccess (RemoteAnswer): ${t.message}", t)
@@ -614,15 +609,24 @@ class WebRtcManager(
                     Log.w(tag, "addRemoteIceCandidate ignored: candidate is null or empty")
                     return@executeOnRtcThread
                 }
+                if (isDisposing.get() || isDisposed.get()) {
+                    Log.d(tag, "addRemoteIceCandidate ignored: disposing/disposed")
+                    return@executeOnRtcThread
+                }
 
                 val pc = peerConnection
-                val isRemoteReady = (pc != null && (hasRemoteDescriptionSet || pc.remoteDescription != null))
+                if (pc == null || pc.signalingState() == PeerConnection.SignalingState.CLOSED) {
+                    Log.d(tag, "addRemoteIceCandidate ignored: pc is null or closed")
+                    return@executeOnRtcThread
+                }
 
                 // Queue candidates until peerConnection is ready AND remote description is established
-                if (!isRemoteReady) {
-                    Log.d(tag, "Queuing ICE candidate (pc=${pc != null}, remoteDescSet=$hasRemoteDescriptionSet): mid=${candidate.sdpMid}")
+                if (!hasRemoteDescriptionSet) {
+                    Log.d(tag, "Queuing ICE candidate (remoteDesc not set yet): mid=${candidate.sdpMid}")
                     synchronized(pendingRemoteCandidates) {
-                        pendingRemoteCandidates.add(candidate)
+                        if (pendingRemoteCandidates.size < 100) {
+                            pendingRemoteCandidates.add(candidate)
+                        }
                     }
                     return@executeOnRtcThread
                 }
@@ -630,7 +634,7 @@ class WebRtcManager(
                 try {
                     pc.addIceCandidate(candidate)
                 } catch (t: Throwable) {
-                    Log.e(tag, "Error adding remote ICE candidate: ${t.message}", t)
+                    Log.w(tag, "Error adding remote ICE candidate: ${t.message}")
                 }
             } catch (t: Throwable) {
                 Log.e(tag, "Error in addRemoteIceCandidate: ${t.message}", t)
@@ -646,10 +650,10 @@ class WebRtcManager(
             pendingRemoteCandidates.clear()
         }
 
-        Log.d(tag, "Draining ${candidatesToApply.size} queued ICE candidates")
         val pc = peerConnection
-        if (pc == null || pc.signalingState() == PeerConnection.SignalingState.CLOSED) return
+        if (pc == null || pc.signalingState() == PeerConnection.SignalingState.CLOSED || isDisposing.get() || isDisposed.get()) return
 
+        Log.d(tag, "Draining ${candidatesToApply.size} queued ICE candidates")
         for (candidate in candidatesToApply) {
             try {
                 if (candidate != null && !candidate.sdp.isNullOrBlank()) {
@@ -688,6 +692,7 @@ class WebRtcManager(
             return
         }
 
+        currentObserver?.isDetached = true
         statsCollector.stop()
         statsCollector.reset()
         updateCallState(WebRtcCallState.ENDED)
@@ -698,6 +703,8 @@ class WebRtcManager(
             synchronized(teardownLock) {
                 try {
                     Log.i(tag, "Starting safe WebRTC call-teardown on non-callback worker thread...")
+                    currentObserver?.isDetached = true
+                    currentObserver = null
                     audioSwitchManager.stopCallAudio()
 
                     synchronized(pendingRemoteCandidates) {
@@ -746,7 +753,7 @@ class WebRtcManager(
                         // Allow native signaling thread in libjingle_peerconnection_so.so
                         // to cleanly exit state loops and release internal ownership
                         try {
-                            Thread.sleep(80)
+                            Thread.sleep(60)
                         } catch (_: InterruptedException) {}
 
                         // 3. Dispose PeerConnection safely, exactly once
@@ -758,30 +765,12 @@ class WebRtcManager(
                         }
                     }
 
-                    // 4. Dispose PeerConnectionFactory ONLY after all PeerConnection instances are disposed
-                    val factoryToDispose = peerConnectionFactory
-                    peerConnectionFactory = null
-
-                    if (factoryToDispose != null) {
-                        try {
-                            Thread.sleep(50)
-                            Log.d(tag, "Disposing PeerConnectionFactory after PeerConnection teardown...")
-                            factoryToDispose.dispose()
-                        } catch (t: Throwable) {
-                            Log.w(tag, "Safe catch disposing PeerConnectionFactory: ${t.message}")
-                        }
-                    }
-
-                    // 5. Release JavaAudioDeviceModule
-                    try {
-                        audioDeviceModule?.release()
-                    } catch (t: Throwable) {
-                        Log.w(tag, "Safe catch releasing audioDeviceModule: ${t.message}")
-                    }
-                    audioDeviceModule = null
+                    // NOTE: The shared PeerConnectionFactory and JavaAudioDeviceModule are intentionally kept alive
+                    // across calls. Repeatedly destroying and recreating the global PeerConnectionFactory causes
+                    // native assertion failures (!env->ExceptionCheck() / SIGABRT) inside libjingle_peerconnection_so.so.
 
                     isDisposed.set(true)
-                    Log.i(tag, "WebRTC resources fully released without SIGABRT crash")
+                    Log.i(tag, "WebRTC call resources fully released safely")
                 } catch (t: Throwable) {
                     Log.e(tag, "Error during WebRTC teardown: ${t.message}", t)
                 } finally {

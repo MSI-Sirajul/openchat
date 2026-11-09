@@ -27,19 +27,16 @@ class OpenChatPeerConnectionObserver(
 
     private val tag = "OpenChatWebRtc_Observer"
 
+    @Volatile
+    var isDetached: Boolean = false
+
     override fun onIceCandidate(candidate: IceCandidate?) {
         try {
+            if (isDetached) return
             if (candidate == null) {
                 Log.d(tag, "[onIceCandidate] Null candidate received (End of ICE gathering)")
                 return
             }
-            val threadName = Thread.currentThread().name
-            Log.i(
-                tag,
-                "[onIceCandidate] Thread='$threadName', sdpMid=${candidate.sdpMid}, " +
-                        "sdpMLineIndex=${candidate.sdpMLineIndex}, serverUrl=${candidate.serverUrl}, " +
-                        "sdpLength=${candidate.sdp?.length ?: 0}"
-            )
             if (!candidate.sdp.isNullOrBlank()) {
                 onIceCandidateGenerated(candidate)
             }
@@ -50,8 +47,9 @@ class OpenChatPeerConnectionObserver(
 
     override fun onIceCandidatesRemoved(candidates: Array<out IceCandidate>?) {
         try {
+            if (isDetached) return
             val count = candidates?.size ?: 0
-            Log.d(tag, "[onIceCandidatesRemoved] Removed $count candidates, Thread='${Thread.currentThread().name}'")
+            Log.d(tag, "[onIceCandidatesRemoved] Removed $count candidates")
         } catch (t: Throwable) {
             Log.e(tag, "[onIceCandidatesRemoved] Exception: ${t.message}", t)
         }
@@ -59,9 +57,8 @@ class OpenChatPeerConnectionObserver(
 
     override fun onSignalingChange(state: PeerConnection.SignalingState?) {
         try {
-            if (state == null) return
-            val threadName = Thread.currentThread().name
-            Log.i(tag, "[onSignalingChange] Thread='$threadName', New SignalingState=$state")
+            if (isDetached || state == null) return
+            Log.i(tag, "[onSignalingChange] New SignalingState=$state")
             onSignalingChangeCallback?.invoke(state)
         } catch (t: Throwable) {
             Log.e(tag, "[onSignalingChange] Callback error: ${t.message}", t)
@@ -70,9 +67,8 @@ class OpenChatPeerConnectionObserver(
 
     override fun onIceConnectionChange(state: PeerConnection.IceConnectionState?) {
         try {
-            if (state == null) return
-            val threadName = Thread.currentThread().name
-            Log.i(tag, "[onIceConnectionChange] Thread='$threadName', New IceConnectionState=$state")
+            if (isDetached || state == null) return
+            Log.i(tag, "[onIceConnectionChange] New IceConnectionState=$state")
             onIceConnectionStateChange(state)
         } catch (t: Throwable) {
             Log.e(tag, "[onIceConnectionChange] Callback error: ${t.message}", t)
@@ -81,6 +77,7 @@ class OpenChatPeerConnectionObserver(
 
     override fun onStandardizedIceConnectionChange(state: PeerConnection.IceConnectionState?) {
         try {
+            if (isDetached) return
             Log.d(tag, "[onStandardizedIceConnectionChange] state=$state")
         } catch (t: Throwable) {
             Log.e(tag, "[onStandardizedIceConnectionChange] Exception: ${t.message}", t)
@@ -89,9 +86,8 @@ class OpenChatPeerConnectionObserver(
 
     override fun onConnectionChange(newState: PeerConnection.PeerConnectionState?) {
         try {
-            if (newState == null) return
-            val threadName = Thread.currentThread().name
-            Log.i(tag, "[onConnectionChange] New PeerConnectionState=$newState, Thread='$threadName'")
+            if (isDetached || newState == null) return
+            Log.i(tag, "[onConnectionChange] New PeerConnectionState=$newState")
             onConnectionChangeCallback?.invoke(newState)
         } catch (t: Throwable) {
             Log.e(tag, "[onConnectionChange] Exception: ${t.message}", t)
@@ -100,7 +96,8 @@ class OpenChatPeerConnectionObserver(
 
     override fun onIceConnectionReceivingChange(receiving: Boolean) {
         try {
-            Log.d(tag, "[onIceConnectionReceivingChange] receiving=$receiving, Thread='${Thread.currentThread().name}'")
+            if (isDetached) return
+            Log.d(tag, "[onIceConnectionReceivingChange] receiving=$receiving")
         } catch (t: Throwable) {
             Log.e(tag, "[onIceConnectionReceivingChange] Exception: ${t.message}", t)
         }
@@ -108,7 +105,8 @@ class OpenChatPeerConnectionObserver(
 
     override fun onIceGatheringChange(state: PeerConnection.IceGatheringState?) {
         try {
-            Log.i(tag, "[onIceGatheringChange] New IceGatheringState=$state, Thread='${Thread.currentThread().name}'")
+            if (isDetached) return
+            Log.i(tag, "[onIceGatheringChange] New IceGatheringState=$state")
         } catch (t: Throwable) {
             Log.e(tag, "[onIceGatheringChange] Exception: ${t.message}", t)
         }
@@ -116,7 +114,8 @@ class OpenChatPeerConnectionObserver(
 
     override fun onIceCandidateError(event: IceCandidateErrorEvent?) {
         try {
-            Log.w(tag, "[onIceCandidateError] code=${event?.errorCode}, text=${event?.errorText}, url=${event?.url}")
+            if (isDetached) return
+            Log.w(tag, "[onIceCandidateError] WebRTC ICE candidate error event received")
         } catch (t: Throwable) {
             Log.e(tag, "[onIceCandidateError] Exception: ${t.message}", t)
         }
@@ -124,6 +123,7 @@ class OpenChatPeerConnectionObserver(
 
     override fun onSelectedCandidatePairChanged(event: CandidatePairChangeEvent?) {
         try {
+            if (isDetached) return
             Log.d(tag, "[onSelectedCandidatePairChanged]")
         } catch (t: Throwable) {
             Log.e(tag, "[onSelectedCandidatePairChanged] Exception: ${t.message}", t)
@@ -132,14 +132,11 @@ class OpenChatPeerConnectionObserver(
 
     override fun onAddStream(stream: MediaStream?) {
         try {
-            val audioTracksCount = stream?.audioTracks?.size ?: 0
-            val videoTracksCount = stream?.videoTracks?.size ?: 0
-            Log.i(tag, "[onAddStream] StreamId=${stream?.id}, AudioTracks=$audioTracksCount, VideoTracks=$videoTracksCount, Thread='${Thread.currentThread().name}'")
+            if (isDetached) return
             stream?.audioTracks?.forEach { track ->
                 if (track != null) {
                     try {
                         track.setEnabled(true)
-                        track.setVolume(1.0)
                     } catch (_: Throwable) {}
                     onTrackAddedCallback?.invoke(track)
                 }
@@ -151,7 +148,8 @@ class OpenChatPeerConnectionObserver(
 
     override fun onRemoveStream(stream: MediaStream?) {
         try {
-            Log.i(tag, "[onRemoveStream] StreamId=${stream?.id}, Thread='${Thread.currentThread().name}'")
+            if (isDetached) return
+            Log.i(tag, "[onRemoveStream] StreamId=${stream?.id}")
         } catch (t: Throwable) {
             Log.e(tag, "[onRemoveStream] Exception: ${t.message}", t)
         }
@@ -159,7 +157,8 @@ class OpenChatPeerConnectionObserver(
 
     override fun onDataChannel(dataChannel: DataChannel?) {
         try {
-            Log.d(tag, "[onDataChannel] ChannelId=${dataChannel?.id()}, label=${dataChannel?.label()}, Thread='${Thread.currentThread().name}'")
+            if (isDetached) return
+            Log.d(tag, "[onDataChannel] ChannelId=${dataChannel?.id()}, label=${dataChannel?.label()}")
         } catch (t: Throwable) {
             Log.e(tag, "[onDataChannel] Exception: ${t.message}", t)
         }
@@ -167,7 +166,8 @@ class OpenChatPeerConnectionObserver(
 
     override fun onRenegotiationNeeded() {
         try {
-            Log.d(tag, "[onRenegotiationNeeded] Renegotiation requested by WebRTC, Thread='${Thread.currentThread().name}'")
+            if (isDetached) return
+            Log.d(tag, "[onRenegotiationNeeded] Renegotiation requested by WebRTC")
         } catch (t: Throwable) {
             Log.e(tag, "[onRenegotiationNeeded] Exception: ${t.message}", t)
         }
@@ -175,15 +175,11 @@ class OpenChatPeerConnectionObserver(
 
     override fun onAddTrack(receiver: RtpReceiver?, mediaStreams: Array<out MediaStream>?) {
         try {
+            if (isDetached) return
             val track = receiver?.track()
-            val trackKind = track?.kind() ?: "unknown"
-            val trackId = track?.id() ?: "unknown"
-            val streamsCount = mediaStreams?.size ?: 0
-            Log.i(tag, "[onAddTrack] Kind=$trackKind, TrackId=$trackId, AssociatedStreams=$streamsCount, Thread='${Thread.currentThread().name}'")
             if (track is AudioTrack) {
                 try {
                     track.setEnabled(true)
-                    track.setVolume(1.0)
                 } catch (_: Throwable) {}
                 onTrackAddedCallback?.invoke(track)
             }
@@ -194,6 +190,7 @@ class OpenChatPeerConnectionObserver(
 
     override fun onRemoveTrack(receiver: RtpReceiver?) {
         try {
+            if (isDetached) return
             Log.d(tag, "[onRemoveTrack] Track=${receiver?.track()?.id()}")
         } catch (t: Throwable) {
             Log.e(tag, "[onRemoveTrack] Exception: ${t.message}", t)
@@ -202,12 +199,11 @@ class OpenChatPeerConnectionObserver(
 
     override fun onTrack(transceiver: RtpTransceiver?) {
         try {
+            if (isDetached) return
             val track = transceiver?.receiver?.track()
-            Log.i(tag, "[onTrack] Kind=${track?.kind()}, TrackId=${track?.id()}")
             if (track is AudioTrack) {
                 try {
                     track.setEnabled(true)
-                    track.setVolume(1.0)
                 } catch (_: Throwable) {}
                 onTrackAddedCallback?.invoke(track)
             }
