@@ -73,7 +73,7 @@ object MediaCompressionManager {
 
     /**
      * Main entry point: Compresses media from a content:// or file:// URI into a temporary
-     * compressed file suitable for upload to Firebase or NHost storage.
+     * compressed file suitable for upload to Firebase Storage.
      */
     suspend fun compressMedia(
         context: Context,

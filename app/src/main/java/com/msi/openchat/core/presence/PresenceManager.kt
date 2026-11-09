@@ -14,7 +14,7 @@ import kotlinx.coroutines.launch
 
 /**
  * PresenceManager manages the client's heartbeat loop, sending periodic presence
- * pings to Nhost while active and marking the session as offline on exit/backgrounding.
+ * pings to the backend while active and marking the session as offline on exit/backgrounding.
  */
 class PresenceManager(
     private val userRepository: UserRepository,

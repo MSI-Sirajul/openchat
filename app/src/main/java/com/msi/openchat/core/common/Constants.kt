@@ -1,13 +1,6 @@
 package com.msi.openchat.core.common
 
 object Constants {
-    val NHOST_SUBDOMAIN: String get() = com.msi.openchat.core.security.NativeCredentialsManager.subdomain
-    val NHOST_REGION: String get() = com.msi.openchat.core.security.NativeCredentialsManager.region
-    val NHOST_AUTH_URL: String get() = com.msi.openchat.core.security.NativeCredentialsManager.authUrl
-    val NHOST_GRAPHQL_URL: String get() = com.msi.openchat.core.security.NativeCredentialsManager.graphqlUrl
-    val NHOST_STORAGE_URL: String get() = com.msi.openchat.core.security.NativeCredentialsManager.storageUrl
-    val NHOST_FUNCTIONS_URL: String get() = com.msi.openchat.core.security.NativeCredentialsManager.functionsUrl
-
     // Storage buckets
     const val BUCKET_AVATARS = "avatars"
     const val BUCKET_IMAGES = "images"

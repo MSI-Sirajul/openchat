@@ -616,5 +616,30 @@ class OpenChatUnitTest {
         val chatBinding = com.example.databinding.FragmentChatBinding.inflate(inflater)
         assertNotNull(chatBinding.textChatAvatar)
         assertNotNull(chatBinding.imgChatAvatar)
+
+        // 5. Default person avatar drawable
+        val defaultAvatarDrawable = androidx.core.content.ContextCompat.getDrawable(themedContext, com.example.R.drawable.ic_default_avatar)
+        assertNotNull(defaultAvatarDrawable)
+    }
+
+    @Test
+    fun testPendingAvatarLocalPreviewAndSave() = kotlinx.coroutines.runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        com.msi.openchat.core.di.ServiceLocator.initialize(context)
+
+        val sessionManager = com.msi.openchat.core.di.ServiceLocator.sessionManager
+        sessionManager.saveSession("token_abc", "refresh_def", "user_preview_1", "preview@openchat.app")
+
+        val viewModel = com.msi.openchat.feature.profile.ProfileViewModel("user_preview_1")
+        assertNull(viewModel.uiState.value.pendingAvatarUri)
+
+        // 1. Selecting an image only updates pendingAvatarUri for local preview
+        val dummyUri = android.net.Uri.parse("content://media/external/images/media/42")
+        viewModel.setPendingAvatar(dummyUri)
+        assertEquals(dummyUri, viewModel.uiState.value.pendingAvatarUri)
+
+        // 2. Canceling edit mode discards the pending avatar
+        viewModel.setEditMode(false)
+        assertNull(viewModel.uiState.value.pendingAvatarUri)
     }
 }

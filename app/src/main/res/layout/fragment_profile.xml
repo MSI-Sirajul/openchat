@@ -75,7 +75,7 @@
                     android:layout_height="80dp"
                     android:layout_gravity="center_vertical">
 
-                    <!-- First-letter Avatar fallback -->
+                    <!-- First-letter Avatar fallback (hidden in favor of default person icon) -->
                     <TextView
                         android:id="@+id/text_profile_avatar"
                         android:layout_width="80dp"
@@ -86,16 +86,18 @@
                         android:text="U"
                         android:textColor="@color/color_avatar_text"
                         android:textSize="32sp"
-                        android:fontFamily="sans-serif-bold" />
+                        android:fontFamily="sans-serif-bold"
+                        android:visibility="gone" />
 
-                    <!-- Uploaded Image Avatar -->
+                    <!-- Avatar Image (Profile picture or default person icon) -->
                     <com.google.android.material.imageview.ShapeableImageView
                         android:id="@+id/img_profile_avatar"
                         android:layout_width="80dp"
                         android:layout_height="80dp"
                         android:scaleType="centerCrop"
+                        android:src="@drawable/ic_default_avatar"
                         app:shapeAppearanceOverlay="@style/ShapeAppearance.Material3.Corner.Full"
-                        android:visibility="gone" />
+                        android:visibility="visible" />
 
                     <!-- Online status dot -->
                     <View

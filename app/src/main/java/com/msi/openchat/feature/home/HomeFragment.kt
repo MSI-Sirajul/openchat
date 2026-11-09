@@ -67,6 +67,7 @@ class HomeFragment : Fragment() {
     override fun onResume() {
         super.onResume()
         (activity as? com.example.MainActivity)?.syncStatusBarColor()
+        refreshHomeProfileAvatar()
     }
 
     private fun setupInsets() {
@@ -394,6 +395,22 @@ class HomeFragment : Fragment() {
                         )
                     }
                 }
+            }
+        }
+    }
+
+    private fun refreshHomeProfileAvatar() {
+        val currentUid = com.msi.openchat.core.di.ServiceLocator.sessionManager.getUserId()
+        if (!currentUid.isNullOrBlank()) {
+            val cached = com.msi.openchat.core.di.ServiceLocator.userRepository.getCachedProfile(currentUid)
+            if (cached != null) {
+                val name = cached.displayName.ifBlank { cached.username ?: "U" }
+                com.msi.openchat.core.ui.AvatarHelper.loadAvatar(
+                    imageView = binding.imgHomeProfileAvatar,
+                    letterTextView = binding.textHomeProfileAvatar,
+                    avatarUrl = cached.avatarUrl ?: cached.avatar,
+                    displayName = name
+                )
             }
         }
     }

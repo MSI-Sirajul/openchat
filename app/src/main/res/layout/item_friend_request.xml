@@ -33,15 +33,17 @@
                 android:text="U"
                 android:textColor="@color/color_avatar_text"
                 android:textSize="18sp"
-                android:textStyle="bold" />
+                android:textStyle="bold"
+                android:visibility="gone" />
 
             <com.google.android.material.imageview.ShapeableImageView
                 android:id="@+id/img_request_avatar"
                 android:layout_width="48dp"
                 android:layout_height="48dp"
                 android:scaleType="centerCrop"
+                android:src="@drawable/ic_default_avatar"
                 app:shapeAppearanceOverlay="@style/ShapeAppearance.Material3.Corner.Full"
-                android:visibility="gone" />
+                android:visibility="visible" />
         </FrameLayout>
 
         <LinearLayout

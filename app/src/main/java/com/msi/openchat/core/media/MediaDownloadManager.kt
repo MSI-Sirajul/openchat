@@ -161,7 +161,7 @@ object MediaDownloadManager {
 
     /**
      * Downloads remote media into the app cache with retry and progress callback.
-     * Supports data: URIs, http://, https://, and NHost/Firebase public endpoints.
+     * Supports data: URIs, http://, https://, and Firebase Storage public endpoints.
      */
     suspend fun downloadToCache(
         context: Context,

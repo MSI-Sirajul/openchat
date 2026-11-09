@@ -44,15 +44,17 @@
                         android:text="U"
                         android:textColor="@color/color_avatar_text"
                         android:textSize="16sp"
-                        android:textStyle="bold" />
+                        android:textStyle="bold"
+                        android:visibility="gone" />
 
                     <com.google.android.material.imageview.ShapeableImageView
                         android:id="@+id/img_chat_avatar"
                         android:layout_width="match_parent"
                         android:layout_height="match_parent"
                         android:scaleType="centerCrop"
+                        android:src="@drawable/ic_default_avatar"
                         app:shapeAppearanceOverlay="@style/ShapeAppearance.Material3.Corner.Full"
-                        android:visibility="gone" />
+                        android:visibility="visible" />
 
                     <View
                         android:id="@+id/dot_chat_online"

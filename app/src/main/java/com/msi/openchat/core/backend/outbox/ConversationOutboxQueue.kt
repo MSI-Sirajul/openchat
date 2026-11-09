@@ -3,6 +3,7 @@ package com.msi.openchat.core.backend.outbox
 import android.content.Context
 import android.net.Uri
 import android.util.Log
+import com.msi.openchat.core.common.Constants
 import com.msi.openchat.data.local.dao.MessageDao
 import com.msi.openchat.data.local.entity.MessageEntity
 import com.msi.openchat.data.model.Message
@@ -196,7 +197,12 @@ class ConversationOutboxQueue(
 
                 if (compressedFile != null && compressedFile.exists() && compressedFile.length() > 0) {
                     messageDao.updateUploadProgress(current.id, 0.2f, "uploading")
-                    val bucket = com.msi.openchat.data.remote.storage.NhostStorageClient.getBucketForType(current.type)
+                    val bucket = when (current.type) {
+                        "image" -> Constants.BUCKET_IMAGES
+                        "audio" -> Constants.BUCKET_AUDIO
+                        "video" -> Constants.BUCKET_VIDEOS
+                        else -> Constants.BUCKET_ATTACHMENTS
+                    }
                     val mime = current.mediaMimeType ?: when (current.type) {
                         "image" -> "image/jpeg"
                         "video" -> "video/mp4"

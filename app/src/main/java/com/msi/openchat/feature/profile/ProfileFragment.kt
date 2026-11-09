@@ -32,7 +32,7 @@ import kotlinx.coroutines.launch
  * - Details: left-aligned About/Bio, Phone number, and read-only locked Email.
  * - Inline edit mode: editing directly on layout with toolbar Save button.
  * - Fresh data loading on open (bypassing stale cache).
- * - Custom avatar photo picker with upload to NHost 'avatars' bucket (with Firebase fallback).
+ * - Custom avatar photo picker with upload to 'avatars' storage bucket.
  */
 class ProfileFragment : Fragment() {
 
@@ -50,12 +50,12 @@ class ProfileFragment : Fragment() {
         }
     }
 
-    // Zero-permission modern Android Photo Picker
+    // Zero-permission modern Android Photo Picker: previews locally, uploads strictly on Save
     private val photoPickerLauncher = registerForActivityResult(
         ActivityResultContracts.PickVisualMedia()
     ) { uri ->
         if (uri != null) {
-            profileViewModel.uploadAvatar(requireContext(), uri)
+            profileViewModel.setPendingAvatar(uri)
         }
     }
 
@@ -100,7 +100,8 @@ class ProfileFragment : Fragment() {
                 displayName = name,
                 username = username,
                 bio = bio,
-                phoneNumber = phone
+                phoneNumber = phone,
+                context = requireContext()
             )
         }
 
@@ -164,13 +165,21 @@ class ProfileFragment : Fragment() {
         val email = profile.email?.takeIf { it.isNotBlank() }
             ?: (ServiceLocator.sessionManager.getUserEmail() ?: "Not provided")
 
-        // 1. Avatar rendering (with image loading & fallback to initial letter)
-        com.msi.openchat.core.ui.AvatarHelper.loadAvatar(
-            imageView = binding.imgProfileAvatar,
-            letterTextView = binding.textProfileAvatar,
-            avatarUrl = profile.avatarUrl ?: profile.avatar,
-            displayName = name
-        )
+        // 1. Avatar rendering: local preview if pending, otherwise remote avatarUrl with default icon fallback
+        if (state.pendingAvatarUri != null) {
+            com.msi.openchat.core.ui.AvatarHelper.previewAvatar(
+                imageView = binding.imgProfileAvatar,
+                letterTextView = binding.textProfileAvatar,
+                imageUri = state.pendingAvatarUri
+            )
+        } else {
+            com.msi.openchat.core.ui.AvatarHelper.loadAvatar(
+                imageView = binding.imgProfileAvatar,
+                letterTextView = binding.textProfileAvatar,
+                avatarUrl = profile.avatarUrl ?: profile.avatar,
+                displayName = name
+            )
+        }
 
         // Presence indicator
         val isOnline = PresenceHelper.isUserOnline(profile)

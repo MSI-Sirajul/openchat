@@ -5,14 +5,18 @@ import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
+import android.net.Uri
 import android.util.Log
-import com.google.android.gms.tasks.Task
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.ChildEventListener
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.DatabaseReference
+import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ServerValue
 import com.google.firebase.database.ValueEventListener
+import com.google.firebase.storage.FirebaseStorage
+import com.google.firebase.storage.StorageReference
 import com.msi.openchat.core.backend.inbox.ConversationInboxProcessor
 import com.msi.openchat.core.backend.outbox.ConversationOutboxQueue
 import com.msi.openchat.core.common.Constants
@@ -22,8 +26,8 @@ import com.msi.openchat.core.security.SessionManager
 import com.msi.openchat.data.local.OpenChatDatabase
 import com.msi.openchat.data.local.entity.MessageEntity
 import com.msi.openchat.data.model.Message
+import com.msi.openchat.data.model.Profile
 import com.msi.openchat.data.remote.firebase.FirebaseManager
-import com.msi.openchat.data.remote.storage.NhostStorageClient
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -39,25 +43,31 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
-import okhttp3.MediaType.Companion.toMediaTypeOrNull
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
-import org.json.JSONObject
 import java.io.File
+import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.TimeUnit
 import kotlin.coroutines.resume
+
+/**
+ * Future plug-in interface for bucket-only Nhost Storage.
+ * Kept here as a clean placeholder for future bucket-only storage without auth/GraphQL.
+ */
+interface NhostStorageClient {
+    suspend fun uploadFile(file: File, mimeType: String, bucket: String): Resource<String>
+    suspend fun uploadBytes(bytes: ByteArray, fileName: String, mimeType: String, bucket: String): Resource<String>
+    fun getFileUrl(fileIdOrPath: String, bucket: String? = null): String
+}
 
 /**
  * BackendManager
  *
  * WhatsApp/Telegram-Grade Unified Backend Layer for OpenChat:
- * - Unifies Firebase Realtime Database + NHost (Storage & GraphQL) into a single resilient facade.
+ * - Firebase is the MAIN backend for Auth, Database, Storage, FCM/push, and Realtime listeners.
  * - Single source of truth: StateFlow<ConnectionState> (Connected, Reconnecting, Offline).
  * - Exposes high-level typed messaging & media operations.
  * - Manages persistent connection heartbeat, token refresh, and automatic listener re-subscription.
  * - Backed by WhatsApp-grade ConversationOutboxQueue (per-conversation isolation) and ConversationInboxProcessor.
+ * - Extensible: Contains a clean stubbed placeholder for a future NhostStorageClient (bucket-only).
  */
 object BackendManager {
     private const val TAG = "BackendManager"
@@ -70,13 +80,10 @@ object BackendManager {
     private val _connectionState = MutableStateFlow<ConnectionState>(ConnectionState.Offline)
     val connectionState: StateFlow<ConnectionState> = _connectionState.asStateFlow()
 
-    // Subsystems
-    private val storageClient by lazy { NhostStorageClient() }
-    private val okHttpClient = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
-        .build()
+    // Stubbed placeholder for future NhostStorageClient (bucket-only, no auth, no GraphQL)
+    // var nhostStorageClient: NhostStorageClient? = null
 
+    // Subsystems
     private var outboxQueue: ConversationOutboxQueue? = null
     private var inboxProcessor: ConversationInboxProcessor? = null
 
@@ -86,6 +93,11 @@ object BackendManager {
     private var heartbeatJob: Job? = null
     private var isNetworkAvailable = false
     private var isFirebaseConnected = false
+
+    // Facade access to underlying Firebase subsystems
+    val auth: FirebaseAuth get() = FirebaseManager.auth
+    val database: FirebaseDatabase get() = FirebaseManager.database
+    val storage: FirebaseStorage get() = FirebaseManager.storage
 
     /**
      * Initialize BackendManager with application context.
@@ -106,14 +118,14 @@ object BackendManager {
                 context = context,
                 messageDao = database.messageDao(),
                 conversationDao = database.conversationDao(),
-                currentUserIdProvider = { sessionManager.getUserId() ?: FirebaseManager.auth.currentUser?.uid }
+                currentUserIdProvider = { sessionManager.getUserId() ?: FirebaseManager.auth?.currentUser?.uid }
             )
 
             // Setup Per-Conversation Outbox Queue
             outboxQueue = ConversationOutboxQueue(
                 context = context,
                 messageDao = database.messageDao(),
-                currentUserIdProvider = { sessionManager.getUserId() ?: FirebaseManager.auth.currentUser?.uid },
+                currentUserIdProvider = { sessionManager.getUserId() ?: FirebaseManager.auth?.currentUser?.uid },
                 fileUploader = { file, mimeType, bucket, onProgress ->
                     uploadFileInternal(file, mimeType, bucket, onProgress)
                 },
@@ -126,7 +138,7 @@ object BackendManager {
             setupFirebaseConnectionObserver()
             startHeartbeatMonitor()
 
-            Log.i(TAG, "BackendManager initialized successfully")
+            Log.i(TAG, "BackendManager initialized successfully with Firebase")
         }
     }
 
@@ -148,13 +160,13 @@ object BackendManager {
                 context = context,
                 messageDao = database.messageDao(),
                 conversationDao = database.conversationDao(),
-                currentUserIdProvider = { sessionManager.getUserId() ?: FirebaseManager.auth.currentUser?.uid }
+                currentUserIdProvider = { sessionManager.getUserId() ?: FirebaseManager.auth?.currentUser?.uid }
             )
 
             outboxQueue = ConversationOutboxQueue(
                 context = context,
                 messageDao = database.messageDao(),
-                currentUserIdProvider = { sessionManager.getUserId() ?: FirebaseManager.auth.currentUser?.uid },
+                currentUserIdProvider = { sessionManager.getUserId() ?: FirebaseManager.auth?.currentUser?.uid },
                 fileUploader = { file, mimeType, bucket, onProgress ->
                     uploadFileInternal(file, mimeType, bucket, onProgress)
                 },
@@ -243,7 +255,7 @@ object BackendManager {
             while (isActive) {
                 delay(25000L) // 25-second heartbeat
                 if (isNetworkAvailable && !isFirebaseConnected) {
-                    Log.d(TAG, "Heartbeat: Reconnecting socket and checking token session...")
+                    Log.d(TAG, "Heartbeat: Reconnecting Firebase socket...")
                     restoreSessionIfNeeded()
                 }
             }
@@ -268,7 +280,7 @@ object BackendManager {
         val uid = sessionManager.getUserId()
         if (uid.isNullOrBlank()) return@withContext
 
-        // Ensure Firebase Realtime Database presence is active
+        // Ensure Firebase Realtime Database is online
         try {
             FirebaseManager.database.goOnline()
         } catch (_: Exception) {}
@@ -347,20 +359,63 @@ object BackendManager {
     }
 
     // =========================================================================
-    // 3. Media Storage API (NHost + Fallbacks)
+    // 3. Media Storage API (Firebase Storage with Future Nhost Client Hook)
     // =========================================================================
+
+    private fun getStorageRefForBucket(bucket: String): StorageReference {
+        return when (bucket) {
+            Constants.BUCKET_AVATARS -> FirebaseManager.getAvatarsStorageRef()
+            Constants.BUCKET_AUDIO, Constants.BUCKET_VOICE_CHAT, Constants.BUCKET_VOICE_MESSAGES -> FirebaseManager.getChatAudioStorageRef()
+            Constants.BUCKET_VIDEOS -> FirebaseManager.getChatVideosStorageRef()
+            Constants.BUCKET_ATTACHMENTS, Constants.BUCKET_CHAT_ATTACHMENTS -> FirebaseManager.getChatAttachmentsStorageRef()
+            else -> FirebaseManager.getChatImagesStorageRef()
+        }
+    }
 
     suspend fun uploadFile(
         file: File,
         mimeType: String,
-        bucket: String = NhostStorageClient.BUCKET_DEFAULT,
+        bucket: String = Constants.BUCKET_IMAGES,
         onProgress: (Float) -> Unit = {}
     ): Resource<String> = withContext(Dispatchers.IO) {
-        val res = storageClient.uploadFile(file, mimeType, bucket)
-        if (res is Resource.Success) {
-            onProgress(1.0f)
+        if (!file.exists()) {
+            return@withContext Resource.Error("File does not exist: ${file.absolutePath}")
         }
-        res
+
+        suspendCancellableCoroutine<Resource<String>> { continuation ->
+            val ext = file.extension.ifBlank { "bin" }
+            val uniqueName = "${UUID.randomUUID()}.$ext"
+            val targetRef = getStorageRefForBucket(bucket).child(uniqueName)
+            val uri = Uri.fromFile(file)
+
+            val uploadTask = targetRef.putFile(uri)
+            uploadTask.addOnProgressListener { taskSnapshot ->
+                val total = taskSnapshot.totalByteCount
+                if (total > 0) {
+                    val progress = taskSnapshot.bytesTransferred.toFloat() / total.toFloat()
+                    onProgress(progress)
+                }
+            }.addOnSuccessListener {
+                targetRef.downloadUrl.addOnSuccessListener { downloadUri ->
+                    onProgress(1.0f)
+                    if (continuation.isActive) {
+                        continuation.resume(Resource.Success(downloadUri.toString()))
+                    }
+                }.addOnFailureListener { e ->
+                    if (continuation.isActive) {
+                        continuation.resume(Resource.Error(e.message ?: "Failed to retrieve download URL", e))
+                    }
+                }
+            }.addOnFailureListener { e ->
+                if (continuation.isActive) {
+                    continuation.resume(Resource.Error(e.message ?: "File upload failed", e))
+                }
+            }
+
+            continuation.invokeOnCancellation {
+                uploadTask.cancel()
+            }
+        }
     }
 
     private suspend fun uploadFileInternal(
@@ -369,13 +424,9 @@ object BackendManager {
         bucket: String,
         onProgress: (Float) -> Unit
     ): String? {
-        onProgress(0.2f)
-        val res = storageClient.uploadFile(file, mimeType, bucket)
+        val res = uploadFile(file, mimeType, bucket, onProgress)
         return when (res) {
-            is Resource.Success -> {
-                onProgress(1.0f)
-                res.data
-            }
+            is Resource.Success -> res.data
             else -> null
         }
     }
@@ -384,9 +435,43 @@ object BackendManager {
         bytes: ByteArray,
         fileName: String,
         mimeType: String,
-        bucket: String = NhostStorageClient.BUCKET_DEFAULT
+        bucket: String = Constants.BUCKET_IMAGES
     ): Resource<String> = withContext(Dispatchers.IO) {
-        storageClient.uploadBytes(bytes, fileName, mimeType, bucket)
+        suspendCancellableCoroutine<Resource<String>> { continuation ->
+            val targetRef = getStorageRefForBucket(bucket).child(fileName)
+            val uploadTask = targetRef.putBytes(bytes)
+
+            uploadTask.addOnSuccessListener {
+                targetRef.downloadUrl.addOnSuccessListener { downloadUri ->
+                    if (continuation.isActive) {
+                        continuation.resume(Resource.Success(downloadUri.toString()))
+                    }
+                }.addOnFailureListener { e ->
+                    if (continuation.isActive) {
+                        continuation.resume(Resource.Error(e.message ?: "Failed to retrieve download URL", e))
+                    }
+                }
+            }.addOnFailureListener { e ->
+                if (continuation.isActive) {
+                    continuation.resume(Resource.Error(e.message ?: "Byte upload failed", e))
+                }
+            }
+
+            continuation.invokeOnCancellation {
+                uploadTask.cancel()
+            }
+        }
+    }
+
+    /**
+     * Resolves a storage path or URL to a playable/downloadable URL.
+     */
+    fun getFileUrl(fileIdOrPath: String, bucket: String? = null): String {
+        if (fileIdOrPath.startsWith("http://") || fileIdOrPath.startsWith("https://")) {
+            return fileIdOrPath
+        }
+        val targetBucket = bucket ?: Constants.BUCKET_IMAGES
+        return "https://firebasestorage.googleapis.com/v0/b/${FirebaseManager.STORAGE_BUCKET}/o/${targetBucket}%2F${fileIdOrPath}?alt=media"
     }
 
     // =========================================================================
@@ -410,7 +495,12 @@ object BackendManager {
                 else -> message.content ?: "Message"
             }
 
-            val bucketId = NhostStorageClient.getBucketForType(message.type)
+            val bucketId = when (message.type) {
+                "image" -> Constants.BUCKET_IMAGES
+                "audio" -> Constants.BUCKET_AUDIO
+                "video" -> Constants.BUCKET_VIDEOS
+                else -> Constants.BUCKET_ATTACHMENTS
+            }
 
             val msgData = HashMap<String, Any?>()
             msgData["id"] = messageId
@@ -501,7 +591,8 @@ object BackendManager {
     }
 
     /**
-     * Send push notification via NHost functions or FCM gateway.
+     * Send push notification via Firebase Realtime Database notifications queue.
+     * Triggers recipient's FirebaseMessaging / Notification listener even when offline/closed.
      */
     suspend fun sendPushNotification(
         recipientId: String,
@@ -510,20 +601,17 @@ object BackendManager {
         data: Map<String, String> = emptyMap()
     ): Boolean = withContext(Dispatchers.IO) {
         try {
-            val json = JSONObject().apply {
-                put("recipient_id", recipientId)
-                put("title", title)
-                put("body", body)
-                put("data", JSONObject(data))
-            }
-            val requestBody = json.toString().toRequestBody("application/json".toMediaTypeOrNull())
-            val request = Request.Builder()
-                .url(Constants.NHOST_FUNCTIONS_URL.trimEnd('/') + "/send-push")
-                .post(requestBody)
-                .build()
+            val notifId = UUID.randomUUID().toString()
+            val notifRef = FirebaseManager.database.getReference("notifications").child(recipientId).child(notifId)
+            val notifData = HashMap<String, Any?>()
+            notifData["id"] = notifId
+            notifData["title"] = title
+            notifData["body"] = body
+            notifData["data"] = data
+            notifData["timestamp"] = ServerValue.TIMESTAMP
 
-            val response = okHttpClient.newCall(request).execute()
-            response.isSuccessful
+            val updates = mapOf<String, Any?>("/notifications/$recipientId/$notifId" to notifData)
+            updateChildrenSuspend(FirebaseManager.database.reference, updates)
         } catch (e: Exception) {
             Log.w(TAG, "Push notification dispatch notice: ${e.message}")
             false
@@ -533,9 +621,8 @@ object BackendManager {
     /**
      * Resolves avatar URL for a profile or user, returning null if missing so UI falls back to initials.
      */
-    fun getAvatarUrl(profile: com.msi.openchat.data.model.Profile?): String? {
+    fun getAvatarUrl(profile: Profile?): String? {
         return profile?.avatarUrl?.trim()?.takeIf { it.isNotBlank() }
             ?: profile?.avatar?.trim()?.takeIf { it.isNotBlank() }
     }
 }
-

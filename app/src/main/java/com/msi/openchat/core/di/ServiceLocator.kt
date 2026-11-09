@@ -99,19 +99,6 @@ object ServiceLocator {
     val conversationDao: com.msi.openchat.data.local.dao.ConversationDao
         get() = database.conversationDao()
 
-    val nhostStorageClient: com.msi.openchat.data.remote.storage.NhostStorageClient by lazy {
-        val secret = try {
-            val field = com.example.BuildConfig::class.java.getField("NHOST_ADMIN_SECRET")
-            (field.get(null) as? String)?.takeIf { it.isNotBlank() }
-        } catch (_: Throwable) {
-            null
-        }
-        com.msi.openchat.data.remote.storage.NhostStorageClient(
-            baseUrl = com.msi.openchat.core.common.Constants.NHOST_STORAGE_URL.ifBlank { com.msi.openchat.data.remote.storage.NhostStorageClient.NHOST_STORAGE_URL },
-            adminSecret = secret
-        )
-    }
-
     val chatRepository: ChatRepository
         get() {
             val uid = try { sessionManager.getUserId() } catch (_: Exception) { null }
@@ -124,8 +111,7 @@ object ServiceLocator {
                             sessionManager = sessionManager,
                             userRepository = userRepository,
                             messageDao = db.messageDao(),
-                            conversationDao = db.conversationDao(),
-                            storageClient = nhostStorageClient
+                            conversationDao = db.conversationDao()
                         )
                     }
                 }
@@ -141,8 +127,7 @@ object ServiceLocator {
                 sessionManager = sessionManager,
                 userRepository = userRepository,
                 messageDao = activeDatabase!!.messageDao(),
-                conversationDao = activeDatabase!!.conversationDao(),
-                storageClient = nhostStorageClient
+                conversationDao = activeDatabase!!.conversationDao()
             )
             com.msi.openchat.core.backend.BackendManager.onUserLoggedIn(context, userId)
         }

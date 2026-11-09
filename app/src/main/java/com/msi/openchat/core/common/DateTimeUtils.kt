@@ -17,7 +17,7 @@ object DateTimeUtils {
     fun formatIsoCurrent(): String = Instant.now().toString()
 
     /**
-     * Parses ISO-8601 / Nhost / PostgreSQL timestamp strings into java.time.Instant safely.
+     * Parses ISO-8601 / RFC-3339 / PostgreSQL timestamp strings into java.time.Instant safely.
      * Handles timezone offsets (e.g., +00:00, +06:00, Z), variable millisecond precision,
      * and space-separated timestamps.
      */

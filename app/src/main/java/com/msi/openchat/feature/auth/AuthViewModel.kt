@@ -235,7 +235,7 @@ class AuthViewModel(
                         registerFcmDevice()
                         val currentToken = ServiceLocator.sessionManager.getAccessToken()
                         if (!currentToken.isNullOrBlank()) {
-                            // Instant login when email verification is disabled in Nhost Console
+                            // Instant login when email verification is disabled
                             ServiceLocator.sessionManager.secureStorage.setAppUnlocked(true)
                             _uiState.value = _uiState.value.copy(
                                 isLoading = false,

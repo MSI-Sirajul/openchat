@@ -17,6 +17,7 @@ data class SettingsUiState(
     val username: String = "",
     val bio: String = "",
     val statusMessage: String = "",
+    val avatarUrl: String? = null,
     val showLastSeen: Boolean = true,
     val showReadReceipts: Boolean = true,
     
@@ -84,6 +85,7 @@ class SettingsViewModel(
                         username = p.username.orEmpty(),
                         bio = p.bio.orEmpty(),
                         statusMessage = p.statusMessage ?: "Available",
+                        avatarUrl = p.avatarUrl ?: p.avatar,
                         showLastSeen = p.showLastSeen,
                         showReadReceipts = p.showReadReceipts,
                         isAppLockEnabled = sessionManager.secureStorage.isAppLockEnabled(),

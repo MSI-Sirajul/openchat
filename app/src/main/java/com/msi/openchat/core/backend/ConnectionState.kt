@@ -1,7 +1,7 @@
 package com.msi.openchat.core.backend
 
 /**
- * Single source of truth for unified backend connectivity (Firebase + NHost + Network).
+ * Single source of truth for unified backend connectivity (Firebase + Network).
  */
 sealed class ConnectionState {
     object Connected : ConnectionState()

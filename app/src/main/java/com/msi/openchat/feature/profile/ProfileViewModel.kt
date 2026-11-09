@@ -15,6 +15,7 @@ import kotlinx.coroutines.launch
 
 data class ProfileUiState(
     val profile: Profile? = null,
+    val pendingAvatarUri: Uri? = null,
     val isLoading: Boolean = false,
     val isSaving: Boolean = false,
     val isUploadingAvatar: Boolean = false,
@@ -45,7 +46,7 @@ class ProfileViewModel(
 
     /**
      * Loads user profile data. When forceRefresh is true, fetches fresh data directly from the backend
-     * (Firebase + NHost) without relying on stale cache.
+     * without relying on stale cache.
      */
     fun loadProfile(forceRefresh: Boolean = true) {
         val targetId = if (userId.isNotBlank()) userId else currentUserId
@@ -91,74 +92,52 @@ class ProfileViewModel(
 
     fun setEditMode(enabled: Boolean) {
         if (!_uiState.value.isSelf && enabled) return
-        _uiState.value = _uiState.value.copy(isEditMode = enabled)
+        _uiState.value = _uiState.value.copy(
+            isEditMode = enabled,
+            pendingAvatarUri = if (!enabled) null else _uiState.value.pendingAvatarUri
+        )
     }
 
     fun toggleEditMode() {
         if (!_uiState.value.isSelf) return
         val current = _uiState.value.isEditMode
-        _uiState.value = _uiState.value.copy(isEditMode = !current)
+        _uiState.value = _uiState.value.copy(
+            isEditMode = !current,
+            pendingAvatarUri = if (current) null else _uiState.value.pendingAvatarUri
+        )
     }
 
     /**
-     * Uploads the chosen avatar image to the 'avatars' storage bucket on NHost (with Firebase fallback),
+     * Stores selected avatar locally for preview during editing.
+     * Upload happens strictly when tapping the Save button.
+     */
+    fun setPendingAvatar(uri: Uri?) {
+        _uiState.value = _uiState.value.copy(pendingAvatarUri = uri)
+    }
+
+    fun clearPendingAvatar() {
+        _uiState.value = _uiState.value.copy(pendingAvatarUri = null)
+    }
+
+    /**
+     * Uploads the chosen avatar image to the 'avatars' storage bucket via BackendManager,
      * updates the profile's avatarUrl, and reflects upload progress.
      */
     fun uploadAvatar(context: Context, imageUri: Uri) {
-        viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isUploadingAvatar = true, avatarUploadProgress = 0.1f)
-            val result = userRepository.uploadAvatar(context, imageUri) { progress ->
-                _uiState.value = _uiState.value.copy(avatarUploadProgress = progress)
-            }
-
-            when (result) {
-                is Resource.Success -> {
-                    val newUrl = result.data
-                    val current = _uiState.value.profile
-                    val updatedProfile = current?.copy(
-                        avatarUrl = newUrl,
-                        avatar = newUrl
-                    )
-                    _uiState.value = _uiState.value.copy(
-                        isUploadingAvatar = false,
-                        profile = updatedProfile,
-                        successMessage = "Avatar uploaded successfully"
-                    )
-
-                    // Immediately persist public URL to Firebase and NHost backend user record
-                    if (current != null) {
-                        userRepository.updateProfile(
-                            displayName = current.displayName.ifBlank { current.username ?: "User" },
-                            username = current.username.orEmpty(),
-                            bio = current.bio.orEmpty(),
-                            statusMessage = current.statusMessage ?: "Available",
-                            phoneNumber = current.phoneNumber,
-                            avatarUrl = newUrl
-                        )
-                    }
-                }
-                is Resource.Error -> {
-                    _uiState.value = _uiState.value.copy(
-                        isUploadingAvatar = false,
-                        errorMessage = result.message ?: "Failed to upload avatar"
-                    )
-                }
-                else -> {
-                    _uiState.value = _uiState.value.copy(isUploadingAvatar = false)
-                }
-            }
-        }
+        setPendingAvatar(imageUri)
     }
 
     /**
-     * Saves all inline-edited profile fields (name, bio, phone, avatar) to Firebase and NHost,
+     * Saves all inline-edited profile fields (name, bio, phone, avatar) to Firebase.
+     * If an avatar was selected, uploads to the 'avatars' bucket first, updates the returned public URL in the DB,
      * updates local cache and credentials, and exits edit mode.
      */
     fun saveProfile(
         displayName: String,
         username: String,
         bio: String,
-        phoneNumber: String
+        phoneNumber: String,
+        context: Context? = null
     ) {
         val current = _uiState.value.profile ?: return
         val newName = displayName.trim()
@@ -170,23 +149,60 @@ class ProfileViewModel(
         val newUsername = username.trim().removePrefix("@")
         val newBio = bio.trim()
         val newPhone = phoneNumber.trim()
+        val pendingUri = _uiState.value.pendingAvatarUri
 
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isSaving = true, errorMessage = null)
+
+            var resolvedAvatarUrl = current.avatarUrl
+
+            // 1. Upload pending avatar image ONLY on Save
+            if (pendingUri != null && context != null) {
+                _uiState.value = _uiState.value.copy(isUploadingAvatar = true, avatarUploadProgress = 0.1f)
+                val uploadResult = userRepository.uploadAvatar(context, pendingUri) { progress ->
+                    _uiState.value = _uiState.value.copy(avatarUploadProgress = progress)
+                }
+
+                when (uploadResult) {
+                    is Resource.Success -> {
+                        resolvedAvatarUrl = uploadResult.data
+                        _uiState.value = _uiState.value.copy(
+                            isUploadingAvatar = false,
+                            avatarUploadProgress = 1.0f
+                        )
+                    }
+                    is Resource.Error -> {
+                        _uiState.value = _uiState.value.copy(
+                            isSaving = false,
+                            isUploadingAvatar = false,
+                            errorMessage = uploadResult.message ?: "Failed to upload avatar"
+                        )
+                        return@launch
+                    }
+                    else -> {
+                        _uiState.value = _uiState.value.copy(isSaving = false, isUploadingAvatar = false)
+                        return@launch
+                    }
+                }
+            }
+
+            // 2. Persist updated profile to Firebase Realtime Database and local caches
             val result = userRepository.updateProfile(
                 displayName = newName,
                 username = if (newUsername.isNotBlank()) newUsername else current.username.orEmpty(),
                 bio = newBio,
                 statusMessage = current.statusMessage ?: "Available",
                 phoneNumber = newPhone,
-                avatarUrl = current.avatarUrl
+                avatarUrl = resolvedAvatarUrl
             )
 
             when (result) {
                 is Resource.Success -> {
                     _uiState.value = _uiState.value.copy(
                         profile = result.data,
+                        pendingAvatarUri = null,
                         isSaving = false,
+                        isUploadingAvatar = false,
                         isEditMode = false,
                         successMessage = "Profile updated successfully"
                     )
@@ -194,11 +210,12 @@ class ProfileViewModel(
                 is Resource.Error -> {
                     _uiState.value = _uiState.value.copy(
                         isSaving = false,
+                        isUploadingAvatar = false,
                         errorMessage = result.message ?: "Failed to save profile"
                     )
                 }
                 else -> {
-                    _uiState.value = _uiState.value.copy(isSaving = false)
+                    _uiState.value = _uiState.value.copy(isSaving = false, isUploadingAvatar = false)
                 }
             }
         }

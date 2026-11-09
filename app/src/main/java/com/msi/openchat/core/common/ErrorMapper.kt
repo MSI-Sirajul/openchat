@@ -68,7 +68,7 @@ object ErrorMapper {
 
         // 6. Email verification notice
         if (lower.contains("unverified") || lower.contains("not confirmed") || lower.contains("not-verified")) {
-            return "Please check your email (including Spam/Junk folder) to confirm your account, or disable 'Require Email Verification' in Nhost Console."
+            return "Please check your email (including Spam/Junk folder) to confirm your account."
         }
 
         return rawMsg.ifBlank { fallback }

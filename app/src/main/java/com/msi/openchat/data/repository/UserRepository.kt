@@ -5,6 +5,7 @@ import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.ServerValue
 import com.google.firebase.database.ValueEventListener
+import com.msi.openchat.core.common.Constants
 import com.msi.openchat.core.common.Resource
 import com.msi.openchat.core.security.SessionManager
 import com.msi.openchat.data.model.Profile
@@ -291,12 +292,12 @@ class UserRepository(
                 mimeType = "image/jpeg"
             ) ?: return@withContext Resource.Error("Could not process selected image")
 
-            onProgress(0.3f)
-            val storageClient = com.msi.openchat.core.di.ServiceLocator.nhostStorageClient
-            val uploadRes = storageClient.uploadFile(
+            onProgress(0.2f)
+            val uploadRes = com.msi.openchat.core.backend.BackendManager.uploadFile(
                 file = tempFile,
                 mimeType = "image/jpeg",
-                bucketId = com.msi.openchat.data.remote.storage.NhostStorageClient.BUCKET_AVATARS
+                bucket = Constants.BUCKET_AVATARS,
+                onProgress = { p -> onProgress(0.2f + p * 0.8f) }
             )
 
             // Delete temporary scratch file
@@ -305,34 +306,10 @@ class UserRepository(
             when (uploadRes) {
                 is Resource.Success<String> -> {
                     onProgress(1.0f)
-                    val avatarUrl = uploadRes.data
-                    Resource.Success(avatarUrl)
+                    Resource.Success(uploadRes.data)
                 }
                 is Resource.Error -> {
-                    // Fallback: upload directly to Firebase Storage avatars directory
-                    suspendCancellableCoroutine<Resource<String>> { continuation ->
-                        val uid = sessionManager.getUserId() ?: FirebaseManager.auth.currentUser?.uid ?: "user"
-                        val fbRef = FirebaseManager.getAvatarsStorageRef().child("${uid}_${System.currentTimeMillis()}.jpg")
-                        fbRef.putFile(imageUri)
-                            .addOnProgressListener { taskSnapshot ->
-                                val total = taskSnapshot.totalByteCount
-                                if (total > 0) {
-                                    val progress = taskSnapshot.bytesTransferred.toFloat() / total.toFloat()
-                                    onProgress(0.3f + progress * 0.7f)
-                                }
-                            }
-                            .addOnSuccessListener {
-                                fbRef.downloadUrl.addOnSuccessListener { uri ->
-                                    onProgress(1.0f)
-                                    continuation.resume(Resource.Success(uri.toString()))
-                                }.addOnFailureListener { e ->
-                                    continuation.resume(Resource.Error(e.message ?: "Failed to get download URL"))
-                                }
-                            }
-                            .addOnFailureListener { e ->
-                                continuation.resume(Resource.Error(uploadRes.message ?: e.message ?: "Avatar upload failed"))
-                            }
-                    }
+                    Resource.Error(uploadRes.message)
                 }
                 else -> Resource.Error("Upload incomplete")
             }

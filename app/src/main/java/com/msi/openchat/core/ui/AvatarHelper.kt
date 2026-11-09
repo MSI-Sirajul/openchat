@@ -1,20 +1,24 @@
 package com.msi.openchat.core.ui
 
+import android.net.Uri
 import android.view.View
 import android.widget.ImageView
 import android.widget.TextView
 import coil.load
 import coil.transform.CircleCropTransformation
+import com.example.R
 import com.msi.openchat.data.model.Profile
 
 /**
  * AvatarHelper
  *
  * Centralized utility for loading user avatars with Coil across the application:
- * - Automatically checks if avatarUrl is present and non-blank.
+ * - Replaces first-letter avatars with a default person icon fallback (R.drawable.ic_default_avatar).
  * - Loads remote image with crossfade and circular cropping.
- * - Manages visibility: displays ImageView on successful load, falls back to letter TextView with initials on error or null URL.
- * - Strictly isolates user avatars to avoid reusing cached images across different users.
+ * - Shows uploaded image everywhere (profile, toolbar, friend lists, chat headers).
+ * - Uses the default person icon as placeholder, error, and fallback.
+ * - Supports local URI preview during editing prior to saving.
+ * - Strictly isolates user avatars by loading each user's own avatar_url.
  */
 object AvatarHelper {
 
@@ -22,9 +26,8 @@ object AvatarHelper {
      * Resolves the avatar URL from a Profile, or returns null if not set.
      */
     fun resolveAvatarUrl(profile: Profile?): String? {
-        val url = profile?.avatarUrl?.trim()?.takeIf { it.isNotBlank() }
+        return profile?.avatarUrl?.trim()?.takeIf { it.isNotBlank() }
             ?: profile?.avatar?.trim()?.takeIf { it.isNotBlank() }
-        return url
     }
 
     /**
@@ -36,47 +39,71 @@ object AvatarHelper {
 
     /**
      * Returns the first letter initial from a display name, username, or default "U".
+     * Maintained for backwards-compatibility if needed.
      */
     fun extractInitial(displayName: String?): String {
         return displayName?.trim()?.take(1)?.uppercase()?.ifBlank { "U" } ?: "U"
     }
 
     /**
-     * Loads an avatar into an ImageView using Coil with fallback to an initials TextView.
-     * When avatarUrl is present and valid, displays the ImageView and hides the letter TextView.
-     * When avatarUrl is null/blank or fails to load, displays the letter TextView with initials and hides the ImageView.
+     * Loads an avatar into an ImageView using Coil with fallback to the default person icon.
+     * When avatarUrl is present and valid, loads and displays the image.
+     * When avatarUrl is null/blank or fails to load, displays R.drawable.ic_default_avatar.
+     * The first-letter TextView is hidden (View.GONE) in favor of the default person icon.
      */
     fun loadAvatar(
         imageView: ImageView,
-        letterTextView: TextView,
+        letterTextView: TextView? = null,
         avatarUrl: String?,
-        displayName: String?
+        displayName: String? = null
     ) {
+        letterTextView?.visibility = View.GONE
+        imageView.visibility = View.VISIBLE
+
         val resolvedUrl = resolveAvatarUrl(avatarUrl)
-        val initial = extractInitial(displayName)
 
         if (!resolvedUrl.isNullOrBlank()) {
-            imageView.visibility = View.VISIBLE
-            letterTextView.visibility = View.GONE
             imageView.load(resolvedUrl) {
                 crossfade(true)
+                placeholder(R.drawable.ic_default_avatar)
+                error(R.drawable.ic_default_avatar)
+                fallback(R.drawable.ic_default_avatar)
                 transformations(CircleCropTransformation())
                 listener(
                     onSuccess = { _, _ ->
                         imageView.visibility = View.VISIBLE
-                        letterTextView.visibility = View.GONE
+                        letterTextView?.visibility = View.GONE
                     },
                     onError = { _, _ ->
-                        imageView.visibility = View.GONE
-                        letterTextView.visibility = View.VISIBLE
-                        letterTextView.text = initial
+                        imageView.visibility = View.VISIBLE
+                        letterTextView?.visibility = View.GONE
+                        imageView.setImageResource(R.drawable.ic_default_avatar)
                     }
                 )
             }
         } else {
-            imageView.visibility = View.GONE
-            letterTextView.visibility = View.VISIBLE
-            letterTextView.text = initial
+            imageView.setImageResource(R.drawable.ic_default_avatar)
+            imageView.visibility = View.VISIBLE
+            letterTextView?.visibility = View.GONE
+        }
+    }
+
+    /**
+     * Previews a locally selected avatar Uri (before saving to server).
+     */
+    fun previewAvatar(
+        imageView: ImageView,
+        letterTextView: TextView? = null,
+        imageUri: Uri
+    ) {
+        letterTextView?.visibility = View.GONE
+        imageView.visibility = View.VISIBLE
+        imageView.load(imageUri) {
+            crossfade(true)
+            placeholder(R.drawable.ic_default_avatar)
+            error(R.drawable.ic_default_avatar)
+            fallback(R.drawable.ic_default_avatar)
+            transformations(CircleCropTransformation())
         }
     }
 
@@ -85,7 +112,7 @@ object AvatarHelper {
      */
     fun loadAvatar(
         imageView: ImageView,
-        letterTextView: TextView,
+        letterTextView: TextView? = null,
         profile: Profile?
     ) {
         val name = profile?.getResolvedName() ?: profile?.displayName ?: profile?.username ?: "User"

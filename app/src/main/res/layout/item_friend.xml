@@ -34,6 +34,7 @@
                 android:textColor="@color/color_avatar_text"
                 android:textSize="18sp"
                 android:textStyle="bold"
+                android:visibility="gone"
                 tools:text="D" />
 
             <com.google.android.material.imageview.ShapeableImageView
@@ -41,8 +42,9 @@
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:scaleType="centerCrop"
+                android:src="@drawable/ic_default_avatar"
                 app:shapeAppearanceOverlay="@style/ShapeAppearance.Material3.Corner.Full"
-                android:visibility="gone" />
+                android:visibility="visible" />
         </FrameLayout>
 
         <View

@@ -43,8 +43,12 @@ class UserSearchAdapter(
         fun bind(item: UserSearchItem) {
             val profile = item.profile
             binding.textUserName.text = profile.displayName.ifBlank { profile.username ?: "User" }
-            binding.textUserHandle.text = if (!profile.username.isNullOrBlank()) "@${profile.username}" else profile.phoneNumber ?: ""
-            binding.textUserAvatar.text = profile.displayName.take(1).ifBlank { "U" }.uppercase()
+            com.msi.openchat.core.ui.AvatarHelper.loadAvatar(
+                imageView = binding.imgUserAvatar,
+                letterTextView = binding.textUserAvatar,
+                avatarUrl = profile.avatarUrl ?: profile.avatar,
+                displayName = profile.displayName
+            )
 
             when (item.status) {
                 RelationshipStatus.FRIENDS -> {

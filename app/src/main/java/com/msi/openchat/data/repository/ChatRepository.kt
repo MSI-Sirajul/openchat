@@ -9,7 +9,7 @@ import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.ServerValue
 import com.google.firebase.database.ValueEventListener
-import com.google.firebase.storage.StorageReference
+import com.msi.openchat.core.common.Constants
 import com.msi.openchat.core.common.Resource
 import com.msi.openchat.core.security.SessionManager
 import com.msi.openchat.data.local.dao.ConversationDao
@@ -43,8 +43,7 @@ class ChatRepository(
     private val sessionManager: SessionManager,
     private val userRepository: UserRepository,
     private val messageDao: MessageDao? = null,
-    private val conversationDao: ConversationDao? = null,
-    private val storageClient: com.msi.openchat.data.remote.storage.NhostStorageClient = com.msi.openchat.data.remote.storage.NhostStorageClient()
+    private val conversationDao: ConversationDao? = null
 ) {
     private val tag = "OpenChat_ChatRepo"
     private val conversationsRef get() = FirebaseManager.conversationsRef
@@ -291,7 +290,12 @@ class ChatRepository(
 
     suspend fun uploadMedia(file: File, type: String, conversationId: String): Resource<String> = withContext(Dispatchers.IO) {
         try {
-            val bucketId = com.msi.openchat.data.remote.storage.NhostStorageClient.getBucketForType(type)
+            val bucketId = when (type) {
+                "image" -> Constants.BUCKET_IMAGES
+                "audio" -> Constants.BUCKET_AUDIO
+                "video" -> Constants.BUCKET_VIDEOS
+                else -> Constants.BUCKET_ATTACHMENTS
+            }
             val ext = file.extension.lowercase()
             val mimeType = when (type) {
                 "image" -> when (ext) {
@@ -315,17 +319,16 @@ class ChatRepository(
                 else -> "application/octet-stream"
             }
 
-            Log.i(tag, "Uploading $type to Nhost bucket '$bucketId' (${file.length()} bytes)")
+            Log.i(tag, "Uploading $type to bucket '$bucketId' (${file.length()} bytes)")
 
-            // Upload directly to Nhost Cloud Storage with dedicated bucket
-            val nhostRes = storageClient.uploadFile(file, mimeType, bucketId)
-            if (nhostRes is Resource.Success) {
-                Log.i(tag, "Media uploaded successfully via Nhost storage: ${nhostRes.data}")
-                return@withContext nhostRes
+            val uploadRes = com.msi.openchat.core.backend.BackendManager.uploadFile(file, mimeType, bucketId)
+            if (uploadRes is Resource.Success) {
+                Log.i(tag, "Media uploaded successfully via BackendManager: ${uploadRes.data}")
+                return@withContext uploadRes
             }
 
-            val errorMsg = (nhostRes as? Resource.Error)?.message ?: "Media upload failed"
-            Log.e(tag, "Nhost upload failed for bucket '$bucketId': $errorMsg")
+            val errorMsg = (uploadRes as? Resource.Error)?.message ?: "Media upload failed"
+            Log.e(tag, "Upload failed for bucket '$bucketId': $errorMsg")
             Resource.Error(errorMsg)
         } catch (e: Exception) {
             Log.e(tag, "Upload error: ${e.message}", e)
@@ -399,8 +402,8 @@ class ChatRepository(
         if (storagePath.startsWith("http://") || storagePath.startsWith("https://")) {
             return@withContext Resource.Success(storagePath)
         }
-        val nhostUrl = storageClient.getFileUrl(storagePath)
-        Resource.Success(nhostUrl)
+        val url = com.msi.openchat.core.backend.BackendManager.getFileUrl(storagePath)
+        Resource.Success(url)
     }
 
     suspend fun getMediaPlayableUrl(urlOrPath: String): Resource<String> = getAudioPlayableUrl(urlOrPath)

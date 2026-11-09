@@ -270,7 +270,12 @@ class SettingsFragment : Fragment() {
     private fun renderState(state: SettingsUiState) {
         val displayName = state.displayName.ifBlank { state.username.ifBlank { "User" } }
         binding.textSettingsName.text = displayName
-        binding.textSettingsAvatar.text = displayName.take(1).uppercase()
+        com.msi.openchat.core.ui.AvatarHelper.loadAvatar(
+            imageView = binding.imgSettingsAvatar,
+            letterTextView = binding.textSettingsAvatar,
+            avatarUrl = state.avatarUrl,
+            displayName = displayName
+        )
         binding.textSettingsUsername.text = if (state.username.isNotBlank()) "@${state.username}" else ""
 
         // Theme selection radio
