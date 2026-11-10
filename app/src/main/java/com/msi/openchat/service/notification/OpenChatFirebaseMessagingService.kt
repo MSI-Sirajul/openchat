@@ -52,12 +52,22 @@ class OpenChatFirebaseMessagingService : FirebaseMessagingService() {
         when (type) {
             "incoming_call" -> {
                 val callerName = remoteMessage.data["caller_name"] ?: title
-                OpenChatNotificationManager.showIncomingCallNotification(
-                    context = applicationContext,
-                    callId = callId.orEmpty(),
-                    callerId = senderId.orEmpty(),
-                    callerName = callerName
-                )
+                val callType = remoteMessage.data["call_type"] ?: "audio"
+                if (callType == "video") {
+                    OpenChatNotificationManager.showIncomingVideoCallNotification(
+                        context = applicationContext,
+                        callId = callId.orEmpty(),
+                        callerId = senderId.orEmpty(),
+                        callerName = callerName
+                    )
+                } else {
+                    OpenChatNotificationManager.showIncomingCallNotification(
+                        context = applicationContext,
+                        callId = callId.orEmpty(),
+                        callerId = senderId.orEmpty(),
+                        callerName = callerName
+                    )
+                }
             }
             "new_message" -> {
                 OpenChatNotificationManager.showMessageNotification(

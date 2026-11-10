@@ -262,6 +262,10 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    fun navigateToVideoCall(peerId: String, peerName: String) {
+        com.msi.openchat.feature.videocall.VideoCallActivity.startOutgoing(this, peerId, peerName)
+    }
+
     fun navigateToAddFriends() {
         supportFragmentManager.commit {
             setCustomAnimations(
@@ -475,15 +479,20 @@ class MainActivity : AppCompatActivity() {
         if (isCall) {
             val callId = uri.getQueryParameter("callId") ?: uri.getQueryParameter("id").orEmpty()
             val contactId = uri.getQueryParameter("contactId") ?: uri.getQueryParameter("callerId").orEmpty()
-            val contactName = uri.getQueryParameter("contactName") ?: uri.getQueryParameter("name") ?: "Voice Call"
+            val contactName = uri.getQueryParameter("contactName") ?: uri.getQueryParameter("name") ?: "OpenChat Call"
+            val callType = uri.getQueryParameter("type") ?: uri.getQueryParameter("callType") ?: "audio"
 
             if (contactId.isNotBlank()) {
-                navigateToCall(
-                    contactId = contactId,
-                    contactName = contactName,
-                    callId = callId,
-                    isIncoming = callId.isNotBlank()
-                )
+                if (callType == "video") {
+                    navigateToVideoCall(contactId, contactName)
+                } else {
+                    navigateToCall(
+                        contactId = contactId,
+                        contactName = contactName,
+                        callId = callId,
+                        isIncoming = callId.isNotBlank()
+                    )
+                }
             }
         } else if (isChat) {
             val convId = uri.getQueryParameter("conversationId") ?: uri.getQueryParameter("id").orEmpty()

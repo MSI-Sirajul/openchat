@@ -46,6 +46,7 @@ class CallActionReceiver : BroadcastReceiver() {
             ACTION_DECLINE_CALL -> {
                 AppServiceManager.stopCallRinging(context)
                 OpenChatNotificationManager.cancelIncomingCallNotification(context)
+                OpenChatNotificationManager.cancelIncomingVideoCallNotification(context)
                 context.sendBroadcast(Intent(ACTION_DISMISS_INCOMING_UI).apply {
                     setPackage(context.packageName)
                     putExtra(EXTRA_CALL_ID, callId)

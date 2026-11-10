@@ -56,6 +56,25 @@ object OpenChatNotificationManager {
                 setShowBadge(true)
             }
 
+            // 1b. Channel for Incoming Video Calls
+            val incomingVideoCallChannel = NotificationChannel(
+                Constants.CHANNEL_INCOMING_VIDEO_CALLS,
+                "Incoming Video Calls",
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "Full-screen alerts and ringtones for incoming video calls"
+                enableVibration(true)
+                vibrationPattern = longArrayOf(0, 1000, 1000, 1000, 1000)
+                val ringtoneUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
+                val audioAttributes = AudioAttributes.Builder()
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
+                    .build()
+                setSound(ringtoneUri, audioAttributes)
+                lockscreenVisibility = NotificationCompat.VISIBILITY_PUBLIC
+                setShowBadge(true)
+            }
+
             // 2. Channel for Ongoing Calls (Low Importance foreground status)
             val activeCallChannel = NotificationChannel(
                 Constants.CHANNEL_ACTIVE_CALLS,
@@ -136,6 +155,7 @@ object OpenChatNotificationManager {
             }
 
             manager.createNotificationChannel(incomingCallChannel)
+            manager.createNotificationChannel(incomingVideoCallChannel)
             manager.createNotificationChannel(activeCallChannel)
             manager.createNotificationChannel(missedCallChannel)
             manager.createNotificationChannel(messageChannel)
@@ -282,6 +302,74 @@ object OpenChatNotificationManager {
         AppServiceManager.stopCallRinging(context)
         val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
         manager?.cancel(Constants.NOTIFICATION_ID_CALL)
+    }
+
+    fun showIncomingVideoCallNotification(
+        context: Context,
+        callId: String,
+        callerId: String,
+        callerName: String
+    ) {
+        initChannels(context)
+        val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
+
+        val fullScreenIntent = Intent(context, com.msi.openchat.feature.videocall.VideoCallActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or
+                    Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                    Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra(com.msi.openchat.feature.videocall.VideoCallActivity.EXTRA_IS_INCOMING, true)
+            putExtra(com.msi.openchat.feature.videocall.VideoCallActivity.EXTRA_CALL_ID, callId)
+            putExtra(com.msi.openchat.feature.videocall.VideoCallActivity.EXTRA_PEER_ID, callerId)
+            putExtra(com.msi.openchat.feature.videocall.VideoCallActivity.EXTRA_PEER_NAME, callerName)
+        }
+        val fullScreenPendingIntent = PendingIntent.getActivity(
+            context,
+            (callId + "_video").hashCode(),
+            fullScreenIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val callerPerson = Person.Builder()
+            .setName(callerName)
+            .setImportant(true)
+            .build()
+
+        val ringtoneUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
+
+        val builder = NotificationCompat.Builder(context, Constants.CHANNEL_INCOMING_VIDEO_CALLS)
+            .setContentTitle("Incoming Video Call")
+            .setContentText("$callerName is video calling...")
+            .setSmallIcon(com.example.R.drawable.ic_video_24)
+            .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setCategory(NotificationCompat.CATEGORY_CALL)
+            .setSound(ringtoneUri)
+            .setVibrate(longArrayOf(0, 1000, 1000, 1000, 1000))
+            .setFullScreenIntent(fullScreenPendingIntent, true)
+            .setContentIntent(fullScreenPendingIntent)
+            .setAutoCancel(true)
+            .setOngoing(true)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+
+        manager.notify(Constants.NOTIFICATION_ID_VIDEO_CALL, builder.build())
+
+        val powerManager = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
+        val keyguardManager = context.getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager
+        val isScreenOff = powerManager?.isInteractive == false
+        val isLocked = keyguardManager?.isKeyguardLocked == true
+
+        if (isScreenOff || isLocked) {
+            try {
+                context.startActivity(fullScreenIntent)
+            } catch (e: Exception) {
+                Log.w(TAG, "Unable to directly launch VideoCallActivity: ${e.message}")
+            }
+        }
+    }
+
+    fun cancelIncomingVideoCallNotification(context: Context) {
+        AppServiceManager.stopCallRinging(context)
+        val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+        manager?.cancel(Constants.NOTIFICATION_ID_VIDEO_CALL)
     }
 
     fun showMessageNotification(

@@ -163,6 +163,10 @@ object ServiceLocator {
         CallRepository(sessionManager, userRepository)
     }
 
+    val videoCallRepository: com.msi.openchat.feature.videocall.VideoCallRepository by lazy {
+        com.msi.openchat.feature.videocall.VideoCallRepository()
+    }
+
     val audioRecorderHelper: AudioRecorderHelper by lazy {
         AudioRecorderHelper(appContext ?: throw IllegalStateException("ServiceLocator not initialized"))
     }

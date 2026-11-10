@@ -25,7 +25,9 @@ object Constants {
 
     // Notification channels
     const val CHANNEL_INCOMING_CALLS = "openchat_incoming_calls"
+    const val CHANNEL_INCOMING_VIDEO_CALLS = "openchat_incoming_video_calls"
     const val CHANNEL_ACTIVE_CALLS = "openchat_active_calls"
+    const val CHANNEL_ACTIVE_VIDEO_CALLS = "openchat_active_video_calls"
     const val CHANNEL_MISSED_CALLS = "openchat_missed_calls"
     const val CHANNEL_MESSAGES = "openchat_messages"
     const val CHANNEL_CALLS = "openchat_calls"
@@ -37,6 +39,7 @@ object Constants {
     const val NOTIFICATION_ID_CALL = 2001
     const val NOTIFICATION_ID_ACTIVE_CALL = 2002
     const val NOTIFICATION_ID_NETWORK = 2003
+    const val NOTIFICATION_ID_VIDEO_CALL = 2004
 
     // Deep link scheme and hosts
     const val DEEP_LINK_SCHEME = "openchat"

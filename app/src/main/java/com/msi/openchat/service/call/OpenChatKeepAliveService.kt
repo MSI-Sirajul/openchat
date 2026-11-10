@@ -209,25 +209,36 @@ class OpenChatKeepAliveService : Service() {
                     val callId = snapshot.child("call_id").getValue(String::class.java).orEmpty()
                     val callerId = snapshot.child("caller_id").getValue(String::class.java).orEmpty()
                     val callerName = snapshot.child("caller_name").getValue(String::class.java) ?: "Friend"
+                    val callType = snapshot.child("call_type").getValue(String::class.java) ?: "audio"
 
                     if (callId.isNotBlank()) {
-                        Log.i(tag, "Incoming background call: $callId from $callerId")
+                        Log.i(tag, "Incoming background call: $callId from $callerId (type=$callType)")
                         serviceScope.launch {
                             try {
                                 ServiceLocator.callRepository.sendSignaling(callId, callerId, "ringing", "{}")
                                 ServiceLocator.callRepository.updateCallStatus(callId, "ringing")
                             } catch (_: Exception) {}
 
-                            OpenChatNotificationManager.showIncomingCallNotification(
-                                context = applicationContext,
-                                callId = callId,
-                                callerId = callerId,
-                                callerName = callerName
-                            )
+                            if (callType == "video") {
+                                OpenChatNotificationManager.showIncomingVideoCallNotification(
+                                    context = applicationContext,
+                                    callId = callId,
+                                    callerId = callerId,
+                                    callerName = callerName
+                                )
+                            } else {
+                                OpenChatNotificationManager.showIncomingCallNotification(
+                                    context = applicationContext,
+                                    callId = callId,
+                                    callerId = callerId,
+                                    callerName = callerName
+                                )
+                            }
                         }
                     }
                 } else {
                     OpenChatNotificationManager.cancelIncomingCallNotification(applicationContext)
+                    OpenChatNotificationManager.cancelIncomingVideoCallNotification(applicationContext)
                 }
             }
 

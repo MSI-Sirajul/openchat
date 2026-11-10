@@ -206,15 +206,14 @@ class ChatFragment : Fragment() {
         )
 
         binding.btnChatVideoCall.setOnClickListener {
-            val hasMicPermission = ContextCompat.checkSelfPermission(
-                requireContext(),
-                Manifest.permission.RECORD_AUDIO
-            ) == PackageManager.PERMISSION_GRANTED
-
-            if (hasMicPermission) {
-                (activity as? MainActivity)?.navigateToCall(contactId, contactName)
+            if (contactId.isNotBlank()) {
+                com.msi.openchat.feature.videocall.VideoCallActivity.startOutgoing(
+                    context = requireContext(),
+                    peerId = contactId,
+                    peerName = contactName.ifBlank { "Contact" }
+                )
             } else {
-                micCallLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                Toast.makeText(requireContext(), "Contact information unavailable", Toast.LENGTH_SHORT).show()
             }
         }
 
