@@ -97,9 +97,15 @@ class ChatRepository(
         val currentUserId = sessionManager.getUserId() ?: FirebaseManager.auth.currentUser?.uid
             ?: return@withContext Resource.Error("Not authenticated")
 
+        // 1. Load from local DB first
+        val localEntities = conversationDao?.getConversationsForUserList(currentUserId).orEmpty()
+        val localConversations = localEntities.map { it.toDomain() }
+
         try {
             val snapshot = getSingleSnapshot(conversationsRef.child(currentUserId))
-                ?: return@withContext Resource.Success(emptyList())
+            if (snapshot == null) {
+                return@withContext Resource.Success(localConversations)
+            }
 
             val rawList = mutableListOf<Conversation>()
             val otherUserIds = mutableListOf<String>()
@@ -145,10 +151,14 @@ class ChatRepository(
                 Log.w(tag, "Room caching notice: ${e.message}")
             }
 
-            Resource.Success(populated)
+            Resource.Success(if (populated.isNotEmpty()) populated else localConversations)
         } catch (e: Exception) {
             Log.e(tag, "getConversations error: ${e.message}", e)
-            Resource.Error(e.message ?: "Failed to get conversations", e)
+            if (localConversations.isNotEmpty()) {
+                Resource.Success(localConversations)
+            } else {
+                Resource.Error(e.message ?: "Failed to get conversations", e)
+            }
         }
     }
 
@@ -187,26 +197,45 @@ class ChatRepository(
     }
 
     suspend fun getMessages(conversationId: String, limit: Int = 100): Resource<List<Message>> = withContext(Dispatchers.IO) {
+        // 1. Load existing messages from local Room DB first
+        val localEntities = messageDao?.getMessagesListForConversation(conversationId).orEmpty()
+        val localMessages = localEntities.map { it.toDomain() }
+
         try {
             val snapshot = getSingleSnapshot(messagesRef.child(conversationId).limitToLast(limit))
-                ?: return@withContext Resource.Success(emptyList())
-
-            val messages = mutableListOf<Message>()
-            for (child in snapshot.children) {
-                val msg = parseMessageSnapshot(child, conversationId)
-                messages.add(msg)
+            if (snapshot == null) {
+                return@withContext Resource.Success(localMessages)
             }
 
-            // Cache to Room
-            try {
-                val entities = messages.map { MessageEntity.fromDomain(it) }
-                messageDao?.insertMessages(entities)
-            } catch (_: Exception) {}
+            val remoteMessages = mutableListOf<Message>()
+            val existingIds = localEntities.map { it.id }.toSet()
 
-            Resource.Success(messages)
+            for (child in snapshot.children) {
+                val msg = parseMessageSnapshot(child, conversationId)
+                remoteMessages.add(msg)
+            }
+
+            // Filter for new/missing messages and merge without duplication or reordering
+            val missingOrUpdated = remoteMessages.filter { msg ->
+                !existingIds.contains(msg.id) || localEntities.any { it.id == msg.id && it.status != msg.status }
+            }
+
+            if (missingOrUpdated.isNotEmpty()) {
+                try {
+                    val entities = missingOrUpdated.map { MessageEntity.fromDomain(it) }
+                    messageDao?.insertMessages(entities)
+                } catch (_: Exception) {}
+            }
+
+            val updatedLocal = messageDao?.getMessagesListForConversation(conversationId)?.map { it.toDomain() }
+            Resource.Success(updatedLocal ?: remoteMessages)
         } catch (e: Exception) {
-            Log.e(tag, "getMessages error: ${e.message}", e)
-            Resource.Error(e.message ?: "Failed to load messages", e)
+            Log.e(tag, "getMessages remote error: ${e.message}", e)
+            if (localMessages.isNotEmpty()) {
+                Resource.Success(localMessages)
+            } else {
+                Resource.Error(e.message ?: "Failed to load messages", e)
+            }
         }
     }
 

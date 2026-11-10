@@ -5,7 +5,7 @@
     android:id="@+id/coordinator_chat"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/color_background">
+    android:background="@drawable/bg_chat_wallpaper">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -17,9 +17,11 @@
             android:id="@+id/toolbar_chat"
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
-            android:background="@color/color_surface"
+            android:background="@color/color_toolbar_background"
             app:navigationIcon="@drawable/ic_arrow_back_24"
-            app:elevation="2dp">
+            app:navigationIconTint="@color/color_toolbar_icon"
+            app:elevation="0dp"
+            app:contentInsetStartWithNavigation="0dp">
 
             <LinearLayout
                 android:id="@+id/layout_contact_header"
@@ -27,9 +29,10 @@
                 android:layout_height="match_parent"
                 android:layout_weight="1"
                 android:gravity="center_vertical"
-                android:orientation="horizontal">
+                android:orientation="horizontal"
+                android:background="?attr/selectableItemBackground">
 
-                <!-- Contact Avatar -->
+                <!-- Contact Avatar Frame -->
                 <FrameLayout
                     android:layout_width="40dp"
                     android:layout_height="40dp">
@@ -58,8 +61,8 @@
 
                     <View
                         android:id="@+id/dot_chat_online"
-                        android:layout_width="10dp"
-                        android:layout_height="10dp"
+                        android:layout_width="12dp"
+                        android:layout_height="12dp"
                         android:layout_gravity="bottom|end"
                         android:background="@drawable/bg_online_dot"
                         android:visibility="gone" />
@@ -77,7 +80,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="Contact"
-                        android:textColor="@color/color_primary_text"
+                        android:textColor="@color/color_toolbar_title"
                         android:textSize="16sp"
                         android:fontFamily="sans-serif-bold"
                         android:maxLines="1"
@@ -88,36 +91,41 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="Offline"
-                        android:textColor="@color/color_secondary_text"
+                        android:textColor="@color/color_toolbar_subtitle"
                         android:textSize="12sp"
+                        android:fontFamily="sans-serif"
                         android:maxLines="1" />
                 </LinearLayout>
             </LinearLayout>
 
-            <!-- Call Action Button -->
+            <!-- Call Action Button (48dp touch target) -->
             <ImageButton
                 android:id="@+id/btn_chat_call"
-                android:layout_width="44dp"
-                android:layout_height="44dp"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
                 android:layout_gravity="end"
-                android:layout_marginEnd="4dp"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:src="@drawable/ic_call_24"
                 android:contentDescription="Call"
                 app:tint="@color/color_primary" />
 
-            <!-- Overflow Menu Button -->
+            <!-- Overflow Menu Button (48dp touch target) -->
             <ImageButton
                 android:id="@+id/btn_chat_more"
-                android:layout_width="44dp"
-                android:layout_height="44dp"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
                 android:layout_gravity="end"
-                android:layout_marginEnd="4dp"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:src="@drawable/ic_more_vert_24"
                 android:contentDescription="More Options"
-                app:tint="@color/color_primary_text" />
+                app:tint="@color/color_toolbar_icon" />
         </com.google.android.material.appbar.MaterialToolbar>
+
+        <!-- Razor-thin subtle divider below toolbar -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/color_divider" />
 
         <!-- Media Upload Progress Bar -->
         <LinearLayout
@@ -152,8 +160,8 @@
             android:layout_height="0dp"
             android:layout_weight="1"
             android:clipToPadding="false"
-            android:paddingHorizontal="8dp"
-            android:paddingVertical="8dp"
+            android:paddingHorizontal="6dp"
+            android:paddingVertical="6dp"
             android:overScrollMode="ifContentScrolls" />
 
         <!-- Realtime Animated Typing Indicator Bubble -->
@@ -166,7 +174,7 @@
             android:background="@drawable/bg_bubble_incoming"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:paddingStart="12dp"
+            android:paddingStart="14dp"
             android:paddingEnd="16dp"
             android:paddingTop="8dp"
             android:paddingBottom="8dp"
@@ -220,7 +228,7 @@
             android:id="@+id/layout_recording_bar"
             android:layout_width="match_parent"
             android:layout_height="56dp"
-            android:background="@color/color_surface"
+            android:background="@color/color_composer_background"
             android:gravity="center_vertical"
             android:orientation="horizontal"
             android:paddingHorizontal="16dp"
@@ -228,8 +236,8 @@
 
             <ImageButton
                 android:id="@+id/btn_cancel_recording"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:src="@drawable/ic_close_24"
                 android:contentDescription="Cancel Recording"
@@ -262,57 +270,67 @@
                 android:textSize="13sp"
                 app:icon="@drawable/ic_send_24"
                 app:cornerRadius="20dp"
-                app:backgroundTint="@color/color_primary" />
+                app:backgroundTint="@color/color_composer_action_bg"
+                app:iconTint="@color/color_composer_action_icon" />
         </LinearLayout>
 
-        <!-- Message Input Bar -->
+        <!-- Subtle Top Divider above composer -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/color_divider" />
+
+        <!-- Message Composer Input Bar -->
         <LinearLayout
             android:id="@+id/layout_input_bar"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:background="@color/color_surface"
+            android:background="@color/color_composer_background"
             android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:paddingHorizontal="8dp"
-            android:paddingVertical="8dp">
+            android:paddingStart="6dp"
+            android:paddingEnd="6dp"
+            android:paddingTop="6dp"
+            android:paddingBottom="6dp">
 
-            <!-- Attachment Button -->
+            <!-- Attachment Button (48dp touch target) -->
             <ImageButton
                 android:id="@+id/btn_chat_attach"
-                android:layout_width="44dp"
-                android:layout_height="44dp"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:src="@drawable/ic_attach_file_24"
                 android:contentDescription="Attach File"
-                app:tint="@color/color_secondary_text" />
+                app:tint="@color/color_composer_icon" />
 
-            <!-- Text Message Input -->
+            <!-- Rounded Pill Text Message Input -->
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/et_message_input"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:background="@drawable/bg_bubble_incoming"
-                android:backgroundTint="@color/color_surface_variant"
+                android:background="@drawable/bg_composer_input"
                 android:hint="@string/chat_type_message_hint"
-                android:textColorHint="@color/color_secondary_text"
-                android:textColor="@color/color_primary_text"
+                android:textColorHint="@color/color_composer_hint"
+                android:textColor="@color/color_composer_text"
                 android:textSize="15sp"
-                android:paddingHorizontal="16dp"
-                android:paddingVertical="10dp"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"
+                android:paddingTop="9dp"
+                android:paddingBottom="9dp"
                 android:maxLines="5"
                 android:minHeight="44dp" />
 
-            <!-- Send / Voice Record Button -->
+            <!-- Send / Voice Record Action Floating Pill Button -->
             <ImageButton
                 android:id="@+id/btn_chat_send_or_mic"
-                android:layout_width="44dp"
-                android:layout_height="44dp"
-                android:layout_marginStart="4dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_marginStart="6dp"
+                android:background="@drawable/bg_composer_action_btn"
                 android:src="@drawable/ic_mic_24"
                 android:contentDescription="Send or Record"
-                app:tint="@color/color_primary" />
+                app:tint="@color/color_composer_action_icon" />
         </LinearLayout>
     </LinearLayout>
 
@@ -337,12 +355,12 @@
 
             <ImageButton
                 android:id="@+id/btn_close_preview"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:src="@drawable/ic_close_24"
                 android:contentDescription="Close Preview"
-                app:tint="#FFFFFF" />
+                app:tint="@color/white" />
 
             <TextView
                 android:id="@+id/text_preview_title"
@@ -350,20 +368,20 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:layout_marginStart="12dp"
-                android:textColor="#FFFFFF"
+                android:textColor="@color/white"
                 android:textSize="16sp"
                 android:fontFamily="sans-serif-bold"
                 android:text="Media Preview" />
 
-            <!-- Download Button: saves file to OpenChat/ subfolders on device -->
+            <!-- Download Button -->
             <ImageButton
                 android:id="@+id/btn_download_preview"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:src="@drawable/ic_download_24"
                 android:contentDescription="Download to OpenChat folder"
-                app:tint="#FFFFFF" />
+                app:tint="@color/white" />
         </LinearLayout>
 
         <!-- Loading spinner for media download / resolution -->
@@ -381,7 +399,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="center"
-            android:textColor="#FFFFFF"
+            android:textColor="@color/white"
             android:textSize="14sp"
             android:visibility="gone" />
 

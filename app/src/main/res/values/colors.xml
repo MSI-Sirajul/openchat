@@ -8,11 +8,7 @@
     <color name="color_primary_accent">#229ED9</color>
     <color name="color_primary_text">#17212B</color>
     <color name="color_secondary_text">#64748B</color>
-    <color name="color_divider">#E3EAF2</color>
-    <color name="color_bubble_incoming">#DDF3E4</color>
-    <color name="color_bubble_outgoing">#D9F0FF</color>
-    <color name="color_bubble_incoming_text">#17212B</color>
-    <color name="color_bubble_outgoing_text">#17212B</color>
+    <color name="color_divider">#E2E8F0</color>
     <color name="color_status_online">#16834A</color>
     <color name="color_online">#16834A</color>
     <color name="color_error">#BA1A1A</color>
@@ -21,10 +17,41 @@
     <color name="color_avatar_text">#087EBA</color>
     <color name="ic_launcher_background">#FFFFFF</color>
 
-    <!-- Navigation selection pill and icon colors (Soft, dynamic & high contrast) -->
+    <!-- Navigation selection pill and icon colors -->
     <color name="color_nav_indicator">#D2E8F8</color>
     <color name="color_nav_item_selected">#065A84</color>
     <color name="color_nav_ripple">#1A087EBA</color>
+
+    <!-- Chat Screen Light Theme Tokens (WhatsApp-inspired clarity, WCAG AA compliant) -->
+    <color name="color_chat_background">#EFEAE2</color>
+    <color name="color_chat_wallpaper_tint">#0D000000</color>
+    <color name="color_toolbar_background">#FFFFFF</color>
+    <color name="color_toolbar_title">#111B21</color>
+    <color name="color_toolbar_subtitle">#667781</color>
+    <color name="color_toolbar_icon">#54656F</color>
+    <color name="color_composer_background">#F0F2F5</color>
+    <color name="color_composer_input_background">#FFFFFF</color>
+    <color name="color_composer_input_border">#E2E8F0</color>
+    <color name="color_composer_text">#111B21</color>
+    <color name="color_composer_hint">#667781</color>
+    <color name="color_composer_icon">#54656F</color>
+    <color name="color_composer_action_bg">#00A884</color>
+    <color name="color_composer_action_icon">#FFFFFF</color>
+
+    <!-- Message Bubble Tokens (Light Theme) -->
+    <color name="color_bubble_incoming">#FFFFFF</color>
+    <color name="color_bubble_outgoing">#D9FDD3</color>
+    <color name="color_bubble_incoming_text">#111B21</color>
+    <color name="color_bubble_outgoing_text">#111B21</color>
+    <color name="color_timestamp_incoming">#667781</color>
+    <color name="color_timestamp_outgoing">#597365</color>
+    <color name="color_date_capsule_bg">#E1DCD5</color>
+    <color name="color_date_capsule_text">#54656F</color>
+    <color name="color_read_tick">#53BDEB</color>
+    <color name="color_delivered_tick">#8696A0</color>
+    <color name="color_media_container_bg">#E2E8F0</color>
+    <color name="color_media_scrim_overlay">#66000000</color>
+    <color name="color_voice_seek_active">#00A884</color>
 
     <!-- Generic palette aliases -->
     <color name="black">#FF000000</color>

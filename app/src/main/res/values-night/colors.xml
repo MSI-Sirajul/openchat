@@ -8,21 +8,48 @@
     <color name="color_primary_accent">#229ED9</color>
     <color name="color_primary_text">#E8EEF5</color>
     <color name="color_secondary_text">#A3B1BF</color>
-    <color name="color_divider">#344452</color>
-    <color name="color_bubble_incoming">#244538</color>
-    <color name="color_bubble_outgoing">#203D52</color>
-    <color name="color_bubble_incoming_text">#E8EEF5</color>
-    <color name="color_bubble_outgoing_text">#E8EEF5</color>
+    <color name="color_divider">#222D34</color>
     <color name="color_status_online">#5DD69A</color>
     <color name="color_error">#FFB4AB</color>
     <color name="color_warning">#F2C078</color>
     <color name="color_avatar_bg">#203342</color>
     <color name="color_avatar_text">#54B9EA</color>
 
-    <!-- Navigation selection pill and icon colors (Soft, dynamic & high contrast for dark theme) -->
+    <!-- Navigation selection pill and icon colors (Dark Theme) -->
     <color name="color_nav_indicator">#223E54</color>
     <color name="color_nav_item_selected">#E3F3FC</color>
     <color name="color_nav_ripple">#2654B9EA</color>
+
+    <!-- Chat Screen Dark Theme Tokens (WhatsApp Dark inspired, WCAG AA compliant) -->
+    <color name="color_chat_background">#0B141A</color>
+    <color name="color_chat_wallpaper_tint">#1AFFFFFF</color>
+    <color name="color_toolbar_background">#111B21</color>
+    <color name="color_toolbar_title">#E9EDEF</color>
+    <color name="color_toolbar_subtitle">#8696A0</color>
+    <color name="color_toolbar_icon">#AEBAC1</color>
+    <color name="color_composer_background">#111B21</color>
+    <color name="color_composer_input_background">#202C33</color>
+    <color name="color_composer_input_border">#2A3942</color>
+    <color name="color_composer_text">#E9EDEF</color>
+    <color name="color_composer_hint">#8696A0</color>
+    <color name="color_composer_icon">#8696A0</color>
+    <color name="color_composer_action_bg">#00A884</color>
+    <color name="color_composer_action_icon">#FFFFFF</color>
+
+    <!-- Message Bubble Tokens (Dark Theme) -->
+    <color name="color_bubble_incoming">#202C33</color>
+    <color name="color_bubble_outgoing">#005C4B</color>
+    <color name="color_bubble_incoming_text">#E9EDEF</color>
+    <color name="color_bubble_outgoing_text">#E9EDEF</color>
+    <color name="color_timestamp_incoming">#8696A0</color>
+    <color name="color_timestamp_outgoing">#8696A0</color>
+    <color name="color_date_capsule_bg">#182229</color>
+    <color name="color_date_capsule_text">#8696A0</color>
+    <color name="color_read_tick">#53BDEB</color>
+    <color name="color_delivered_tick">#8696A0</color>
+    <color name="color_media_container_bg">#182229</color>
+    <color name="color_media_scrim_overlay">#80000000</color>
+    <color name="color_voice_seek_active">#00A884</color>
 
     <!-- Generic palette aliases -->
     <color name="black">#FF000000</color>

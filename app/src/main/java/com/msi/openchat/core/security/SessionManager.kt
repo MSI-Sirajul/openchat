@@ -127,7 +127,14 @@ class SessionManager(val context: Context) {
         if (!uid.isNullOrBlank()) {
             clearUserScopedPrefs(uid)
         }
-        prefs.edit().clear().commit()
+        val onboardingCompleted = isPermissionOnboardingCompleted()
+        prefs.edit()
+            .remove(Constants.KEY_ACCESS_TOKEN)
+            .remove(Constants.KEY_REFRESH_TOKEN)
+            .remove(Constants.KEY_USER_ID)
+            .remove(Constants.KEY_USER_EMAIL)
+            .putBoolean(Constants.KEY_PERMISSION_ONBOARDING_COMPLETED, onboardingCompleted)
+            .commit()
         secureStorage.clearAllAuthData()
         _accessToken.value = null
         _currentUserId.value = null

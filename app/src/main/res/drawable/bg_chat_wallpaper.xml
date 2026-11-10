@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Base Solid Chat Wallpaper Background -->
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="@color/color_chat_background" />
+        </shape>
+    </item>
+
+    <!-- Subtle Ambient Vignette / Wallpaper Tint Layer -->
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:angle="270"
+                android:startColor="@color/color_chat_wallpaper_tint"
+                android:endColor="@android:color/transparent"
+                android:type="linear" />
+        </shape>
+    </item>
+</layer-list>

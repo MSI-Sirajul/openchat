@@ -1,29 +1,31 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:paddingStart="12dp"
-    android:paddingEnd="12dp"
-    android:paddingTop="3dp"
-    android:paddingBottom="3dp">
+    android:paddingStart="8dp"
+    android:paddingEnd="8dp"
+    android:paddingTop="2dp"
+    android:paddingBottom="2dp">
 
-    <!-- Pure Text Date Separator (no background capsule) -->
+    <!-- Floating Date Separator Capsule -->
     <TextView
         android:id="@+id/textDateSeparator"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="center_horizontal"
-        android:layout_marginTop="12dp"
-        android:layout_marginBottom="8dp"
-        android:paddingStart="8dp"
-        android:paddingEnd="8dp"
-        android:paddingTop="2dp"
-        android:paddingBottom="2dp"
+        android:layout_marginTop="10dp"
+        android:layout_marginBottom="6dp"
+        android:background="@drawable/bg_date_capsule"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:paddingTop="4dp"
+        android:paddingBottom="4dp"
         android:textSize="12sp"
-        android:textStyle="bold"
-        android:textColor="@color/color_secondary_text"
+        android:fontFamily="sans-serif-medium"
+        android:textColor="@color/color_date_capsule_text"
         android:visibility="gone"
         tools:visibility="visible"
         tools:text="Yesterday" />
@@ -36,17 +38,17 @@
         android:layout_gravity="end"
         android:orientation="vertical"
         android:background="@drawable/bg_bubble_outgoing"
-        android:paddingStart="14dp"
-        android:paddingEnd="14dp"
-        android:paddingTop="10dp"
-        android:paddingBottom="8dp">
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:paddingTop="8dp"
+        android:paddingBottom="6dp">
 
         <!-- Media Container (Image or Video) -->
         <FrameLayout
             android:id="@+id/layoutMediaContainer"
             android:layout_width="240dp"
             android:layout_height="180dp"
-            android:layout_marginBottom="6dp"
+            android:layout_marginBottom="4dp"
             android:background="@drawable/bg_media_rounded"
             android:clipToOutline="true"
             android:visibility="gone"
@@ -59,12 +61,12 @@
                 android:scaleType="centerCrop"
                 android:contentDescription="Attached photo" />
 
-            <!-- Video Overlay with Play Button -->
+            <!-- Video Overlay with Play Button & Scrim -->
             <FrameLayout
                 android:id="@+id/layoutVideoOverlay"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:background="#33000000"
+                android:background="@drawable/bg_media_scrim"
                 android:visibility="gone"
                 tools:visibility="visible">
 
@@ -74,8 +76,10 @@
                     android:layout_height="48dp"
                     android:layout_gravity="center"
                     android:background="@drawable/bg_avatar_circle"
+                    android:backgroundTint="@color/color_media_scrim_overlay"
                     android:padding="12dp"
                     android:src="@drawable/ic_play_24"
+                    app:tint="@color/white"
                     android:contentDescription="Play video" />
 
                 <TextView
@@ -84,13 +88,14 @@
                     android:layout_height="wrap_content"
                     android:layout_gravity="bottom|start"
                     android:layout_margin="8dp"
-                    android:background="#88000000"
+                    android:background="@drawable/bg_date_capsule"
+                    android:backgroundTint="@color/color_media_scrim_overlay"
                     android:paddingStart="6dp"
                     android:paddingEnd="6dp"
                     android:paddingTop="2dp"
                     android:paddingBottom="2dp"
                     android:text="VIDEO"
-                    android:textColor="#FFFFFF"
+                    android:textColor="@color/white"
                     android:textSize="10sp"
                     android:textStyle="bold" />
             </FrameLayout>
@@ -123,6 +128,7 @@
                 android:layout_weight="1"
                 android:max="100"
                 android:progress="0"
+                android:progressTint="@color/color_voice_seek_active"
                 android:layout_marginStart="8dp"
                 android:layout_marginEnd="8dp" />
 
@@ -131,7 +137,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:textSize="11sp"
-                android:textColor="#FFFFFF"
+                android:textColor="@color/color_bubble_outgoing_text"
                 tools:text="0:15" />
         </LinearLayout>
 
@@ -150,6 +156,7 @@
                 android:layout_width="24dp"
                 android:layout_height="24dp"
                 android:src="@drawable/ic_file_24"
+                app:tint="@color/color_primary"
                 android:contentDescription="File icon" />
 
             <TextView
@@ -161,6 +168,7 @@
                 android:singleLine="true"
                 android:ellipsize="middle"
                 android:textSize="13sp"
+                android:textColor="@color/color_bubble_outgoing_text"
                 tools:text="Project_Report.pdf" />
         </LinearLayout>
 
@@ -170,7 +178,8 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:textSize="15sp"
-            android:textColor="#FFFFFF"
+            android:lineSpacingExtra="2dp"
+            android:textColor="@color/color_bubble_outgoing_text"
             tools:text="Hey, checking in on the performance updates!" />
 
         <!-- Timestamp and Status Row -->
@@ -178,7 +187,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="end"
-            android:layout_marginTop="3dp"
+            android:layout_marginTop="2dp"
             android:orientation="horizontal"
             android:gravity="center_vertical">
 
@@ -187,7 +196,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:textSize="11sp"
-                android:textColor="#CBD5E1"
+                android:textColor="@color/color_timestamp_outgoing"
                 tools:text="14:32" />
 
             <TextView
@@ -197,15 +206,15 @@
                 android:layout_marginStart="4dp"
                 android:textSize="10sp"
                 android:textStyle="bold"
-                android:textColor="#10B981"
+                android:textColor="@color/color_status_online"
                 android:text="Seen"
                 android:visibility="gone"
                 tools:visibility="visible" />
 
             <ImageView
                 android:id="@+id/imageMessageStatus"
-                android:layout_width="16dp"
-                android:layout_height="16dp"
+                android:layout_width="15dp"
+                android:layout_height="15dp"
                 android:layout_marginStart="4dp"
                 android:contentDescription="Message status"
                 android:visibility="gone"

@@ -2,8 +2,8 @@
 <resources>
     <style name="Theme.MyApplication" parent="Theme.Material3.DayNight.NoActionBar">
         <item name="android:windowBackground">@color/color_background</item>
-        <item name="android:statusBarColor">@color/color_surface</item>
-        <item name="android:navigationBarColor">@color/color_surface</item>
+        <item name="android:statusBarColor">@color/color_toolbar_background</item>
+        <item name="android:navigationBarColor">@color/color_composer_background</item>
         <item name="android:windowLightStatusBar">false</item>
         <item name="android:windowLightNavigationBar">false</item>
         <item name="colorPrimary">@color/color_primary</item>
@@ -11,6 +11,7 @@
         <item name="colorSecondaryContainer">@color/color_nav_indicator</item>
         <item name="colorOnSecondaryContainer">@color/color_nav_item_selected</item>
         <item name="colorSurface">@color/color_surface</item>
+        <item name="colorSurfaceVariant">@color/color_surface_variant</item>
         <item name="colorError">@color/color_error</item>
     </style>
 </resources>

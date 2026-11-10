@@ -173,12 +173,18 @@ class OpenChatKeepAliveService : Service() {
     private fun observeConnectionState() {
         serviceScope.launch {
             BackendManager.connectionState.collectLatest { state ->
-                val label = when (state) {
-                    is ConnectionState.Connected -> "Connected"
-                    is ConnectionState.Reconnecting -> state.reason
-                    is ConnectionState.Offline -> "Offline - reconnecting"
+                when (state) {
+                    is ConnectionState.Connected -> {
+                        // Connected: clear transient network notification
+                        OpenChatNotificationManager.updateConnectionNotification(applicationContext, "Connected", isConnected = true)
+                    }
+                    is ConnectionState.Reconnecting -> {
+                        OpenChatNotificationManager.updateConnectionNotification(applicationContext, state.reason, isConnected = false)
+                    }
+                    is ConnectionState.Offline -> {
+                        OpenChatNotificationManager.updateConnectionNotification(applicationContext, "Reconnecting…", isConnected = false)
+                    }
                 }
-                updateForegroundNotification(label)
             }
         }
     }

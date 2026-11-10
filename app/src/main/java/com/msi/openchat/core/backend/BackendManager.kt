@@ -5,9 +5,9 @@ import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
-import android.net.Uri
 import android.util.Log
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.database.ChildEventListener
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
@@ -15,8 +15,8 @@ import com.google.firebase.database.DatabaseReference
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ServerValue
 import com.google.firebase.database.ValueEventListener
+import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.storage.FirebaseStorage
-import com.google.firebase.storage.StorageReference
 import com.msi.openchat.core.backend.inbox.ConversationInboxProcessor
 import com.msi.openchat.core.backend.outbox.ConversationOutboxQueue
 import com.msi.openchat.core.common.Constants
@@ -25,6 +25,7 @@ import com.msi.openchat.core.common.Resource
 import com.msi.openchat.core.security.SessionManager
 import com.msi.openchat.data.local.OpenChatDatabase
 import com.msi.openchat.data.local.entity.MessageEntity
+import com.msi.openchat.data.model.CallSession
 import com.msi.openchat.data.model.Message
 import com.msi.openchat.data.model.Profile
 import com.msi.openchat.data.remote.firebase.FirebaseManager
@@ -62,12 +63,13 @@ interface NhostStorageClient {
  * BackendManager
  *
  * WhatsApp/Telegram-Grade Unified Backend Layer for OpenChat:
- * - Firebase is the MAIN backend for Auth, Database, Storage, FCM/push, and Realtime listeners.
+ * - Firebase is the ONLY backend (Auth, Database/Firestore, FCM/push, and Realtime listeners).
+ * - Safe, idempotent initialization with offline persistence enabled.
  * - Single source of truth: StateFlow<ConnectionState> (Connected, Reconnecting, Offline).
- * - Exposes high-level typed messaging & media operations.
+ * - Exposes high-level typed messaging, call session coordination, presence, and profile sync.
+ * - Media uploads locked with "Media uploads are temporarily unavailable".
+ * - WhatsApp-grade outbox/inbox processing with strict (serverTimestamp, seq) deterministic ordering.
  * - Manages persistent connection heartbeat, token refresh, and automatic listener re-subscription.
- * - Backed by WhatsApp-grade ConversationOutboxQueue (per-conversation isolation) and ConversationInboxProcessor.
- * - Extensible: Contains a clean stubbed placeholder for a future NhostStorageClient (bucket-only).
  */
 object BackendManager {
     private const val TAG = "BackendManager"
@@ -80,8 +82,9 @@ object BackendManager {
     private val _connectionState = MutableStateFlow<ConnectionState>(ConnectionState.Offline)
     val connectionState: StateFlow<ConnectionState> = _connectionState.asStateFlow()
 
-    // Stubbed placeholder for future NhostStorageClient (bucket-only, no auth, no GraphQL)
-    // var nhostStorageClient: NhostStorageClient? = null
+    // Auth State observable
+    private val _currentFirebaseUser = MutableStateFlow<FirebaseUser?>(null)
+    val currentFirebaseUser: StateFlow<FirebaseUser?> = _currentFirebaseUser.asStateFlow()
 
     // Subsystems
     private var outboxQueue: ConversationOutboxQueue? = null
@@ -90,6 +93,7 @@ object BackendManager {
     // Active conversation listeners cache for seamless re-subscription upon reconnect
     private val activeConversationListeners = ConcurrentHashMap<String, DatabaseReference>()
     private var firebaseConnectedListener: ValueEventListener? = null
+    private var authStateListener: FirebaseAuth.AuthStateListener? = null
     private var heartbeatJob: Job? = null
     private var isNetworkAvailable = false
     private var isFirebaseConnected = false
@@ -100,8 +104,8 @@ object BackendManager {
     val storage: FirebaseStorage get() = FirebaseManager.storage
 
     /**
-     * Initialize BackendManager with application context.
-     * Idempotent and safe to invoke from Application, Service, or BootReceiver.
+     * Initialize Firebase & BackendManager once (safe, idempotent).
+     * Safe to invoke from Application, Activity, or Service.
      */
     fun initialize(context: Context) {
         if (isInitialized) return
@@ -110,10 +114,13 @@ object BackendManager {
             appContext = context.applicationContext
             isInitialized = true
 
+            // 1. Ensure FirebaseManager singleton is initialized with persistence
+            FirebaseManager.init()
+
             val database = OpenChatDatabase.getInstance(context)
             val sessionManager = SessionManager(context)
 
-            // Setup Inbox Processor
+            // 2. Setup Inbox Processor
             inboxProcessor = ConversationInboxProcessor(
                 context = context,
                 messageDao = database.messageDao(),
@@ -121,7 +128,7 @@ object BackendManager {
                 currentUserIdProvider = { sessionManager.getUserId() ?: FirebaseManager.auth?.currentUser?.uid }
             )
 
-            // Setup Per-Conversation Outbox Queue
+            // 3. Setup Per-Conversation Outbox Queue
             outboxQueue = ConversationOutboxQueue(
                 context = context,
                 messageDao = database.messageDao(),
@@ -134,11 +141,51 @@ object BackendManager {
                 }
             )
 
+            // 4. Setup Auth State Observer
+            setupAuthStateObserver()
+
+            // 5. Setup Network & Firebase Connection Observers
             setupNetworkMonitoring(context)
             setupFirebaseConnectionObserver()
             startHeartbeatMonitor()
 
+            // 6. Refresh FCM Token in background
+            refreshFcmToken()
+
             Log.i(TAG, "BackendManager initialized successfully with Firebase")
+        }
+    }
+
+    private fun setupAuthStateObserver() {
+        try {
+            val listener = FirebaseAuth.AuthStateListener { fbAuth ->
+                val user = fbAuth.currentUser
+                _currentFirebaseUser.value = user
+                Log.d(TAG, "Firebase AuthState changed: uid=${user?.uid}")
+            }
+            FirebaseManager.auth?.addAuthStateListener(listener)
+            authStateListener = listener
+            _currentFirebaseUser.value = FirebaseManager.auth?.currentUser
+        } catch (e: Exception) {
+            Log.w(TAG, "Error attaching AuthStateListener: ${e.message}")
+        }
+    }
+
+    fun refreshFcmToken() {
+        try {
+            FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
+                if (task.isSuccessful) {
+                    val token = task.result
+                    val ctx = appContext
+                    val uid = if (ctx != null) SessionManager(ctx).getUserId() else FirebaseManager.auth?.currentUser?.uid
+                    if (!uid.isNullOrBlank() && !token.isNullOrBlank()) {
+                        FirebaseManager.usersRef.child(uid).child("fcm_token").setValue(token)
+                        Log.d(TAG, "FCM token updated successfully: $token")
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "FCM token refresh notice: ${e.message}")
         }
     }
 
@@ -147,7 +194,8 @@ object BackendManager {
             activeConversationListeners.clear()
             outboxQueue?.clearAllQueues()
             _connectionState.value = ConnectionState.Offline
-            Log.i(TAG, "BackendManager listeners and outbox cleared on user logout")
+            _currentFirebaseUser.value = null
+            Log.i(TAG, "BackendManager listeners, outbox, and session cleared on user logout")
         }
     }
 
@@ -174,6 +222,8 @@ object BackendManager {
                     dispatchMessageToServer(messageEntity)
                 }
             )
+
+            refreshFcmToken()
             recomputeConnectionState()
             Log.i(TAG, "BackendManager re-bound to user: $newUserId")
         }
@@ -280,7 +330,6 @@ object BackendManager {
         val uid = sessionManager.getUserId()
         if (uid.isNullOrBlank()) return@withContext
 
-        // Ensure Firebase Realtime Database is online
         try {
             FirebaseManager.database.goOnline()
         } catch (_: Exception) {}
@@ -359,63 +408,20 @@ object BackendManager {
     }
 
     // =========================================================================
-    // 3. Media Storage API (Firebase Storage with Future Nhost Client Hook)
+    // 3. Media Upload Lockdown (Disabled without UI removal)
     // =========================================================================
 
-    private fun getStorageRefForBucket(bucket: String): StorageReference {
-        return when (bucket) {
-            Constants.BUCKET_AVATARS -> FirebaseManager.getAvatarsStorageRef()
-            Constants.BUCKET_AUDIO, Constants.BUCKET_VOICE_CHAT, Constants.BUCKET_VOICE_MESSAGES -> FirebaseManager.getChatAudioStorageRef()
-            Constants.BUCKET_VIDEOS -> FirebaseManager.getChatVideosStorageRef()
-            Constants.BUCKET_ATTACHMENTS, Constants.BUCKET_CHAT_ATTACHMENTS -> FirebaseManager.getChatAttachmentsStorageRef()
-            else -> FirebaseManager.getChatImagesStorageRef()
-        }
-    }
-
+    /**
+     * Media uploads locked: Returns clear "temporarily unavailable" state.
+     * UI and feature code remain fully intact.
+     */
     suspend fun uploadFile(
         file: File,
         mimeType: String,
         bucket: String = Constants.BUCKET_IMAGES,
         onProgress: (Float) -> Unit = {}
     ): Resource<String> = withContext(Dispatchers.IO) {
-        if (!file.exists()) {
-            return@withContext Resource.Error("File does not exist: ${file.absolutePath}")
-        }
-
-        suspendCancellableCoroutine<Resource<String>> { continuation ->
-            val ext = file.extension.ifBlank { "bin" }
-            val uniqueName = "${UUID.randomUUID()}.$ext"
-            val targetRef = getStorageRefForBucket(bucket).child(uniqueName)
-            val uri = Uri.fromFile(file)
-
-            val uploadTask = targetRef.putFile(uri)
-            uploadTask.addOnProgressListener { taskSnapshot ->
-                val total = taskSnapshot.totalByteCount
-                if (total > 0) {
-                    val progress = taskSnapshot.bytesTransferred.toFloat() / total.toFloat()
-                    onProgress(progress)
-                }
-            }.addOnSuccessListener {
-                targetRef.downloadUrl.addOnSuccessListener { downloadUri ->
-                    onProgress(1.0f)
-                    if (continuation.isActive) {
-                        continuation.resume(Resource.Success(downloadUri.toString()))
-                    }
-                }.addOnFailureListener { e ->
-                    if (continuation.isActive) {
-                        continuation.resume(Resource.Error(e.message ?: "Failed to retrieve download URL", e))
-                    }
-                }
-            }.addOnFailureListener { e ->
-                if (continuation.isActive) {
-                    continuation.resume(Resource.Error(e.message ?: "File upload failed", e))
-                }
-            }
-
-            continuation.invokeOnCancellation {
-                uploadTask.cancel()
-            }
-        }
+        Resource.Error("Media uploads are temporarily unavailable")
     }
 
     private suspend fun uploadFileInternal(
@@ -424,11 +430,7 @@ object BackendManager {
         bucket: String,
         onProgress: (Float) -> Unit
     ): String? {
-        val res = uploadFile(file, mimeType, bucket, onProgress)
-        return when (res) {
-            is Resource.Success -> res.data
-            else -> null
-        }
+        return null
     }
 
     suspend fun uploadBytes(
@@ -437,30 +439,7 @@ object BackendManager {
         mimeType: String,
         bucket: String = Constants.BUCKET_IMAGES
     ): Resource<String> = withContext(Dispatchers.IO) {
-        suspendCancellableCoroutine<Resource<String>> { continuation ->
-            val targetRef = getStorageRefForBucket(bucket).child(fileName)
-            val uploadTask = targetRef.putBytes(bytes)
-
-            uploadTask.addOnSuccessListener {
-                targetRef.downloadUrl.addOnSuccessListener { downloadUri ->
-                    if (continuation.isActive) {
-                        continuation.resume(Resource.Success(downloadUri.toString()))
-                    }
-                }.addOnFailureListener { e ->
-                    if (continuation.isActive) {
-                        continuation.resume(Resource.Error(e.message ?: "Failed to retrieve download URL", e))
-                    }
-                }
-            }.addOnFailureListener { e ->
-                if (continuation.isActive) {
-                    continuation.resume(Resource.Error(e.message ?: "Byte upload failed", e))
-                }
-            }
-
-            continuation.invokeOnCancellation {
-                uploadTask.cancel()
-            }
-        }
+        Resource.Error("Media uploads are temporarily unavailable")
     }
 
     /**
@@ -602,7 +581,6 @@ object BackendManager {
     ): Boolean = withContext(Dispatchers.IO) {
         try {
             val notifId = UUID.randomUUID().toString()
-            val notifRef = FirebaseManager.database.getReference("notifications").child(recipientId).child(notifId)
             val notifData = HashMap<String, Any?>()
             notifData["id"] = notifId
             notifData["title"] = title
@@ -616,6 +594,16 @@ object BackendManager {
             Log.w(TAG, "Push notification dispatch notice: ${e.message}")
             false
         }
+    }
+
+    /**
+     * Typed facade API to initiate or update a WebRTC call session.
+     */
+    suspend fun startCall(
+        receiverId: String,
+        callType: String = "audio"
+    ): Resource<CallSession> {
+        return com.msi.openchat.core.di.ServiceLocator.callRepository.initiateCall(receiverId, callType)
     }
 
     /**

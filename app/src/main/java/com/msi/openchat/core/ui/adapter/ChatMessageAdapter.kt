@@ -78,10 +78,22 @@ class ChatMessageAdapter(
         ) {
             val context = binding.root.context
 
-            // Pure text date separator with no background capsule
-            binding.textDateSeparator.background = null
+            val outgoingBg = androidx.core.content.ContextCompat.getColor(context, R.color.color_bubble_outgoing)
+            val incomingBg = androidx.core.content.ContextCompat.getColor(context, R.color.color_bubble_incoming)
+            val outgoingText = androidx.core.content.ContextCompat.getColor(context, R.color.color_bubble_outgoing_text)
+            val incomingText = androidx.core.content.ContextCompat.getColor(context, R.color.color_bubble_incoming_text)
+            val outgoingTime = androidx.core.content.ContextCompat.getColor(context, R.color.color_timestamp_outgoing)
+            val incomingTime = androidx.core.content.ContextCompat.getColor(context, R.color.color_timestamp_incoming)
+            val primaryAccentColor = androidx.core.content.ContextCompat.getColor(context, R.color.color_primary)
+            val dateCapsuleText = androidx.core.content.ContextCompat.getColor(context, R.color.color_date_capsule_text)
+            val readTickColor = androidx.core.content.ContextCompat.getColor(context, R.color.color_read_tick)
+            val tickColor = androidx.core.content.ContextCompat.getColor(context, R.color.color_delivered_tick)
+
+            // Date separator capsule
             if (showDateSeparator) {
                 binding.textDateSeparator.visibility = View.VISIBLE
+                binding.textDateSeparator.setBackgroundResource(R.drawable.bg_date_capsule)
+                binding.textDateSeparator.setTextColor(dateCapsuleText)
                 binding.textDateSeparator.text = DateTimeUtils.formatDateSeparator(message.createdAt)
             } else {
                 binding.textDateSeparator.visibility = View.GONE
@@ -90,34 +102,23 @@ class ChatMessageAdapter(
             val isOutgoing = message.senderId == currentUserId
             val params = binding.layoutBubbleContainer.layoutParams as LinearLayout.LayoutParams
 
-            // High-contrast, theme-synchronized colors
-            val bubbleTextColor: Int
-            val bubbleTimeColor: Int
-            val bubbleBgColor: Int
-            val primaryAccentColor: Int
+            val bubbleTextColor = if (isOutgoing) outgoingText else incomingText
+            val bubbleTimeColor = if (isOutgoing) outgoingTime else incomingTime
+            val bubbleBgColor = if (isOutgoing) outgoingBg else incomingBg
 
-            if (isDark) {
-                bubbleTextColor = Color.parseColor("#E8EEF5")
-                bubbleTimeColor = Color.parseColor("#A3B1BF")
-                primaryAccentColor = Color.parseColor("#54B9EA")
-                bubbleBgColor = if (isOutgoing) Color.parseColor("#203D52") else Color.parseColor("#244538")
-            } else {
-                bubbleTextColor = Color.parseColor("#17212B")
-                bubbleTimeColor = Color.parseColor("#64748B")
-                primaryAccentColor = Color.parseColor("#087EBA")
-                bubbleBgColor = if (isOutgoing) Color.parseColor("#D9F0FF") else Color.parseColor("#DDF3E4")
-            }
-
-            binding.textDateSeparator.setTextColor(bubbleTimeColor)
-
+            val maxBubbleMargin = (48 * context.resources.displayMetrics.density).toInt()
             if (isOutgoing) {
                 params.gravity = Gravity.END
+                params.marginStart = maxBubbleMargin
+                params.marginEnd = 0
                 val bg = (context.getDrawable(R.drawable.bg_bubble_outgoing)?.mutate() as? GradientDrawable)
                     ?: GradientDrawable()
                 bg.setColor(bubbleBgColor)
                 binding.layoutBubbleContainer.background = bg
             } else {
                 params.gravity = Gravity.START
+                params.marginStart = 0
+                params.marginEnd = maxBubbleMargin
                 val bg = (context.getDrawable(R.drawable.bg_bubble_incoming)?.mutate() as? GradientDrawable)
                     ?: GradientDrawable()
                 bg.setColor(bubbleBgColor)
@@ -128,6 +129,7 @@ class ChatMessageAdapter(
             binding.textMessageBody.setTextColor(bubbleTextColor)
             binding.textMessageTime.setTextColor(bubbleTimeColor)
             binding.textVoiceDuration.setTextColor(bubbleTextColor)
+            binding.textFileName.setTextColor(bubbleTextColor)
             binding.btnPlayVoice.setColorFilter(primaryAccentColor)
 
             binding.textMessageTime.text = DateTimeUtils.formatMessageTime(context, message.createdAt)
@@ -139,22 +141,22 @@ class ChatMessageAdapter(
                     "read" -> {
                         binding.textSeenStatus.visibility = View.GONE
                         binding.imageMessageStatus.setImageResource(R.drawable.ic_read)
-                        binding.imageMessageStatus.clearColorFilter()
+                        binding.imageMessageStatus.setColorFilter(readTickColor)
                     }
                     "delivered" -> {
                         binding.textSeenStatus.visibility = View.GONE
                         binding.imageMessageStatus.setImageResource(R.drawable.ic_delevered)
-                        binding.imageMessageStatus.setColorFilter(bubbleTimeColor)
+                        binding.imageMessageStatus.setColorFilter(tickColor)
                     }
                     "sending" -> {
                         binding.textSeenStatus.visibility = View.GONE
                         binding.imageMessageStatus.setImageResource(R.drawable.ic_clock_16)
-                        binding.imageMessageStatus.setColorFilter(bubbleTimeColor)
+                        binding.imageMessageStatus.setColorFilter(tickColor)
                     }
                     else -> { // "sent"
                         binding.textSeenStatus.visibility = View.GONE
                         binding.imageMessageStatus.setImageResource(R.drawable.ic_sent)
-                        binding.imageMessageStatus.setColorFilter(bubbleTimeColor)
+                        binding.imageMessageStatus.setColorFilter(tickColor)
                     }
                 }
             } else {

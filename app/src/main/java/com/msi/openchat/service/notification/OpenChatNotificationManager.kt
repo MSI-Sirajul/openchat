@@ -503,4 +503,48 @@ object OpenChatNotificationManager {
         manager.notify(notifId, notification)
         Log.d(TAG, "Dispatched friend accepted notification (Channel B) for friend $friendName (conv=$conversationId)")
     }
+
+    /**
+     * Contextual connection notification handling:
+     * - CONNECTED -> hide notification entirely (no permanent notification).
+     * - RECONNECTING / SYNCING -> transient notification, auto-cancelled once connected.
+     * Uses monochrome app icon (ic_chat_24) for universal rendering across Android versions.
+     */
+    fun updateConnectionNotification(context: Context, status: String, isConnected: Boolean) {
+        val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
+        if (isConnected) {
+            manager.cancel(Constants.NOTIFICATION_ID_NETWORK)
+            return
+        }
+
+        initChannels(context)
+
+        val intent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            context,
+            Constants.NOTIFICATION_ID_NETWORK,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val notification = NotificationCompat.Builder(context, Constants.CHANNEL_NETWORK)
+            .setContentTitle("OpenChat")
+            .setContentText(status)
+            .setSmallIcon(com.example.R.drawable.ic_chat_24)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setCategory(NotificationCompat.CATEGORY_STATUS)
+            .setContentIntent(pendingIntent)
+            .setOngoing(false)
+            .setAutoCancel(true)
+            .build()
+
+        manager.notify(Constants.NOTIFICATION_ID_NETWORK, notification)
+    }
+
+    fun cancelConnectionNotification(context: Context) {
+        val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+        manager?.cancel(Constants.NOTIFICATION_ID_NETWORK)
+    }
 }

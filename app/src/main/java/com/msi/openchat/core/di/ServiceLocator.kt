@@ -140,12 +140,14 @@ object ServiceLocator {
             activeChatRepository = null
             activeDatabase = null
             if (!oldUserId.isNullOrBlank()) {
-                com.msi.openchat.data.local.OpenChatDatabase.closeDatabaseForUser(oldUserId)
+                com.msi.openchat.data.local.OpenChatDatabase.deleteDatabaseForUser(context, oldUserId)
             }
             userRepository.clearCache()
             com.msi.openchat.core.backend.BackendManager.onUserLoggedOut()
             try {
-                coil.Coil.imageLoader(context).memoryCache?.clear()
+                val imageLoader = coil.Coil.imageLoader(context)
+                imageLoader.memoryCache?.clear()
+                imageLoader.diskCache?.clear()
             } catch (_: Exception) {}
         }
     }

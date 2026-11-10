@@ -257,9 +257,16 @@ class ChatFragment : Fragment() {
                     binding.btnChatSendOrMic.setImageResource(R.drawable.ic_mic_24)
                     binding.btnChatSendOrMic.contentDescription = "Record Voice"
                 }
+                binding.btnChatSendOrMic.setColorFilter(
+                    ContextCompat.getColor(requireContext(), R.color.color_composer_action_icon)
+                )
             }
             override fun afterTextChanged(s: Editable?) {}
         })
+
+        binding.btnChatSendOrMic.setColorFilter(
+            ContextCompat.getColor(requireContext(), R.color.color_composer_action_icon)
+        )
 
         binding.btnChatSendOrMic.setOnClickListener {
             val text = binding.etMessageInput.text?.toString().orEmpty()
@@ -651,7 +658,7 @@ class ChatFragment : Fragment() {
         } else if (isOnline) {
             binding.textChatContactStatus.setTextColor(ContextCompat.getColor(requireContext(), R.color.color_online))
         } else {
-            binding.textChatContactStatus.setTextColor(ContextCompat.getColor(requireContext(), R.color.color_secondary_text))
+            binding.textChatContactStatus.setTextColor(ContextCompat.getColor(requireContext(), R.color.color_toolbar_subtitle))
         }
 
         // Messages list
