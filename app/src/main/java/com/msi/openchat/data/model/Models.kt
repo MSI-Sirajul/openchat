@@ -111,7 +111,8 @@ data class Message(
     val uploadProgress: Float = 1.0f,
     // Transient fields for local recording/playback
     val isPlaying: Boolean = false,
-    val playbackProgress: Float = 0f
+    val playbackProgress: Float = 0f,
+    @Json(name = "sender_name") val senderName: String? = null
 )
 
 @JsonClass(generateAdapter = true)

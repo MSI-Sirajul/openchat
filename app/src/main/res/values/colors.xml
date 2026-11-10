@@ -52,6 +52,7 @@
     <color name="color_media_container_bg">#E2E8F0</color>
     <color name="color_media_scrim_overlay">#66000000</color>
     <color name="color_voice_seek_active">#00A884</color>
+    <color name="color_sender_name">#00A884</color>
 
     <!-- Generic palette aliases -->
     <color name="black">#FF000000</color>

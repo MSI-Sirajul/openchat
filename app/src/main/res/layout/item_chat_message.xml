@@ -16,14 +16,14 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="center_horizontal"
-        android:layout_marginTop="10dp"
-        android:layout_marginBottom="6dp"
+        android:layout_marginTop="12dp"
+        android:layout_marginBottom="8dp"
         android:background="@drawable/bg_date_capsule"
         android:paddingStart="12dp"
         android:paddingEnd="12dp"
         android:paddingTop="4dp"
         android:paddingBottom="4dp"
-        android:textSize="12sp"
+        android:textSize="11.5sp"
         android:fontFamily="sans-serif-medium"
         android:textColor="@color/color_date_capsule_text"
         android:visibility="gone"
@@ -43,12 +43,25 @@
         android:paddingTop="8dp"
         android:paddingBottom="6dp">
 
+        <!-- Sender Name (shown for incoming messages in group chats) -->
+        <TextView
+            android:id="@+id/textSenderName"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="3dp"
+            android:textSize="12.5sp"
+            android:fontFamily="sans-serif-bold"
+            android:textColor="@color/color_sender_name"
+            android:visibility="gone"
+            tools:visibility="visible"
+            tools:text="Alex Rivera" />
+
         <!-- Media Container (Image or Video) -->
         <FrameLayout
             android:id="@+id/layoutMediaContainer"
             android:layout_width="240dp"
             android:layout_height="180dp"
-            android:layout_marginBottom="4dp"
+            android:layout_marginBottom="5dp"
             android:background="@drawable/bg_media_rounded"
             android:clipToOutline="true"
             android:visibility="gone"
@@ -114,8 +127,8 @@
 
             <ImageButton
                 android:id="@+id/btnPlayVoice"
-                android:layout_width="36dp"
-                android:layout_height="36dp"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
                 android:background="?android:attr/selectableItemBackgroundBorderless"
                 android:src="@drawable/ic_play_24"
                 android:contentDescription="Play voice note" />
@@ -136,7 +149,8 @@
                 android:id="@+id/textVoiceDuration"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:textSize="11sp"
+                android:textSize="12sp"
+                android:fontFamily="sans-serif-medium"
                 android:textColor="@color/color_bubble_outgoing_text"
                 tools:text="0:15" />
         </LinearLayout>
@@ -167,18 +181,20 @@
                 android:layout_marginStart="8dp"
                 android:singleLine="true"
                 android:ellipsize="middle"
-                android:textSize="13sp"
+                android:textSize="13.5sp"
+                android:fontFamily="sans-serif-medium"
                 android:textColor="@color/color_bubble_outgoing_text"
                 tools:text="Project_Report.pdf" />
         </LinearLayout>
 
-        <!-- Text Message Body -->
+        <!-- Text Message Body (Enhanced Typography & Line Height) -->
         <TextView
             android:id="@+id/textMessageBody"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:textSize="15sp"
-            android:lineSpacingExtra="2dp"
+            android:textSize="15.5sp"
+            android:lineSpacingExtra="3dp"
+            android:fontFamily="sans-serif"
             android:textColor="@color/color_bubble_outgoing_text"
             tools:text="Hey, checking in on the performance updates!" />
 
@@ -187,7 +203,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="end"
-            android:layout_marginTop="2dp"
+            android:layout_marginTop="3dp"
             android:orientation="horizontal"
             android:gravity="center_vertical">
 
@@ -196,6 +212,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:textSize="11sp"
+                android:fontFamily="sans-serif-medium"
                 android:textColor="@color/color_timestamp_outgoing"
                 tools:text="14:32" />
 
@@ -205,7 +222,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginStart="4dp"
                 android:textSize="10sp"
-                android:textStyle="bold"
+                android:fontFamily="sans-serif-bold"
                 android:textColor="@color/color_status_online"
                 android:text="Seen"
                 android:visibility="gone"
@@ -213,13 +230,13 @@
 
             <ImageView
                 android:id="@+id/imageMessageStatus"
-                android:layout_width="15dp"
-                android:layout_height="15dp"
+                android:layout_width="16dp"
+                android:layout_height="16dp"
                 android:layout_marginStart="4dp"
                 android:contentDescription="Message status"
                 android:visibility="gone"
                 tools:visibility="visible"
-                tools:src="@drawable/ic_read" />
+                tools:src="@drawable/ic_check_double_16" />
         </LinearLayout>
     </LinearLayout>
 </LinearLayout>

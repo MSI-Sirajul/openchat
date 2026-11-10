@@ -102,6 +102,14 @@ class ChatMessageAdapter(
             val isOutgoing = message.senderId == currentUserId
             val params = binding.layoutBubbleContainer.layoutParams as LinearLayout.LayoutParams
 
+            // Sender name in groups
+            if (!isOutgoing && !message.senderName.isNullOrBlank()) {
+                binding.textSenderName.visibility = View.VISIBLE
+                binding.textSenderName.text = message.senderName
+            } else {
+                binding.textSenderName.visibility = View.GONE
+            }
+
             val bubbleTextColor = if (isOutgoing) outgoingText else incomingText
             val bubbleTimeColor = if (isOutgoing) outgoingTime else incomingTime
             val bubbleBgColor = if (isOutgoing) outgoingBg else incomingBg
@@ -134,29 +142,33 @@ class ChatMessageAdapter(
 
             binding.textMessageTime.text = DateTimeUtils.formatMessageTime(context, message.createdAt)
 
-            // Message Status & Read Receipts (Seen status)
+            // Message Status & Read Receipts (Single / Double tick with uniform stroke)
             if (isOutgoing) {
                 binding.imageMessageStatus.visibility = View.VISIBLE
                 when (message.status) {
                     "read" -> {
                         binding.textSeenStatus.visibility = View.GONE
-                        binding.imageMessageStatus.setImageResource(R.drawable.ic_read)
+                        binding.imageMessageStatus.setImageResource(R.drawable.ic_check_double_16)
                         binding.imageMessageStatus.setColorFilter(readTickColor)
+                        binding.imageMessageStatus.contentDescription = "Read"
                     }
                     "delivered" -> {
                         binding.textSeenStatus.visibility = View.GONE
-                        binding.imageMessageStatus.setImageResource(R.drawable.ic_delevered)
+                        binding.imageMessageStatus.setImageResource(R.drawable.ic_check_double_16)
                         binding.imageMessageStatus.setColorFilter(tickColor)
+                        binding.imageMessageStatus.contentDescription = "Delivered"
                     }
                     "sending" -> {
                         binding.textSeenStatus.visibility = View.GONE
                         binding.imageMessageStatus.setImageResource(R.drawable.ic_clock_16)
                         binding.imageMessageStatus.setColorFilter(tickColor)
+                        binding.imageMessageStatus.contentDescription = "Sending"
                     }
                     else -> { // "sent"
                         binding.textSeenStatus.visibility = View.GONE
-                        binding.imageMessageStatus.setImageResource(R.drawable.ic_sent)
+                        binding.imageMessageStatus.setImageResource(R.drawable.ic_check_single_16)
                         binding.imageMessageStatus.setColorFilter(tickColor)
+                        binding.imageMessageStatus.contentDescription = "Sent"
                     }
                 }
             } else {

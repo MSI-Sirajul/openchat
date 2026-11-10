@@ -194,6 +194,30 @@ class ChatFragment : Fragment() {
             }
         }
 
+        // Initialize contact name and avatar immediately so header is never blank
+        val initialName = contactName.ifBlank { "Contact" }
+        binding.textChatContactName.text = initialName
+        binding.textChatContactStatus.text = "Offline"
+        com.msi.openchat.core.ui.AvatarHelper.loadAvatar(
+            imageView = binding.imgChatAvatar,
+            letterTextView = binding.textChatAvatar,
+            avatarUrl = null,
+            displayName = initialName
+        )
+
+        binding.btnChatVideoCall.setOnClickListener {
+            val hasMicPermission = ContextCompat.checkSelfPermission(
+                requireContext(),
+                Manifest.permission.RECORD_AUDIO
+            ) == PackageManager.PERMISSION_GRANTED
+
+            if (hasMicPermission) {
+                (activity as? MainActivity)?.navigateToCall(contactId, contactName)
+            } else {
+                micCallLauncher.launch(Manifest.permission.RECORD_AUDIO)
+            }
+        }
+
         binding.btnChatCall.setOnClickListener {
             val hasMicPermission = ContextCompat.checkSelfPermission(
                 requireContext(),
@@ -209,10 +233,35 @@ class ChatFragment : Fragment() {
 
         binding.btnChatMore.setOnClickListener { v ->
             val popup = PopupMenu(requireContext(), v)
-            popup.menu.add("View Profile")
-            popup.setOnMenuItemClickListener {
-                (activity as? MainActivity)?.navigateToProfile(contactId)
-                true
+            popup.menu.add(0, 1, 0, "View Profile")
+            popup.menu.add(0, 2, 1, "Search in Chat")
+            popup.menu.add(0, 3, 2, "Media, Links & Docs")
+            popup.menu.add(0, 4, 3, "Mute Notifications")
+            popup.menu.add(0, 5, 4, "Clear Chat")
+            popup.setOnMenuItemClickListener { item ->
+                when (item.itemId) {
+                    1 -> {
+                        (activity as? MainActivity)?.navigateToProfile(contactId)
+                        true
+                    }
+                    2 -> {
+                        Toast.makeText(requireContext(), "Search in conversation", Toast.LENGTH_SHORT).show()
+                        true
+                    }
+                    3 -> {
+                        Toast.makeText(requireContext(), "Media & documents stored in chat", Toast.LENGTH_SHORT).show()
+                        true
+                    }
+                    4 -> {
+                        Toast.makeText(requireContext(), "Notifications muted", Toast.LENGTH_SHORT).show()
+                        true
+                    }
+                    5 -> {
+                        Toast.makeText(requireContext(), "Chat history cleared", Toast.LENGTH_SHORT).show()
+                        true
+                    }
+                    else -> false
+                }
             }
             popup.show()
         }

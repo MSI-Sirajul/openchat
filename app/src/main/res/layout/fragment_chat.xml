@@ -12,113 +12,151 @@
         android:layout_height="match_parent"
         android:orientation="vertical">
 
-        <!-- Chat Header Toolbar -->
+        <!-- Chat Header Toolbar (Edge-to-edge safe, flat 0dp elevation) -->
         <com.google.android.material.appbar.MaterialToolbar
             android:id="@+id/toolbar_chat"
             android:layout_width="match_parent"
-            android:layout_height="?attr/actionBarSize"
+            android:layout_height="62dp"
+            android:minHeight="?attr/actionBarSize"
             android:background="@color/color_toolbar_background"
             app:navigationIcon="@drawable/ic_arrow_back_24"
             app:navigationIconTint="@color/color_toolbar_icon"
+            app:navigationContentDescription="Back"
             app:elevation="0dp"
-            app:contentInsetStartWithNavigation="0dp">
+            app:contentInsetStart="0dp"
+            app:contentInsetStartWithNavigation="0dp"
+            app:contentInsetEnd="0dp">
 
+            <!-- Master horizontal container inside Toolbar for reliable weight measurement -->
             <LinearLayout
-                android:id="@+id/layout_contact_header"
-                android:layout_width="0dp"
+                android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:layout_weight="1"
-                android:gravity="center_vertical"
                 android:orientation="horizontal"
-                android:background="?attr/selectableItemBackground">
+                android:gravity="center_vertical">
 
-                <!-- Contact Avatar Frame -->
-                <FrameLayout
-                    android:layout_width="40dp"
-                    android:layout_height="40dp">
+                <!-- Contact Header (Avatar + Name + Status) -->
+                <LinearLayout
+                    android:id="@+id/layout_contact_header"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:background="?attr/selectableItemBackground"
+                    android:paddingStart="2dp"
+                    android:paddingEnd="4dp">
 
-                    <TextView
-                        android:id="@+id/text_chat_avatar"
-                        android:layout_width="match_parent"
-                        android:layout_height="match_parent"
-                        android:background="@drawable/bg_avatar_circle"
-                        android:backgroundTint="@color/color_avatar_bg"
-                        android:gravity="center"
-                        android:text="U"
-                        android:textColor="@color/color_avatar_text"
-                        android:textSize="16sp"
-                        android:textStyle="bold"
-                        android:visibility="gone" />
+                    <!-- Contact Avatar Frame (40dp x 40dp) -->
+                    <FrameLayout
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:layout_gravity="center_vertical">
 
-                    <com.google.android.material.imageview.ShapeableImageView
-                        android:id="@+id/img_chat_avatar"
-                        android:layout_width="match_parent"
-                        android:layout_height="match_parent"
-                        android:scaleType="centerCrop"
-                        android:src="@drawable/ic_default_avatar"
-                        app:shapeAppearanceOverlay="@style/ShapeAppearance.Material3.Corner.Full"
-                        android:visibility="visible" />
+                        <TextView
+                            android:id="@+id/text_chat_avatar"
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:background="@drawable/bg_avatar_circle"
+                            android:backgroundTint="@color/color_avatar_bg"
+                            android:gravity="center"
+                            android:text="U"
+                            android:textColor="@color/color_avatar_text"
+                            android:textSize="16sp"
+                            android:fontFamily="sans-serif-bold"
+                            android:visibility="gone" />
 
-                    <View
-                        android:id="@+id/dot_chat_online"
-                        android:layout_width="12dp"
-                        android:layout_height="12dp"
-                        android:layout_gravity="bottom|end"
-                        android:background="@drawable/bg_online_dot"
-                        android:visibility="gone" />
-                </FrameLayout>
+                        <com.google.android.material.imageview.ShapeableImageView
+                            android:id="@+id/img_chat_avatar"
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:scaleType="centerCrop"
+                            android:src="@drawable/ic_default_avatar"
+                            app:shapeAppearanceOverlay="@style/ShapeAppearance.Material3.Corner.Full"
+                            android:visibility="visible" />
 
-                <!-- Name & Online Status -->
+                        <View
+                            android:id="@+id/dot_chat_online"
+                            android:layout_width="12dp"
+                            android:layout_height="12dp"
+                            android:layout_gravity="bottom|end"
+                            android:background="@drawable/bg_online_dot"
+                            android:visibility="gone" />
+                    </FrameLayout>
+
+                    <!-- Name & Online / Last Seen Status -->
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginStart="10dp"
+                        android:layout_marginEnd="4dp"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:id="@+id/text_chat_contact_name"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="Contact"
+                            android:textColor="@color/color_toolbar_title"
+                            android:textSize="16sp"
+                            android:fontFamily="sans-serif-bold"
+                            android:lineHeight="20sp"
+                            android:maxLines="1"
+                            android:ellipsize="end" />
+
+                        <TextView
+                            android:id="@+id/text_chat_contact_status"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="Offline"
+                            android:textColor="@color/color_toolbar_subtitle"
+                            android:textSize="12.5sp"
+                            android:fontFamily="sans-serif"
+                            android:maxLines="1"
+                            android:ellipsize="end" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <!-- Actions: Video Call, Voice Call, Overflow Menu -->
                 <LinearLayout
                     android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="12dp"
-                    android:orientation="vertical">
+                    android:layout_height="match_parent"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:paddingEnd="4dp">
 
-                    <TextView
-                        android:id="@+id/text_chat_contact_name"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Contact"
-                        android:textColor="@color/color_toolbar_title"
-                        android:textSize="16sp"
-                        android:fontFamily="sans-serif-bold"
-                        android:maxLines="1"
-                        android:ellipsize="end" />
+                    <!-- Video Call Action Button (44dp) -->
+                    <ImageButton
+                        android:id="@+id/btn_chat_video_call"
+                        android:layout_width="44dp"
+                        android:layout_height="44dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:src="@drawable/ic_video_24"
+                        android:contentDescription="Video Call"
+                        app:tint="@color/color_toolbar_icon" />
 
-                    <TextView
-                        android:id="@+id/text_chat_contact_status"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Offline"
-                        android:textColor="@color/color_toolbar_subtitle"
-                        android:textSize="12sp"
-                        android:fontFamily="sans-serif"
-                        android:maxLines="1" />
+                    <!-- Voice Call Action Button (44dp) -->
+                    <ImageButton
+                        android:id="@+id/btn_chat_call"
+                        android:layout_width="44dp"
+                        android:layout_height="44dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:src="@drawable/ic_call_24"
+                        android:contentDescription="Voice Call"
+                        app:tint="@color/color_toolbar_icon" />
+
+                    <!-- Overflow Menu Button (44dp) -->
+                    <ImageButton
+                        android:id="@+id/btn_chat_more"
+                        android:layout_width="44dp"
+                        android:layout_height="44dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:src="@drawable/ic_more_vert_24"
+                        android:contentDescription="More Options"
+                        app:tint="@color/color_toolbar_icon" />
                 </LinearLayout>
+
             </LinearLayout>
-
-            <!-- Call Action Button (48dp touch target) -->
-            <ImageButton
-                android:id="@+id/btn_chat_call"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:layout_gravity="end"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:src="@drawable/ic_call_24"
-                android:contentDescription="Call"
-                app:tint="@color/color_primary" />
-
-            <!-- Overflow Menu Button (48dp touch target) -->
-            <ImageButton
-                android:id="@+id/btn_chat_more"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:layout_gravity="end"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:src="@drawable/ic_more_vert_24"
-                android:contentDescription="More Options"
-                app:tint="@color/color_toolbar_icon" />
         </com.google.android.material.appbar.MaterialToolbar>
 
         <!-- Razor-thin subtle divider below toolbar -->
