@@ -139,6 +139,7 @@ class ActiveVideoCallActivity : AppCompatActivity(), SensorEventListener {
 
     private fun setupViews() {
         // Attach WebRTC SurfaceViewRenderers
+        binding.localVideoView.setZOrderMediaOverlay(true)
         repository.attachLocalRenderer(binding.localVideoView)
         repository.attachRemoteRenderer(binding.remoteVideoView)
 

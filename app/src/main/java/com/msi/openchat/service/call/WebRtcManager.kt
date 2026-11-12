@@ -19,6 +19,8 @@ import org.webrtc.PeerConnection
 import org.webrtc.PeerConnectionFactory
 import org.webrtc.SdpObserver
 import org.webrtc.SessionDescription
+import org.webrtc.SoftwareVideoDecoderFactory
+import org.webrtc.SoftwareVideoEncoderFactory
 import org.webrtc.audio.JavaAudioDeviceModule
 import java.util.concurrent.Executors
 
@@ -112,6 +114,8 @@ class WebRtcManager(
 
                     sharedFactory = PeerConnectionFactory.builder()
                         .setAudioDeviceModule(adm)
+                        .setVideoEncoderFactory(SoftwareVideoEncoderFactory())
+                        .setVideoDecoderFactory(SoftwareVideoDecoderFactory())
                         .createPeerConnectionFactory()
                     Log.i("OpenChatWebRtc", "Shared PeerConnectionFactory created successfully")
                 } catch (t: Throwable) {
@@ -345,6 +349,7 @@ class WebRtcManager(
 
         val sdpConstraints = MediaConstraints().apply {
             mandatory.add(MediaConstraints.KeyValuePair("OfferToReceiveAudio", "true"))
+            mandatory.add(MediaConstraints.KeyValuePair("OfferToReceiveVideo", "false"))
         }
 
         pc.createOffer(object : SdpObserver {
@@ -489,6 +494,7 @@ class WebRtcManager(
 
         val sdpConstraints = MediaConstraints().apply {
             mandatory.add(MediaConstraints.KeyValuePair("OfferToReceiveAudio", "true"))
+            mandatory.add(MediaConstraints.KeyValuePair("OfferToReceiveVideo", "false"))
         }
 
         pc.createAnswer(object : SdpObserver {

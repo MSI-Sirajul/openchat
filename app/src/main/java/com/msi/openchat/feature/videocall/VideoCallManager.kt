@@ -30,6 +30,8 @@ import org.webrtc.DataChannel
 import org.webrtc.DefaultVideoDecoderFactory
 import org.webrtc.DefaultVideoEncoderFactory
 import org.webrtc.EglBase
+import org.webrtc.SoftwareVideoDecoderFactory
+import org.webrtc.SoftwareVideoEncoderFactory
 import org.webrtc.IceCandidate
 import org.webrtc.MediaConstraints
 import org.webrtc.MediaStream
@@ -37,6 +39,7 @@ import org.webrtc.PeerConnection
 import org.webrtc.PeerConnectionFactory
 import org.webrtc.RtpReceiver
 import org.webrtc.RtpTransceiver
+import org.webrtc.RendererCommon
 import org.webrtc.SdpObserver
 import org.webrtc.SessionDescription
 import org.webrtc.SurfaceTextureHelper
@@ -60,7 +63,21 @@ import java.util.concurrent.atomic.AtomicBoolean
 object VideoCallManager {
     private const val TAG = "OpenChat_VideoCallMgr"
 
-    val rootEglBase: EglBase by lazy { EglBase.create() }
+    private val eglConfigAttributes: IntArray by lazy {
+        try {
+            EglBase.configBuilder().setOpenGlesVersion(2).createConfigAttributes()
+        } catch (_: Throwable) {
+            EglBase.CONFIG_PLAIN
+        }
+    }
+
+    val rootEglBase: EglBase by lazy {
+        try {
+            EglBase.create(null, eglConfigAttributes)
+        } catch (_: Throwable) {
+            EglBase.create()
+        }
+    }
 
     private val managerScope = CoroutineScope(Dispatchers.Default + Job())
     private var timerJob: Job? = null
@@ -146,8 +163,18 @@ object VideoCallManager {
                 JavaAudioDeviceModule.builder(context).createAudioDeviceModule()
             }
 
-            val encoderFactory = DefaultVideoEncoderFactory(rootEglBase.eglBaseContext, false, true)
-            val decoderFactory = DefaultVideoDecoderFactory(rootEglBase.eglBaseContext)
+            val encoderFactory = try {
+                DefaultVideoEncoderFactory(rootEglBase.eglBaseContext, false, true)
+            } catch (t: Throwable) {
+                Log.w(TAG, "DefaultVideoEncoderFactory fallback to Software: ${t.message}")
+                SoftwareVideoEncoderFactory()
+            }
+            val decoderFactory = try {
+                DefaultVideoDecoderFactory(rootEglBase.eglBaseContext)
+            } catch (t: Throwable) {
+                Log.w(TAG, "DefaultVideoDecoderFactory fallback to Software: ${t.message}")
+                SoftwareVideoDecoderFactory()
+            }
 
             peerConnectionFactory = PeerConnectionFactory.builder()
                 .setAudioDeviceModule(adm)
@@ -179,9 +206,11 @@ object VideoCallManager {
     fun attachLocalRenderer(renderer: SurfaceViewRenderer) {
         localRenderer = renderer
         try {
-            renderer.init(rootEglBase.eglBaseContext, null)
-            renderer.setEnableHardwareScaler(true)
+            renderer.init(rootEglBase.eglBaseContext, null, eglConfigAttributes, org.webrtc.GlRectDrawer())
+            renderer.setEnableHardwareScaler(false)
+            renderer.setScalingType(RendererCommon.ScalingType.SCALE_ASPECT_FILL)
             renderer.setMirror(true)
+            renderer.setZOrderMediaOverlay(true)
         } catch (e: Exception) {
             Log.w(TAG, "Local renderer already initialized or failed: ${e.message}")
         }
@@ -197,8 +226,9 @@ object VideoCallManager {
     fun attachRemoteRenderer(renderer: SurfaceViewRenderer) {
         remoteRenderer = renderer
         try {
-            renderer.init(rootEglBase.eglBaseContext, null)
-            renderer.setEnableHardwareScaler(true)
+            renderer.init(rootEglBase.eglBaseContext, null, eglConfigAttributes, org.webrtc.GlRectDrawer())
+            renderer.setEnableHardwareScaler(false)
+            renderer.setScalingType(RendererCommon.ScalingType.SCALE_ASPECT_FIT)
             renderer.setMirror(false)
         } catch (e: Exception) {
             Log.w(TAG, "Remote renderer already initialized or failed: ${e.message}")
@@ -793,6 +823,10 @@ object VideoCallManager {
                 peerConnection?.dispose()
             } catch (_: Exception) {}
             peerConnection = null
+
+            try {
+                surfaceTextureHelper?.stopListening()
+            } catch (_: Exception) {}
 
             try {
                 videoCapturer?.stopCapture()
