@@ -20,6 +20,10 @@ class VideoCallRepository {
         VideoCallManager.attachRemoteRenderer(renderer)
     }
 
+    fun detachRenderers() {
+        VideoCallManager.detachRenderers()
+    }
+
     fun startOutgoingCall(context: Context, receiverId: String, receiverName: String) {
         VideoCallManager.startOutgoingCall(context, receiverId, receiverName)
     }

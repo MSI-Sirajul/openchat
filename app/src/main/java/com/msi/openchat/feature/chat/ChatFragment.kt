@@ -112,7 +112,11 @@ class ChatFragment : Fragment() {
         ActivityResultContracts.RequestPermission()
     ) { isGranted ->
         if (isGranted) {
-            (activity as? MainActivity)?.navigateToCall(contactId, contactName)
+            com.msi.openchat.feature.calls.OutgoingAudioCallActivity.start(
+                context = requireContext(),
+                contactId = contactId,
+                contactName = contactName.ifBlank { "Contact" }
+            )
         } else {
             Toast.makeText(requireContext(), "Microphone permission is required to start a call", Toast.LENGTH_SHORT).show()
         }
@@ -207,7 +211,11 @@ class ChatFragment : Fragment() {
 
         binding.btnChatVideoCall.setOnClickListener {
             if (contactId.isNotBlank()) {
-                com.msi.openchat.feature.videocall.VideoCallActivity.startOutgoing(
+                if (com.msi.openchat.service.call.CallSessionCoordinator.currentCallId.value != null) {
+                    Toast.makeText(requireContext(), "Cannot start video call while voice call is active", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+                com.msi.openchat.feature.videocall.OutgoingVideoCallActivity.start(
                     context = requireContext(),
                     peerId = contactId,
                     peerName = contactName.ifBlank { "Contact" }
@@ -218,13 +226,21 @@ class ChatFragment : Fragment() {
         }
 
         binding.btnChatCall.setOnClickListener {
+            if (com.msi.openchat.feature.videocall.VideoCallManager.isCallActive()) {
+                Toast.makeText(requireContext(), "Cannot start voice call while video call is active", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
             val hasMicPermission = ContextCompat.checkSelfPermission(
                 requireContext(),
                 Manifest.permission.RECORD_AUDIO
             ) == PackageManager.PERMISSION_GRANTED
 
             if (hasMicPermission) {
-                (activity as? MainActivity)?.navigateToCall(contactId, contactName)
+                com.msi.openchat.feature.calls.OutgoingAudioCallActivity.start(
+                    context = requireContext(),
+                    contactId = contactId,
+                    contactName = contactName.ifBlank { "Contact" }
+                )
             } else {
                 micCallLauncher.launch(Manifest.permission.RECORD_AUDIO)
             }

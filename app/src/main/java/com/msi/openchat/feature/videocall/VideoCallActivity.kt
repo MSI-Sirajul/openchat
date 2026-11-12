@@ -484,6 +484,7 @@ class VideoCallActivity : AppCompatActivity(), SensorEventListener {
         AppServiceManager.stopCallRinging(this)
         releaseProximityLock()
         try {
+            repository.detachRenderers()
             binding.localVideoView.release()
             binding.remoteVideoView.release()
         } catch (_: Exception) {}

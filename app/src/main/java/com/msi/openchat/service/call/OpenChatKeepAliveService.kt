@@ -214,12 +214,25 @@ class OpenChatKeepAliveService : Service() {
                     if (callId.isNotBlank()) {
                         Log.i(tag, "Incoming background call: $callId from $callerId (type=$callType)")
                         serviceScope.launch {
-                            try {
-                                ServiceLocator.callRepository.sendSignaling(callId, callerId, "ringing", "{}")
-                                ServiceLocator.callRepository.updateCallStatus(callId, "ringing")
-                            } catch (_: Exception) {}
-
                             if (callType == "video") {
+                                // Strictly Video Call branch
+                                // 1. Mutual exclusion: check if audio call is active
+                                if (CallSessionCoordinator.currentCallId.value != null) {
+                                    Log.w(tag, "Audio call is active, declining incoming video call as busy: $callId")
+                                    try {
+                                        val signaling = com.msi.openchat.feature.videocall.VideoCallSignaling(ServiceLocator.sessionManager)
+                                        signaling.updateCallStatus(callId, "declined", "Busy on another call")
+                                        signaling.sendSignaling(callId, callerId, "busy", "{\"reason\":\"busy\"}")
+                                    } catch (_: Exception) {}
+                                    return@launch
+                                }
+
+                                try {
+                                    val signaling = com.msi.openchat.feature.videocall.VideoCallSignaling(ServiceLocator.sessionManager)
+                                    signaling.updateCallStatus(callId, "ringing")
+                                    signaling.sendSignaling(callId, callerId, "ringing", "{}")
+                                } catch (_: Exception) {}
+
                                 OpenChatNotificationManager.showIncomingVideoCallNotification(
                                     context = applicationContext,
                                     callId = callId,
@@ -227,6 +240,22 @@ class OpenChatKeepAliveService : Service() {
                                     callerName = callerName
                                 )
                             } else {
+                                // Strictly Audio Call branch
+                                // 1. Mutual exclusion: check if video call is active
+                                if (com.msi.openchat.feature.videocall.VideoCallManager.isCallActive()) {
+                                    Log.w(tag, "Video call is active, declining incoming audio call as busy: $callId")
+                                    try {
+                                        ServiceLocator.callRepository.updateCallStatus(callId = callId, status = "declined", endReason = "Busy on another call")
+                                        ServiceLocator.callRepository.sendSignaling(callId, callerId, "busy", "{\"reason\":\"busy\"}")
+                                    } catch (_: Exception) {}
+                                    return@launch
+                                }
+
+                                try {
+                                    ServiceLocator.callRepository.sendSignaling(callId, callerId, "ringing", "{}")
+                                    ServiceLocator.callRepository.updateCallStatus(callId, "ringing")
+                                } catch (_: Exception) {}
+
                                 OpenChatNotificationManager.showIncomingCallNotification(
                                     context = applicationContext,
                                     callId = callId,

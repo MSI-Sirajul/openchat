@@ -55,13 +55,6 @@ class HomeFragment : Fragment() {
         setupActions()
         observeState()
         observeCurrentUserProfile()
-
-        // Prompt for battery optimization exemption for background keep-alive reliability
-        context?.let { ctx ->
-            if (!com.msi.openchat.core.backend.battery.BatteryOptimizationHelper.isIgnoringBatteryOptimizations(ctx)) {
-                com.msi.openchat.core.backend.battery.BatteryOptimizationHelper.requestIgnoreBatteryOptimization(ctx)
-            }
-        }
     }
 
     override fun onResume() {

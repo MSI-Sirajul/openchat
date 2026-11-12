@@ -88,16 +88,14 @@ class CallActionReceiver : BroadcastReceiver() {
                 // Keep channel alive in foreground immediately showing duration and end call action
                 OpenChatCallService.startCallService(context, callId, callerName)
 
-                // Launch MainActivity and navigate directly to active in-call screen
-                val launchIntent = Intent(context, MainActivity::class.java).apply {
-                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or
-                            Intent.FLAG_ACTIVITY_SINGLE_TOP or
-                            Intent.FLAG_ACTIVITY_CLEAR_TOP
-                    setAction(OpenChatNotificationManager.ACTION_ACCEPT_CALL)
-                    putExtra(OpenChatNotificationManager.EXTRA_CALL_ID, callId)
-                    putExtra(OpenChatNotificationManager.EXTRA_CALLER_ID, callerId)
-                    putExtra(OpenChatNotificationManager.EXTRA_CALLER_NAME, callerName)
-                }
+                // Launch ActiveAudioCallActivity directly
+                val launchIntent = com.msi.openchat.feature.calls.ActiveAudioCallActivity.createIntent(
+                    context = context,
+                    callId = callId,
+                    contactId = callerId,
+                    contactName = callerName,
+                    isIncoming = true
+                )
                 context.startActivity(launchIntent)
             }
 

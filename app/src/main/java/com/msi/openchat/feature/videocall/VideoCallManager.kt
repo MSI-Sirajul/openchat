@@ -108,6 +108,11 @@ object VideoCallManager {
     private val _uiState = MutableStateFlow(VideoCallUiState())
     val uiState: StateFlow<VideoCallUiState> = _uiState.asStateFlow()
 
+    fun isCallActive(): Boolean {
+        val s = _uiState.value.status
+        return s !is VideoCallStatus.Idle && s !is VideoCallStatus.Ended
+    }
+
     private val isDisposing = AtomicBoolean(false)
 
     fun initialize(context: Context) {
@@ -127,10 +132,13 @@ object VideoCallManager {
                 .createInitializationOptions()
             PeerConnectionFactory.initialize(options)
 
+            val isAecSupported = JavaAudioDeviceModule.isBuiltInAcousticEchoCancelerSupported()
+            val isNsSupported = JavaAudioDeviceModule.isBuiltInNoiseSuppressorSupported()
+
             val adm = try {
                 JavaAudioDeviceModule.builder(context)
-                    .setUseHardwareAcousticEchoCanceler(true)
-                    .setUseHardwareNoiseSuppressor(true)
+                    .setUseHardwareAcousticEchoCanceler(isAecSupported)
+                    .setUseHardwareNoiseSuppressor(isNsSupported)
                     .setAudioSource(android.media.MediaRecorder.AudioSource.VOICE_COMMUNICATION)
                     .createAudioDeviceModule()
             } catch (t: Throwable) {
@@ -138,7 +146,7 @@ object VideoCallManager {
                 JavaAudioDeviceModule.builder(context).createAudioDeviceModule()
             }
 
-            val encoderFactory = DefaultVideoEncoderFactory(rootEglBase.eglBaseContext, true, true)
+            val encoderFactory = DefaultVideoEncoderFactory(rootEglBase.eglBaseContext, false, true)
             val decoderFactory = DefaultVideoDecoderFactory(rootEglBase.eglBaseContext)
 
             peerConnectionFactory = PeerConnectionFactory.builder()
@@ -197,6 +205,20 @@ object VideoCallManager {
         }
 
         remoteVideoTrack?.addSink(renderer)
+    }
+
+    /**
+     * Safely detaches and unbinds SurfaceViewRenderers from media tracks before release
+     */
+    fun detachRenderers() {
+        try {
+            localRenderer?.let { localVideoTrack?.removeSink(it) }
+        } catch (_: Exception) {}
+        try {
+            remoteRenderer?.let { remoteVideoTrack?.removeSink(it) }
+        } catch (_: Exception) {}
+        localRenderer = null
+        remoteRenderer = null
     }
 
     private fun setupLocalMediaTracks() {

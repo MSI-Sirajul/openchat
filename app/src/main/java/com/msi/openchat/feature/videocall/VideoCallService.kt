@@ -13,6 +13,7 @@ import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.example.R
+import com.msi.openchat.core.common.Constants
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -29,7 +30,7 @@ class VideoCallService : Service() {
     private var stateObserverJob: Job? = null
 
     companion object {
-        const val CHANNEL_ACTIVE_VIDEO = "openchat_video_active"
+        const val CHANNEL_ACTIVE_VIDEO = Constants.CHANNEL_ACTIVE_VIDEO_CALLS
         const val NOTIFICATION_ID = 2027
 
         const val ACTION_START = "com.msi.openchat.action.START_VIDEO_CALL"
@@ -144,7 +145,7 @@ class VideoCallService : Service() {
     }
 
     private fun buildOngoingNotification(peerName: String, duration: String, isMuted: Boolean): Notification {
-        val contentIntent = VideoCallActivity.createResumeIntent(this)
+        val contentIntent = ActiveVideoCallActivity.createResumeIntent(this)
         val contentPendingIntent = PendingIntent.getActivity(
             this,
             0,

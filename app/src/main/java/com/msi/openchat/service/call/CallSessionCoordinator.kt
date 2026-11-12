@@ -99,6 +99,8 @@ object CallSessionCoordinator {
         unregisterActiveCall()
     }
 
+    fun isActive(): Boolean = _currentCallId.value != null
+
     fun unregisterActiveCall(callId: String? = null) {
         if (callId == null || _currentCallId.value == callId) {
             Log.i(TAG, "Unregistering active call session")

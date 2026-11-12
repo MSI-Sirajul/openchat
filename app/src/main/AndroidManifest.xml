@@ -82,7 +82,70 @@
             </intent-filter>
         </activity>
 
-        <!-- Dedicated Full-Screen Incoming Call Activity -->
+        <!-- Dedicated Full-Screen Incoming Audio Call Activity -->
+        <activity
+            android:name="com.msi.openchat.feature.calls.IncomingAudioCallActivity"
+            android:exported="false"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:launchMode="singleTop"
+            android:excludeFromRecents="true"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.OpenChat.CallScreen" />
+
+        <!-- Dedicated Full-Screen Outgoing Audio Call Activity -->
+        <activity
+            android:name="com.msi.openchat.feature.calls.OutgoingAudioCallActivity"
+            android:exported="false"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:launchMode="singleTop"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.OpenChat.CallScreen" />
+
+        <!-- Dedicated Full-Screen Active Ongoing Audio Call Activity -->
+        <activity
+            android:name="com.msi.openchat.feature.calls.ActiveAudioCallActivity"
+            android:exported="false"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:launchMode="singleTop"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.OpenChat.CallScreen" />
+
+        <!-- Dedicated Full-Screen Incoming Video Call Activity -->
+        <activity
+            android:name="com.msi.openchat.feature.videocall.IncomingVideoCallActivity"
+            android:exported="false"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:launchMode="singleTop"
+            android:excludeFromRecents="true"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.OpenChat.CallScreen" />
+
+        <!-- Dedicated Full-Screen Outgoing Video Call Activity -->
+        <activity
+            android:name="com.msi.openchat.feature.videocall.OutgoingVideoCallActivity"
+            android:exported="false"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:launchMode="singleTop"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.OpenChat.CallScreen" />
+
+        <!-- Dedicated Full-Screen Active Ongoing Video Call Activity with PiP -->
+        <activity
+            android:name="com.msi.openchat.feature.videocall.ActiveVideoCallActivity"
+            android:exported="false"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:supportsPictureInPicture="true"
+            android:launchMode="singleTop"
+            android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation"
+            android:theme="@style/Theme.OpenChat.CallScreen" />
+
+        <!-- Legacy Call Activities kept for backward compatibility -->
         <activity
             android:name="com.msi.openchat.feature.calls.IncomingCallActivity"
             android:exported="false"
@@ -91,9 +154,8 @@
             android:launchMode="singleTop"
             android:excludeFromRecents="true"
             android:screenOrientation="portrait"
-            android:theme="@style/Theme.MyApplication" />
+            android:theme="@style/Theme.OpenChat.CallScreen" />
 
-        <!-- Real-Time Video Call Activity with PiP and Lock Screen Wake -->
         <activity
             android:name="com.msi.openchat.feature.videocall.VideoCallActivity"
             android:exported="false"
@@ -102,7 +164,19 @@
             android:supportsPictureInPicture="true"
             android:launchMode="singleTop"
             android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation"
-            android:theme="@style/Theme.MyApplication" />
+            android:theme="@style/Theme.OpenChat.CallScreen" />
+
+        <!-- Video Call Actions BroadcastReceiver (Strictly Isolated from Audio) -->
+        <receiver
+            android:name="com.msi.openchat.feature.videocall.VideoCallActionReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.msi.openchat.action.ACCEPT_VIDEO_CALL" />
+                <action android:name="com.msi.openchat.action.DECLINE_VIDEO_CALL" />
+                <action android:name="com.msi.openchat.action.END_VIDEO_CALL" />
+                <action android:name="com.msi.openchat.action.DISMISS_INCOMING_VIDEO_UI" />
+            </intent-filter>
+        </receiver>
 
         <!-- Notification Call Actions BroadcastReceiver -->
         <receiver

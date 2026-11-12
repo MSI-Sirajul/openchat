@@ -390,6 +390,12 @@ class MainActivity : AppCompatActivity() {
         if (intent == null) return
 
         val action = intent.action
+        val callType = intent.getStringExtra("call_type") ?: intent.getStringExtra("incoming_call_type")
+        if (callType == "video" || action?.contains("VIDEO") == true || intent.hasExtra("extra_video_call_id")) {
+            // Strictly ignore video calls in MainActivity - handled exclusively by video activities/receivers
+            return
+        }
+
         val incomingCallId = intent.getStringExtra(OpenChatNotificationManager.EXTRA_CALL_ID)
             ?: intent.getStringExtra("incoming_call_id")
         val incomingCallerId = intent.getStringExtra(OpenChatNotificationManager.EXTRA_CALLER_ID)
@@ -417,13 +423,24 @@ class MainActivity : AppCompatActivity() {
             val isAnswered = action == OpenChatNotificationManager.ACTION_ACCEPT_CALL ||
                     intent.getBooleanExtra("is_already_answered", false)
 
-            navigateToCall(
-                contactId = incomingCallerId,
-                contactName = incomingCallerName,
-                callId = incomingCallId,
-                isIncoming = true,
-                isAlreadyAnswered = isAnswered
-            )
+            if (isAnswered) {
+                val activeIntent = com.msi.openchat.feature.calls.ActiveAudioCallActivity.createIntent(
+                    context = this,
+                    callId = incomingCallId,
+                    contactId = incomingCallerId,
+                    contactName = incomingCallerName,
+                    isIncoming = true
+                )
+                startActivity(activeIntent)
+            } else {
+                val incomingIntent = com.msi.openchat.feature.calls.IncomingAudioCallActivity.createIntent(
+                    context = this,
+                    callId = incomingCallId,
+                    callerId = incomingCallerId,
+                    callerName = incomingCallerName
+                )
+                startActivity(incomingIntent)
+            }
             return
         }
 

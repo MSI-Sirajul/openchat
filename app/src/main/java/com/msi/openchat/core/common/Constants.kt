@@ -25,9 +25,9 @@ object Constants {
 
     // Notification channels
     const val CHANNEL_INCOMING_CALLS = "openchat_incoming_calls"
-    const val CHANNEL_INCOMING_VIDEO_CALLS = "openchat_incoming_video_calls"
+    const val CHANNEL_INCOMING_VIDEO_CALLS = "video_call_incoming"
     const val CHANNEL_ACTIVE_CALLS = "openchat_active_calls"
-    const val CHANNEL_ACTIVE_VIDEO_CALLS = "openchat_active_video_calls"
+    const val CHANNEL_ACTIVE_VIDEO_CALLS = "video_call_ongoing"
     const val CHANNEL_MISSED_CALLS = "openchat_missed_calls"
     const val CHANNEL_MESSAGES = "openchat_messages"
     const val CHANNEL_CALLS = "openchat_calls"

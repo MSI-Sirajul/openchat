@@ -226,17 +226,13 @@ class IncomingCallActivity : AppCompatActivity() {
         AppServiceManager.stopCallRinging(this)
         OpenChatNotificationManager.cancelIncomingCallNotification(this)
 
-        // Launch MainActivity and navigate to CallScreen
-        val intent = Intent(this, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or
-                    Intent.FLAG_ACTIVITY_SINGLE_TOP or
-                    Intent.FLAG_ACTIVITY_CLEAR_TOP
-            action = OpenChatNotificationManager.ACTION_ACCEPT_CALL
-            putExtra(OpenChatNotificationManager.EXTRA_CALL_ID, callId)
-            putExtra(OpenChatNotificationManager.EXTRA_CALLER_ID, callerId)
-            putExtra(OpenChatNotificationManager.EXTRA_CALLER_NAME, callerName)
-            putExtra("is_already_answered", true)
-        }
+        val intent = ActiveAudioCallActivity.createIntent(
+            context = this,
+            callId = callId,
+            contactId = callerId,
+            contactName = callerName,
+            isIncoming = true
+        )
         startActivity(intent)
         cleanupAndFinish()
     }

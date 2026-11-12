@@ -154,9 +154,20 @@ object OpenChatNotificationManager {
                 description = "Alerts when network connection is unstable or lost"
             }
 
+            // 2b. Channel for Ongoing Video Calls (Low Importance foreground status)
+            val activeVideoCallChannel = NotificationChannel(
+                Constants.CHANNEL_ACTIVE_VIDEO_CALLS,
+                "Ongoing Video Calls",
+                NotificationManager.IMPORTANCE_LOW
+            ).apply {
+                description = "Ongoing active video call status and controls"
+                setShowBadge(false)
+            }
+
             manager.createNotificationChannel(incomingCallChannel)
             manager.createNotificationChannel(incomingVideoCallChannel)
             manager.createNotificationChannel(activeCallChannel)
+            manager.createNotificationChannel(activeVideoCallChannel)
             manager.createNotificationChannel(missedCallChannel)
             manager.createNotificationChannel(messageChannel)
             manager.createNotificationChannel(friendsChannel)
@@ -177,8 +188,8 @@ object OpenChatNotificationManager {
         initChannels(context)
         val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
 
-        // 1. Full-screen intent pointing to dedicated IncomingCallActivity
-        val fullScreenIntent = IncomingCallActivity.createIntent(
+        // 1. Full-screen intent pointing to dedicated full-screen IncomingAudioCallActivity
+        val fullScreenIntent = com.msi.openchat.feature.calls.IncomingAudioCallActivity.createIntent(
             context = context,
             callId = callId,
             callerId = callerId,
@@ -313,19 +324,43 @@ object OpenChatNotificationManager {
         initChannels(context)
         val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
 
-        val fullScreenIntent = Intent(context, com.msi.openchat.feature.videocall.VideoCallActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or
-                    Intent.FLAG_ACTIVITY_SINGLE_TOP or
-                    Intent.FLAG_ACTIVITY_CLEAR_TOP
-            putExtra(com.msi.openchat.feature.videocall.VideoCallActivity.EXTRA_IS_INCOMING, true)
-            putExtra(com.msi.openchat.feature.videocall.VideoCallActivity.EXTRA_CALL_ID, callId)
-            putExtra(com.msi.openchat.feature.videocall.VideoCallActivity.EXTRA_PEER_ID, callerId)
-            putExtra(com.msi.openchat.feature.videocall.VideoCallActivity.EXTRA_PEER_NAME, callerName)
-        }
+        val fullScreenIntent = com.msi.openchat.feature.videocall.IncomingVideoCallActivity.createIntent(
+            context = context,
+            callId = callId,
+            callerId = callerId,
+            callerName = callerName
+        )
         val fullScreenPendingIntent = PendingIntent.getActivity(
             context,
             (callId + "_video").hashCode(),
             fullScreenIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        // Accept Action via VideoCallActionReceiver (strictly isolated from audio)
+        val acceptIntent = Intent(context, com.msi.openchat.feature.videocall.VideoCallActionReceiver::class.java).apply {
+            action = com.msi.openchat.feature.videocall.VideoCallActionReceiver.ACTION_ACCEPT_VIDEO_CALL
+            putExtra(com.msi.openchat.feature.videocall.VideoCallActionReceiver.EXTRA_CALL_ID, callId)
+            putExtra(com.msi.openchat.feature.videocall.VideoCallActionReceiver.EXTRA_CALLER_ID, callerId)
+            putExtra(com.msi.openchat.feature.videocall.VideoCallActionReceiver.EXTRA_CALLER_NAME, callerName)
+        }
+        val acceptPendingIntent = PendingIntent.getBroadcast(
+            context,
+            (callId + "_v_accept").hashCode(),
+            acceptIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        // Decline Action via VideoCallActionReceiver (strictly isolated from audio)
+        val declineIntent = Intent(context, com.msi.openchat.feature.videocall.VideoCallActionReceiver::class.java).apply {
+            action = com.msi.openchat.feature.videocall.VideoCallActionReceiver.ACTION_DECLINE_VIDEO_CALL
+            putExtra(com.msi.openchat.feature.videocall.VideoCallActionReceiver.EXTRA_CALL_ID, callId)
+            putExtra(com.msi.openchat.feature.videocall.VideoCallActionReceiver.EXTRA_CALLER_ID, callerId)
+        }
+        val declinePendingIntent = PendingIntent.getBroadcast(
+            context,
+            (callId + "_v_decline").hashCode(),
+            declineIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
@@ -350,6 +385,19 @@ object OpenChatNotificationManager {
             .setOngoing(true)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
 
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            builder.setStyle(
+                NotificationCompat.CallStyle.forIncomingCall(
+                    callerPerson,
+                    declinePendingIntent,
+                    acceptPendingIntent
+                )
+            )
+        } else {
+            builder.addAction(com.example.R.drawable.ic_video_24, "Accept", acceptPendingIntent)
+            builder.addAction(android.R.drawable.ic_menu_close_clear_cancel, "Decline", declinePendingIntent)
+        }
+
         manager.notify(Constants.NOTIFICATION_ID_VIDEO_CALL, builder.build())
 
         val powerManager = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
@@ -361,7 +409,7 @@ object OpenChatNotificationManager {
             try {
                 context.startActivity(fullScreenIntent)
             } catch (e: Exception) {
-                Log.w(TAG, "Unable to directly launch VideoCallActivity: ${e.message}")
+                Log.w(TAG, "Unable to directly launch IncomingVideoCallActivity: ${e.message}")
             }
         }
     }
