@@ -211,8 +211,10 @@ class ChatFragment : Fragment() {
 
         binding.btnChatVideoCall.setOnClickListener {
             if (contactId.isNotBlank()) {
-                if (com.msi.openchat.service.call.CallSessionCoordinator.currentCallId.value != null) {
-                    Toast.makeText(requireContext(), "Cannot start video call while voice call is active", Toast.LENGTH_SHORT).show()
+                if (com.msi.openchat.service.call.CallSessionCoordinator.currentCallId.value != null ||
+                    com.msi.openchat.service.call.CallSessionGuard.isAnyCallActive() ||
+                    com.msi.openchat.feature.videocall.VideoCallManager.isCallActive()) {
+                    Toast.makeText(requireContext(), "Cannot start video call: a call is already active", Toast.LENGTH_SHORT).show()
                     return@setOnClickListener
                 }
                 com.msi.openchat.feature.videocall.OutgoingVideoCallActivity.start(
@@ -226,8 +228,10 @@ class ChatFragment : Fragment() {
         }
 
         binding.btnChatCall.setOnClickListener {
-            if (com.msi.openchat.feature.videocall.VideoCallManager.isCallActive()) {
-                Toast.makeText(requireContext(), "Cannot start voice call while video call is active", Toast.LENGTH_SHORT).show()
+            if (com.msi.openchat.feature.videocall.VideoCallManager.isCallActive() ||
+                com.msi.openchat.service.call.CallSessionGuard.isAnyCallActive() ||
+                com.msi.openchat.service.call.CallSessionCoordinator.isActive()) {
+                Toast.makeText(requireContext(), "Cannot start voice call: a call is already active", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
             val hasMicPermission = ContextCompat.checkSelfPermission(

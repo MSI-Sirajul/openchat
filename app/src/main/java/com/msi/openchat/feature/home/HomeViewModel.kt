@@ -256,16 +256,41 @@ class HomeViewModel(
                     val callId = snapshot.child("call_id").getValue(String::class.java).orEmpty()
                     val callerId = snapshot.child("caller_id").getValue(String::class.java).orEmpty()
                     val callerName = snapshot.child("caller_name").getValue(String::class.java) ?: "Friend"
+                    val callType = snapshot.child("call_type").getValue(String::class.java).orEmpty()
+
+                    // Do not trigger incoming call if the user initiated the call themselves
+                    if (callerId == currentUserId) return
+
+                    // Do not trigger incoming call if user is already participating in an active audio or video call
+                    if (com.msi.openchat.service.call.CallSessionGuard.isAnyCallActive() ||
+                        com.msi.openchat.feature.videocall.VideoCallManager.isCallActive() ||
+                        com.msi.openchat.service.call.CallSessionCoordinator.isActive()) {
+                        android.util.Log.w("HomeViewModel", "User is already in call, ignoring incoming call: $callId (type=$callType)")
+                        return
+                    }
+
                     if (callId.isNotBlank()) {
-                        com.msi.openchat.service.notification.OpenChatNotificationManager.showIncomingCallNotification(
-                            context = ServiceLocator.context,
-                            callId = callId,
-                            callerId = callerId,
-                            callerName = callerName
-                        )
+                        if (com.msi.openchat.service.call.CallSessionGuard.isVideoCall(callId, callType)) {
+                            // Strictly trigger Video Call Notification & fullScreenIntent
+                            com.msi.openchat.service.notification.OpenChatNotificationManager.showIncomingVideoCallNotification(
+                                context = ServiceLocator.context,
+                                callId = callId,
+                                callerId = callerId,
+                                callerName = callerName
+                            )
+                        } else {
+                            // Strictly trigger Audio Call Notification & fullScreenIntent
+                            com.msi.openchat.service.notification.OpenChatNotificationManager.showIncomingCallNotification(
+                                context = ServiceLocator.context,
+                                callId = callId,
+                                callerId = callerId,
+                                callerName = callerName
+                            )
+                        }
                     }
                 } else {
                     com.msi.openchat.service.notification.OpenChatNotificationManager.cancelIncomingCallNotification(ServiceLocator.context)
+                    com.msi.openchat.service.notification.OpenChatNotificationManager.cancelIncomingVideoCallNotification(ServiceLocator.context)
                 }
             }
             override fun onCancelled(error: DatabaseError) {}

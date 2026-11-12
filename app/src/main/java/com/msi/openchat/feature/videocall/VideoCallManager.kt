@@ -324,6 +324,7 @@ object VideoCallManager {
             if (res is Resource.Success && res.data != null) {
                 val session = res.data
                 val callId = session.id
+                com.msi.openchat.service.call.CallSessionGuard.registerVideoCall(callId)
                 _uiState.value = _uiState.value.copy(
                     callId = callId,
                     status = VideoCallStatus.OutgoingCalling(callId, receiverId, receiverName)
@@ -347,6 +348,7 @@ object VideoCallManager {
      * Receive and answer an incoming call
      */
     fun acceptIncomingCall(context: Context, callId: String, callerId: String, callerName: String) {
+        com.msi.openchat.service.call.CallSessionGuard.registerVideoCall(callId)
         initialize(context)
         acquireWakeLock(context)
         setCommunicationAudioMode(speakerOn = true)
@@ -797,6 +799,8 @@ object VideoCallManager {
         val callId = state.callId
         val peerId = state.peerId
         val duration = state.durationSeconds
+
+        com.msi.openchat.service.call.CallSessionGuard.unregisterCall(callId)
 
         timerJob?.cancel()
         timeoutJob?.cancel()

@@ -185,6 +185,20 @@ object OpenChatNotificationManager {
         callerId: String,
         callerName: String
     ) {
+        // Safety guard: If call is actually video, divert immediately to video notification
+        if (com.msi.openchat.service.call.CallSessionGuard.isVideoCall(callId, null)) {
+            Log.w(TAG, "Diverting video call from showIncomingCallNotification to showIncomingVideoCallNotification: $callId")
+            showIncomingVideoCallNotification(context, callId, callerId, callerName)
+            return
+        }
+
+        // Mutual exclusion guard: Never show incoming audio call notification if user is already on a video call
+        if (com.msi.openchat.feature.videocall.VideoCallManager.isCallActive() ||
+            com.msi.openchat.service.call.CallSessionGuard.isVideoCallActive()) {
+            Log.w(TAG, "Active video call in progress, suppressing incoming audio notification: $callId")
+            return
+        }
+
         initChannels(context)
         val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
 
@@ -321,6 +335,20 @@ object OpenChatNotificationManager {
         callerId: String,
         callerName: String
     ) {
+        // Safety guard: If call is actually audio, divert immediately to audio notification
+        if (callId.startsWith("audio_") && !callId.startsWith("video_")) {
+            Log.w(TAG, "Diverting audio call from showIncomingVideoCallNotification to showIncomingCallNotification: $callId")
+            showIncomingCallNotification(context, callId, callerId, callerName)
+            return
+        }
+
+        // Mutual exclusion guard: Never show incoming video call notification if user is already on an audio call
+        if (com.msi.openchat.service.call.CallSessionCoordinator.isActive() ||
+            com.msi.openchat.service.call.CallSessionGuard.isAudioCallActive()) {
+            Log.w(TAG, "Active audio call in progress, suppressing incoming video notification: $callId")
+            return
+        }
+
         initChannels(context)
         val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
 

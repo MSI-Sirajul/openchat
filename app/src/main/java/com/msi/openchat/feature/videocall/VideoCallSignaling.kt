@@ -42,7 +42,7 @@ class VideoCallSignaling(
             ?: return@withContext Resource.Error("User not authenticated")
 
         try {
-            val callId = callsRef.push().key ?: UUID.randomUUID().toString()
+            val callId = com.msi.openchat.service.call.CallSessionGuard.generateVideoCallId()
             val nowTime = System.currentTimeMillis().toString()
 
             val callerProfile = try {
@@ -69,7 +69,9 @@ class VideoCallSignaling(
 
             val updates = HashMap<String, Any?>()
             updates["/calls/$callId"] = callData
+            updates["/video_calls/$callId"] = callData
             updates["/users/$receiverId/incoming_call"] = incomingData
+            updates["/users/$receiverId/incoming_video_call"] = incomingData
 
             suspendCancellableCoroutine<Resource<CallSession>> { continuation ->
                 FirebaseManager.database.reference.updateChildren(updates).addOnCompleteListener { task ->
@@ -255,6 +257,7 @@ class VideoCallSignaling(
     fun clearIncomingCall(userId: String) {
         if (userId.isNotBlank()) {
             usersRef.child(userId).child("incoming_call").removeValue()
+            usersRef.child(userId).child("incoming_video_call").removeValue()
         }
     }
 

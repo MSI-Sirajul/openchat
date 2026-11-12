@@ -39,7 +39,11 @@ class CallRepository(
                 ?: return@withContext Resource.Error("Not authenticated")
 
             try {
-                val callId = callsRef.push().key ?: UUID.randomUUID().toString()
+                val callId = if (callType == "audio") {
+                    com.msi.openchat.service.call.CallSessionGuard.generateAudioCallId()
+                } else {
+                    com.msi.openchat.service.call.CallSessionGuard.generateVideoCallId()
+                }
                 val nowTime = System.currentTimeMillis().toString()
 
                 val callData = HashMap<String, Any?>()
@@ -65,6 +69,13 @@ class CallRepository(
 
                 val updates = HashMap<String, Any?>()
                 updates["/calls/$callId"] = callData
+                if (callType == "audio") {
+                    updates["/audio_calls/$callId"] = callData
+                    updates["/users/$receiverId/incoming_audio_call"] = incomingData
+                } else {
+                    updates["/video_calls/$callId"] = callData
+                    updates["/users/$receiverId/incoming_video_call"] = incomingData
+                }
                 updates["/users/$receiverId/incoming_call"] = incomingData
 
                 val receiverProfile = when (val p = userRepository.getUserProfile(receiverId)) {
@@ -127,6 +138,8 @@ class CallRepository(
                     val receiverId = snapshot.child("receiver_id").getValue(String::class.java)
                     if (!receiverId.isNullOrBlank()) {
                         FirebaseManager.usersRef.child(receiverId).child("incoming_call").removeValue()
+                        FirebaseManager.usersRef.child(receiverId).child("incoming_audio_call").removeValue()
+                        FirebaseManager.usersRef.child(receiverId).child("incoming_video_call").removeValue()
                     }
                 }
                 override fun onCancelled(error: DatabaseError) {}

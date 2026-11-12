@@ -211,13 +211,20 @@ class OpenChatKeepAliveService : Service() {
                     val callerName = snapshot.child("caller_name").getValue(String::class.java) ?: "Friend"
                     val callType = snapshot.child("call_type").getValue(String::class.java) ?: "audio"
 
+                    if (callerId == uid) {
+                        Log.d(tag, "Ignoring incoming call event originating from self ($uid)")
+                        return
+                    }
+
                     if (callId.isNotBlank()) {
                         Log.i(tag, "Incoming background call: $callId from $callerId (type=$callType)")
                         serviceScope.launch {
-                            if (callType == "video") {
+                            val isVideo = com.msi.openchat.service.call.CallSessionGuard.isVideoCall(callId, callType)
+                            if (isVideo) {
                                 // Strictly Video Call branch
                                 // 1. Mutual exclusion: check if audio call is active
-                                if (CallSessionCoordinator.currentCallId.value != null) {
+                                if (CallSessionCoordinator.currentCallId.value != null ||
+                                    com.msi.openchat.service.call.CallSessionGuard.isAudioCallActive()) {
                                     Log.w(tag, "Audio call is active, declining incoming video call as busy: $callId")
                                     try {
                                         val signaling = com.msi.openchat.feature.videocall.VideoCallSignaling(ServiceLocator.sessionManager)

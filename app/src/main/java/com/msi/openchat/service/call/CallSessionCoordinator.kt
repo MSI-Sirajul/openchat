@@ -46,6 +46,7 @@ object CallSessionCoordinator {
         contactName: String
     ) {
         Log.i(TAG, "Registering active call session: $callId with $contactName")
+        CallSessionGuard.registerAudioCall(callId)
         activeCallViewModelRef = WeakReference(viewModel)
         _currentCallId.value = callId
         _contactId.value = contactId
@@ -104,6 +105,7 @@ object CallSessionCoordinator {
     fun unregisterActiveCall(callId: String? = null) {
         if (callId == null || _currentCallId.value == callId) {
             Log.i(TAG, "Unregistering active call session")
+            CallSessionGuard.unregisterCall(callId ?: _currentCallId.value)
             activeCallViewModelRef = null
             _currentCallId.value = null
             _callState.value = WebRtcCallState.ENDED
