@@ -284,7 +284,11 @@ class ProfileFragment : Fragment() {
             }
 
             binding.btnProfileCall.setOnClickListener {
-                (activity as? MainActivity)?.navigateToCall(profile.id, name)
+                com.msi.openchat.feature.calls.OutgoingAudioCallActivity.start(
+                    context = requireContext(),
+                    contactId = profile.id,
+                    contactName = name
+                )
             }
         }
     }

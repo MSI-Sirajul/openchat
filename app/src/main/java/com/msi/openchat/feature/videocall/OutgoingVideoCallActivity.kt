@@ -1,15 +1,19 @@
 package com.msi.openchat.feature.videocall
 
+import android.Manifest
 import android.animation.ObjectAnimator
 import android.animation.PropertyValuesHolder
 import android.animation.ValueAnimator
 import android.content.Context
 import android.content.Intent
-import android.os.Build
+import android.content.pm.PackageManager
 import android.os.Bundle
 import android.view.WindowManager
 import android.widget.Toast
+import androidx.activity.OnBackPressedCallback
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -32,15 +36,36 @@ class OutgoingVideoCallActivity : AppCompatActivity() {
     private var peerName: String = "OpenChat Contact"
     private var pulseAnimator: ObjectAnimator? = null
     private var hasNavigatedToActive = false
+    private var hasStartedCall = false
+
+    private val videoPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { results ->
+        val camGranted = results[Manifest.permission.CAMERA] == true ||
+            ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+        val micGranted = results[Manifest.permission.RECORD_AUDIO] == true ||
+            ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+
+        if (camGranted && micGranted) {
+            beginOutgoingVideoCall()
+        } else {
+            Toast.makeText(this, "Camera and microphone permissions are required for video calls", Toast.LENGTH_SHORT).show()
+            finish()
+        }
+    }
 
     companion object {
         const val EXTRA_PEER_ID = "outgoing_video_peer_id"
         const val EXTRA_PEER_NAME = "outgoing_video_peer_name"
 
         fun start(context: Context, peerId: String, peerName: String) {
-            // Guard: Mutual exclusion check
+            // Guard: Mutual exclusion check against audio calls & active video calls
             if (CallSessionCoordinator.isActive()) {
                 Toast.makeText(context, "Cannot start video call: a voice call is active", Toast.LENGTH_SHORT).show()
+                return
+            }
+            if (VideoCallManager.isCallActive()) {
+                Toast.makeText(context, "A video call is already in progress", Toast.LENGTH_SHORT).show()
                 return
             }
 
@@ -55,6 +80,12 @@ class OutgoingVideoCallActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (CallSessionCoordinator.isActive()) {
+            Toast.makeText(this, "Cannot start video call while voice call is active", Toast.LENGTH_SHORT).show()
+            finish()
+            return
+        }
+
         WindowCompat.setDecorFitsSystemWindows(window, false)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
@@ -63,6 +94,11 @@ class OutgoingVideoCallActivity : AppCompatActivity() {
 
         peerId = intent.getStringExtra(EXTRA_PEER_ID).orEmpty()
         peerName = intent.getStringExtra(EXTRA_PEER_NAME) ?: "OpenChat Contact"
+
+        if (peerId.isBlank()) {
+            finish()
+            return
+        }
 
         setupEdgeToEdge()
         startPulseAnimation()
@@ -75,11 +111,37 @@ class OutgoingVideoCallActivity : AppCompatActivity() {
             finish()
         }
 
-        // Start outgoing video call
-        VideoCallManager.startOutgoingCall(this, peerId, peerName)
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                VideoCallManager.endCall("Cancelled by caller")
+                finish()
+            }
+        })
 
         // Observe state transitions
         observeCallState()
+
+        // Ensure CAMERA and RECORD_AUDIO permissions before initializing WebRTC tracks & signaling
+        ensurePermissionsAndStart()
+    }
+
+    private fun ensurePermissionsAndStart() {
+        val hasCam = ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+        val hasMic = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+        if (hasCam && hasMic) {
+            beginOutgoingVideoCall()
+        } else {
+            val missing = mutableListOf<String>()
+            if (!hasCam) missing.add(Manifest.permission.CAMERA)
+            if (!hasMic) missing.add(Manifest.permission.RECORD_AUDIO)
+            videoPermissionLauncher.launch(missing.toTypedArray())
+        }
+    }
+
+    private fun beginOutgoingVideoCall() {
+        if (hasStartedCall) return
+        hasStartedCall = true
+        VideoCallManager.startOutgoingCall(this, peerId, peerName)
     }
 
     private fun setupEdgeToEdge() {

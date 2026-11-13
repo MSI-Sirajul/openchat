@@ -20,19 +20,23 @@ import java.util.UUID
 import kotlin.coroutines.resume
 
 /**
- * Typed signaling wrapper for Video Calling using Firebase Realtime Database.
- * Handles room creation, offer/answer, ICE candidates, status synchronization, and hangup.
+ * Isolated signaling wrapper for VIDEO Calling using dedicated Firebase Realtime Database paths:
+ * - /videoCalls/{callId}
+ * - /videoCallSignaling/{callId}
+ * - /users/{receiverId}/incomingVideoCall
+ *
+ * Audio calls are handled strictly by CallRepository on /audioCalls and /audioCallSignaling.
  */
 class VideoCallSignaling(
     private val sessionManager: SessionManager
 ) {
     private val tag = "OpenChat_VideoSignaling"
-    private val callsRef get() = FirebaseManager.callsRef
-    private val callSignalingRef get() = FirebaseManager.callSignalingRef
+    private val videoCallsRef get() = FirebaseManager.videoCallsRef
+    private val videoCallSignalingRef get() = FirebaseManager.videoCallSignalingRef
     private val usersRef get() = FirebaseManager.usersRef
 
     /**
-     * Initiates a new video call session
+     * Initiates a new video call session strictly under /videoCalls and /users/{receiverId}/incomingVideoCall
      */
     suspend fun createVideoCall(
         receiverId: String,
@@ -42,7 +46,8 @@ class VideoCallSignaling(
             ?: return@withContext Resource.Error("User not authenticated")
 
         try {
-            val callId = com.msi.openchat.service.call.CallSessionGuard.generateVideoCallId()
+            val pushKey = videoCallsRef.push().key ?: UUID.randomUUID().toString()
+            val callId = "vid_$pushKey"
             val nowTime = System.currentTimeMillis().toString()
 
             val callerProfile = try {
@@ -61,22 +66,22 @@ class VideoCallSignaling(
             callData["created_at"] = nowTime
             callData["started_at"] = nowTime
 
-            val incomingData = HashMap<String, Any?>()
-            incomingData["call_id"] = callId
-            incomingData["caller_id"] = callerId
-            incomingData["caller_name"] = callerName
-            incomingData["call_type"] = "video"
+            val incomingVideoData = HashMap<String, Any?>()
+            incomingVideoData["call_id"] = callId
+            incomingVideoData["caller_id"] = callerId
+            incomingVideoData["caller_name"] = callerName
+            incomingVideoData["call_type"] = "video"
+            incomingVideoData["created_at"] = nowTime
 
             val updates = HashMap<String, Any?>()
-            updates["/calls/$callId"] = callData
-            updates["/video_calls/$callId"] = callData
-            updates["/users/$receiverId/incoming_call"] = incomingData
-            updates["/users/$receiverId/incoming_video_call"] = incomingData
+            updates["/videoCalls/$callId"] = callData
+            updates["/users/$receiverId/incomingVideoCall"] = incomingVideoData
 
             suspendCancellableCoroutine<Resource<CallSession>> { continuation ->
                 FirebaseManager.database.reference.updateChildren(updates).addOnCompleteListener { task ->
                     if (task.isSuccessful) {
-                        callsRef.child(callId).child("status").onDisconnect().setValue("ended")
+                        videoCallsRef.child(callId).child("status").onDisconnect().setValue("ended")
+                        usersRef.child(receiverId).child("incomingVideoCall").onDisconnect().removeValue()
                         continuation.resume(
                             Resource.Success(
                                 CallSession(
@@ -102,7 +107,7 @@ class VideoCallSignaling(
     }
 
     /**
-     * Send SDP offer/answer, ICE candidate, or bye signal
+     * Send SDP offer/answer, ICE candidate, or bye signal on /videoCallSignaling/{callId}
      */
     suspend fun sendSignaling(
         callId: String,
@@ -110,11 +115,15 @@ class VideoCallSignaling(
         type: String,
         payload: String
     ): Resource<Unit> = withContext(Dispatchers.IO) {
+        if (callId.isBlank() || callId.startsWith("aud_")) {
+            return@withContext Resource.Error("Invalid video callId: $callId")
+        }
+
         val senderId = sessionManager.getUserId() ?: FirebaseManager.auth.currentUser?.uid
             ?: return@withContext Resource.Error("User not authenticated")
 
         try {
-            val msgId = callSignalingRef.child(callId).push().key ?: UUID.randomUUID().toString()
+            val msgId = videoCallSignalingRef.child(callId).push().key ?: UUID.randomUUID().toString()
             val msgData = HashMap<String, Any?>()
             msgData["id"] = msgId
             msgData["call_id"] = callId
@@ -125,7 +134,7 @@ class VideoCallSignaling(
             msgData["created_at"] = System.currentTimeMillis().toString()
 
             suspendCancellableCoroutine<Resource<Unit>> { continuation ->
-                callSignalingRef.child(callId).child(msgId).setValue(msgData)
+                videoCallSignalingRef.child(callId).child(msgId).setValue(msgData)
                     .addOnCompleteListener { task ->
                         if (task.isSuccessful) {
                             continuation.resume(Resource.Success(Unit))
@@ -141,16 +150,20 @@ class VideoCallSignaling(
     }
 
     /**
-     * Stream incoming signaling messages (SDP offer, answer, ICE candidates) for this call
+     * Stream incoming video signaling messages (SDP offer, answer, ICE candidates) for this call
      */
     fun listenSignaling(callId: String, currentUserId: String): Flow<CallSignalingMessage> = callbackFlow {
-        val query = callSignalingRef.child(callId)
+        if (callId.isBlank() || callId.startsWith("aud_")) {
+            close()
+            return@callbackFlow
+        }
+
+        val query = videoCallSignalingRef.child(callId)
         val listener = object : ChildEventListener {
             override fun onChildAdded(snapshot: DataSnapshot, previousChildName: String?) {
                 try {
                     val receiverId = snapshot.child("receiver_id").getValue(String::class.java).orEmpty()
                     val senderId = snapshot.child("sender_id").getValue(String::class.java).orEmpty()
-                    // Accept if directed to us and not sent by us
                     if (receiverId == currentUserId && senderId != currentUserId) {
                         val type = snapshot.child("type").getValue(String::class.java).orEmpty()
                         val payload = snapshot.child("payload").getValue(String::class.java).orEmpty()
@@ -183,10 +196,15 @@ class VideoCallSignaling(
     }
 
     /**
-     * Observe call session status changes (e.g. calling -> ringing -> connected -> ended)
+     * Observe video call session status changes under /videoCalls/{callId}
      */
     fun listenCallSession(callId: String): Flow<CallSession?> = callbackFlow {
-        val ref = callsRef.child(callId)
+        if (callId.isBlank() || callId.startsWith("aud_")) {
+            close()
+            return@callbackFlow
+        }
+
+        val ref = videoCallsRef.child(callId)
         val listener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 if (!snapshot.exists()) {
@@ -222,7 +240,7 @@ class VideoCallSignaling(
     }
 
     /**
-     * Updates call session status (e.g. ringing, connected, declined, busy, ended)
+     * Updates video call session status and clears /users/{receiverId}/incomingVideoCall on termination
      */
     suspend fun updateCallStatus(
         callId: String,
@@ -230,20 +248,38 @@ class VideoCallSignaling(
         endReason: String? = null,
         durationSeconds: Int = 0
     ): Resource<Unit> = withContext(Dispatchers.IO) {
+        if (callId.isBlank() || callId.startsWith("aud_")) {
+            return@withContext Resource.Error("Ignoring non-video callId: $callId")
+        }
+
         try {
             val updates = HashMap<String, Any?>()
             updates["status"] = status
             if (endReason != null) updates["end_reason"] = endReason
             if (durationSeconds > 0) updates["duration_seconds"] = durationSeconds
             if (status == "connected") updates["connected_at"] = System.currentTimeMillis().toString()
-            if (status == "ended" || status == "declined" || status == "busy") {
+            val isTerminal = status in listOf("ended", "declined", "busy", "missed", "failed")
+            if (isTerminal) {
                 updates["ended_at"] = System.currentTimeMillis().toString()
             }
 
+            if (isTerminal) {
+                videoCallsRef.child(callId).child("receiver_id")
+                    .addListenerForSingleValueEvent(object : ValueEventListener {
+                        override fun onDataChange(snapshot: DataSnapshot) {
+                            val receiverId = snapshot.getValue(String::class.java)
+                            if (!receiverId.isNullOrBlank()) {
+                                clearIncomingVideoCall(receiverId)
+                            }
+                        }
+                        override fun onCancelled(error: DatabaseError) {}
+                    })
+            }
+
             suspendCancellableCoroutine<Resource<Unit>> { continuation ->
-                callsRef.child(callId).updateChildren(updates).addOnCompleteListener { task ->
+                videoCallsRef.child(callId).updateChildren(updates).addOnCompleteListener { task ->
                     if (task.isSuccessful) continuation.resume(Resource.Success(Unit))
-                    else continuation.resume(Resource.Error(task.exception?.message ?: "Failed to update call status"))
+                    else continuation.resume(Resource.Error(task.exception?.message ?: "Failed to update video call status"))
                 }
             }
         } catch (e: Exception) {
@@ -252,14 +288,15 @@ class VideoCallSignaling(
     }
 
     /**
-     * Clears incoming call node for a user
+     * Clears incoming VIDEO call node strictly for a user (never touches audio)
      */
-    fun clearIncomingCall(userId: String) {
+    fun clearIncomingVideoCall(userId: String) {
         if (userId.isNotBlank()) {
-            usersRef.child(userId).child("incoming_call").removeValue()
-            usersRef.child(userId).child("incoming_video_call").removeValue()
+            usersRef.child(userId).child("incomingVideoCall").removeValue()
         }
     }
+
+    fun clearIncomingCall(userId: String) = clearIncomingVideoCall(userId)
 
     /**
      * Auto decline with "busy" reason when user is already in another call

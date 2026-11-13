@@ -247,23 +247,38 @@ class MainActivity : AppCompatActivity() {
         isIncoming: Boolean = false,
         isAlreadyAnswered: Boolean = false
     ) {
-        supportFragmentManager.commit {
-            setCustomAnimations(
-                R.anim.slide_in_right,
-                R.anim.slide_out_left,
-                R.anim.slide_in_left,
-                R.anim.slide_out_right
+        if (isIncoming && !callId.isNullOrBlank()) {
+            if (isAlreadyAnswered) {
+                startActivity(
+                    com.msi.openchat.feature.calls.ActiveAudioCallActivity.createIntent(
+                        context = this,
+                        callId = callId,
+                        contactId = contactId,
+                        contactName = contactName,
+                        isIncoming = true
+                    )
+                )
+            } else {
+                startActivity(
+                    com.msi.openchat.feature.calls.IncomingAudioCallActivity.createIntent(
+                        context = this,
+                        callId = callId,
+                        callerId = contactId,
+                        callerName = contactName
+                    )
+                )
+            }
+        } else {
+            com.msi.openchat.feature.calls.OutgoingAudioCallActivity.start(
+                context = this,
+                contactId = contactId,
+                contactName = contactName
             )
-            replace(
-                R.id.fragment_container,
-                CallFragment.newInstance(contactId, contactName, callId, isIncoming, isAlreadyAnswered)
-            )
-            addToBackStack("call")
         }
     }
 
     fun navigateToVideoCall(peerId: String, peerName: String) {
-        com.msi.openchat.feature.videocall.VideoCallActivity.startOutgoing(this, peerId, peerName)
+        com.msi.openchat.feature.videocall.OutgoingVideoCallActivity.start(this, peerId, peerName)
     }
 
     fun navigateToAddFriends() {

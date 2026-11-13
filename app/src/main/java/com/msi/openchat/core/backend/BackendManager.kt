@@ -603,7 +603,13 @@ object BackendManager {
         receiverId: String,
         callType: String = "audio"
     ): Resource<CallSession> {
-        return com.msi.openchat.core.di.ServiceLocator.callRepository.initiateCall(receiverId, callType)
+        return if (callType == "video") {
+            com.msi.openchat.feature.videocall.VideoCallSignaling(
+                com.msi.openchat.core.di.ServiceLocator.sessionManager
+            ).createVideoCall(receiverId, "OpenChat Contact")
+        } else {
+            com.msi.openchat.core.di.ServiceLocator.callRepository.initiateAudioCall(receiverId)
+        }
     }
 
     /**

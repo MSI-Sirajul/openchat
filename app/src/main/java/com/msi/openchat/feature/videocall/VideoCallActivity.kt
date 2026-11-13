@@ -55,6 +55,7 @@ class VideoCallActivity : AppCompatActivity(), SensorEventListener {
     private var targetPeerId = ""
     private var targetPeerName = ""
     private var targetCallId = ""
+    private var renderersAttached = false
 
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -173,6 +174,7 @@ class VideoCallActivity : AppCompatActivity(), SensorEventListener {
         binding.localVideoView.setZOrderMediaOverlay(true)
         repository.attachLocalRenderer(binding.localVideoView)
         repository.attachRemoteRenderer(binding.remoteVideoView)
+        renderersAttached = true
 
         // Minimize / PiP button
         binding.btnMinimize.setOnClickListener {
@@ -486,8 +488,13 @@ class VideoCallActivity : AppCompatActivity(), SensorEventListener {
         releaseProximityLock()
         try {
             repository.detachRenderers()
-            binding.localVideoView.release()
-            binding.remoteVideoView.release()
         } catch (_: Exception) {}
+        if (renderersAttached) {
+            renderersAttached = false
+            try { binding.localVideoView.clearImage() } catch (_: Exception) {}
+            try { binding.localVideoView.release() } catch (_: Exception) {}
+            try { binding.remoteVideoView.clearImage() } catch (_: Exception) {}
+            try { binding.remoteVideoView.release() } catch (_: Exception) {}
+        }
     }
 }

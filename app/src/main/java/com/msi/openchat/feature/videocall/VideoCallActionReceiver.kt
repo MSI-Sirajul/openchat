@@ -38,6 +38,10 @@ class VideoCallActionReceiver : BroadcastReceiver() {
 
         when (action) {
             ACTION_DECLINE_VIDEO_CALL -> {
+                if (callId.startsWith("aud_")) {
+                    Log.w(tag, "Video receiver ignored audio callId=$callId")
+                    return
+                }
                 AppServiceManager.stopCallRinging(context)
                 OpenChatNotificationManager.cancelIncomingVideoCallNotification(context)
                 context.sendBroadcast(Intent(ACTION_DISMISS_INCOMING_VIDEO_UI).apply {
@@ -59,6 +63,10 @@ class VideoCallActionReceiver : BroadcastReceiver() {
             }
 
             ACTION_ACCEPT_VIDEO_CALL -> {
+                if (callId.startsWith("aud_")) {
+                    Log.w(tag, "Video receiver ignored audio accept callId=$callId")
+                    return
+                }
                 AppServiceManager.stopCallRinging(context)
                 OpenChatNotificationManager.cancelIncomingVideoCallNotification(context)
                 context.sendBroadcast(Intent(ACTION_DISMISS_INCOMING_VIDEO_UI).apply {

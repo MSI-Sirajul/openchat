@@ -209,7 +209,6 @@ class HomeViewModel(
     private var convListener: ValueEventListener? = null
     private var friendListener: ValueEventListener? = null
     private var reqListener: ValueEventListener? = null
-    private var callListener: ValueEventListener? = null
 
     private fun observeRealtime() {
         val currentUserId = sessionManager.getUserId() ?: FirebaseManager.auth.currentUser?.uid.orEmpty()
@@ -248,55 +247,6 @@ class HomeViewModel(
         }
         reqListener = rl
         FirebaseManager.friendRequestsRef.child(currentUserId).addValueEventListener(rl)
-
-        // 3. Observe real-time incoming call signaling alerts
-        val callL = object : ValueEventListener {
-            override fun onDataChange(snapshot: DataSnapshot) {
-                if (snapshot.exists()) {
-                    val callId = snapshot.child("call_id").getValue(String::class.java).orEmpty()
-                    val callerId = snapshot.child("caller_id").getValue(String::class.java).orEmpty()
-                    val callerName = snapshot.child("caller_name").getValue(String::class.java) ?: "Friend"
-                    val callType = snapshot.child("call_type").getValue(String::class.java).orEmpty()
-
-                    // Do not trigger incoming call if the user initiated the call themselves
-                    if (callerId == currentUserId) return
-
-                    // Do not trigger incoming call if user is already participating in an active audio or video call
-                    if (com.msi.openchat.service.call.CallSessionGuard.isAnyCallActive() ||
-                        com.msi.openchat.feature.videocall.VideoCallManager.isCallActive() ||
-                        com.msi.openchat.service.call.CallSessionCoordinator.isActive()) {
-                        android.util.Log.w("HomeViewModel", "User is already in call, ignoring incoming call: $callId (type=$callType)")
-                        return
-                    }
-
-                    if (callId.isNotBlank()) {
-                        if (com.msi.openchat.service.call.CallSessionGuard.isVideoCall(callId, callType)) {
-                            // Strictly trigger Video Call Notification & fullScreenIntent
-                            com.msi.openchat.service.notification.OpenChatNotificationManager.showIncomingVideoCallNotification(
-                                context = ServiceLocator.context,
-                                callId = callId,
-                                callerId = callerId,
-                                callerName = callerName
-                            )
-                        } else {
-                            // Strictly trigger Audio Call Notification & fullScreenIntent
-                            com.msi.openchat.service.notification.OpenChatNotificationManager.showIncomingCallNotification(
-                                context = ServiceLocator.context,
-                                callId = callId,
-                                callerId = callerId,
-                                callerName = callerName
-                            )
-                        }
-                    }
-                } else {
-                    com.msi.openchat.service.notification.OpenChatNotificationManager.cancelIncomingCallNotification(ServiceLocator.context)
-                    com.msi.openchat.service.notification.OpenChatNotificationManager.cancelIncomingVideoCallNotification(ServiceLocator.context)
-                }
-            }
-            override fun onCancelled(error: DatabaseError) {}
-        }
-        callListener = callL
-        FirebaseManager.usersRef.child(currentUserId).child("incoming_call").addValueEventListener(callL)
     }
 
     private fun removeFirebaseListeners() {
@@ -305,11 +255,9 @@ class HomeViewModel(
             convListener?.let { FirebaseManager.conversationsRef.child(uid).removeEventListener(it) }
             friendListener?.let { FirebaseManager.friendsRef.child(uid).removeEventListener(it) }
             reqListener?.let { FirebaseManager.friendRequestsRef.child(uid).removeEventListener(it) }
-            callListener?.let { FirebaseManager.usersRef.child(uid).child("incoming_call").removeEventListener(it) }
             convListener = null
             friendListener = null
             reqListener = null
-            callListener = null
             attachedUserId = null
         }
     }

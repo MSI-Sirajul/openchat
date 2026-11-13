@@ -36,6 +36,10 @@ public class FirebaseManager {
     public static DatabaseReference typingRef;
     public static DatabaseReference callsRef;
     public static DatabaseReference callSignalingRef;
+    public static DatabaseReference audioCallsRef;
+    public static DatabaseReference audioCallSignalingRef;
+    public static DatabaseReference videoCallsRef;
+    public static DatabaseReference videoCallSignalingRef;
     public static DatabaseReference connectedRef;
     public static DatabaseReference mediaMetadataRef;
     public static DatabaseReference conversationMediaRef;
@@ -120,6 +124,10 @@ public class FirebaseManager {
             typingRef = database.getReference("typing");
             callsRef = database.getReference("calls");
             callSignalingRef = database.getReference("call_signaling");
+            audioCallsRef = database.getReference("audioCalls");
+            audioCallSignalingRef = database.getReference("audioCallSignaling");
+            videoCallsRef = database.getReference("videoCalls");
+            videoCallSignalingRef = database.getReference("videoCallSignaling");
             connectedRef = database.getReference(".info/connected");
             mediaMetadataRef = database.getReference("media_metadata");
             conversationMediaRef = database.getReference("conversation_media");
@@ -203,6 +211,26 @@ public class FirebaseManager {
     public static DatabaseReference getCallSignalingRef() {
         if (callSignalingRef == null) init();
         return callSignalingRef;
+    }
+
+    public static DatabaseReference getAudioCallsRef() {
+        if (audioCallsRef == null) init();
+        return audioCallsRef;
+    }
+
+    public static DatabaseReference getAudioCallSignalingRef() {
+        if (audioCallSignalingRef == null) init();
+        return audioCallSignalingRef;
+    }
+
+    public static DatabaseReference getVideoCallsRef() {
+        if (videoCallsRef == null) init();
+        return videoCallsRef;
+    }
+
+    public static DatabaseReference getVideoCallSignalingRef() {
+        if (videoCallSignalingRef == null) init();
+        return videoCallSignalingRef;
     }
 
     public static DatabaseReference getConnectedRef() {

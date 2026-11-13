@@ -77,41 +77,51 @@ class CallViewModel(
     @Volatile private var hasProcessedAnswer = false
 
     init {
-        initWebRtc()
-
         val callId = initialCallId.orEmpty()
-        CallSessionCoordinator.registerActiveCall(this, callId, contactId, contactName)
+        if (callId.startsWith("vid_") ||
+            com.msi.openchat.feature.videocall.VideoCallManager.isCallActive()
+        ) {
+            _uiState.value = _uiState.value.copy(
+                callStatus = "Call Blocked",
+                errorMessage = "Another call type is active",
+                isCallActive = false
+            )
+        } else {
+            initWebRtc()
 
-        val hasMicPermission = ContextCompat.checkSelfPermission(
-            context,
-            Manifest.permission.RECORD_AUDIO
-        ) == PackageManager.PERMISSION_GRANTED
+            CallSessionCoordinator.registerActiveCall(this, callId, contactId, contactName)
 
-        if (isIncoming && callId.isNotBlank()) {
-            startObservingSignaling(callId)
-            if (isAlreadyAnswered) {
-                // Already answered from notification or incoming activity
-                viewModelScope.launch {
-                    try {
-                        callRepository.updateCallStatus(callId, "connected")
-                    } catch (_: Exception) {}
+            val hasMicPermission = ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.RECORD_AUDIO
+            ) == PackageManager.PERMISSION_GRANTED
+
+            if (isIncoming && callId.isNotBlank()) {
+                startObservingSignaling(callId)
+                if (isAlreadyAnswered) {
+                    // Already answered from notification or incoming activity
+                    viewModelScope.launch {
+                        try {
+                            callRepository.updateAudioCallStatus(callId, "connected")
+                        } catch (_: Exception) {}
+                    }
+                    if (hasMicPermission) {
+                        startWebRtcCall(isCaller = false)
+                    }
+                } else {
+                    // Incoming call waiting for user answer/decline
+                    viewModelScope.launch {
+                        try {
+                            callRepository.updateAudioCallStatus(callId, "ringing")
+                            callRepository.sendSignaling(callId, contactId, "ringing", "{}")
+                        } catch (_: Exception) {}
+                    }
                 }
+            } else if (!isIncoming) {
+                // Initiating outgoing call if permission granted
                 if (hasMicPermission) {
-                    startWebRtcCall(isCaller = false)
+                    initiateOutgoingCall()
                 }
-            } else {
-                // Incoming call waiting for user answer/decline
-                viewModelScope.launch {
-                    try {
-                        callRepository.updateCallStatus(callId, "ringing")
-                        callRepository.sendSignaling(callId, contactId, "ringing", "{}")
-                    } catch (_: Exception) {}
-                }
-            }
-        } else if (!isIncoming) {
-            // Initiating outgoing call if permission granted
-            if (hasMicPermission) {
-                initiateOutgoingCall()
             }
         }
     }
@@ -191,8 +201,16 @@ class CallViewModel(
     }
 
     private fun initiateOutgoingCall() {
+        if (com.msi.openchat.feature.videocall.VideoCallManager.isCallActive()) {
+            _uiState.value = _uiState.value.copy(
+                callStatus = "Busy",
+                errorMessage = "Video call is active",
+                isCallActive = false
+            )
+            return
+        }
         viewModelScope.launch {
-            when (val res = callRepository.initiateCall(contactId)) {
+            when (val res = callRepository.initiateAudioCall(contactId)) {
                 is Resource.Success -> {
                     val call = res.data
                     _uiState.value = _uiState.value.copy(callId = call.id, callStatus = "Calling...")

@@ -1,15 +1,20 @@
 package com.msi.openchat.feature.calls
 
+import android.Manifest
 import android.animation.ObjectAnimator
 import android.animation.PropertyValuesHolder
 import android.animation.ValueAnimator
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Bundle
 import android.view.View
 import android.view.WindowManager
 import android.widget.Toast
+import androidx.activity.OnBackPressedCallback
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -19,7 +24,7 @@ import com.example.databinding.ActivityOutgoingAudioCallBinding
 import com.msi.openchat.core.common.Resource
 import com.msi.openchat.core.di.ServiceLocator
 import com.msi.openchat.feature.videocall.VideoCallManager
-import com.msi.openchat.feature.videocall.VideoCallStatus
+import com.msi.openchat.service.call.CallSessionCoordinator
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -38,16 +43,31 @@ class OutgoingAudioCallActivity : AppCompatActivity() {
     private var pulseAnimator: ObjectAnimator? = null
     private var timeoutJob: Job? = null
     private var hasNavigatedToActive = false
+    private var hasStartedCall = false
+
+    private val micPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            startOutgoingCall()
+        } else {
+            Toast.makeText(this, "Microphone permission is required for voice calls", Toast.LENGTH_SHORT).show()
+            finish()
+        }
+    }
 
     companion object {
         const val EXTRA_CONTACT_ID = "outgoing_audio_contact_id"
         const val EXTRA_CONTACT_NAME = "outgoing_audio_contact_name"
 
         fun start(context: Context, contactId: String, contactName: String) {
-            // Guard: Mutual exclusion check
-            val videoState = VideoCallManager.uiState.value.status
-            if (videoState !is VideoCallStatus.Idle && videoState !is VideoCallStatus.Ended) {
+            // Guard: Mutual exclusion check against active video or audio calls
+            if (VideoCallManager.isCallActive()) {
                 Toast.makeText(context, "Cannot start voice call: a video call is active", Toast.LENGTH_SHORT).show()
+                return
+            }
+            if (CallSessionCoordinator.isActive()) {
+                Toast.makeText(context, "A voice call is already in progress", Toast.LENGTH_SHORT).show()
                 return
             }
 
@@ -62,6 +82,12 @@ class OutgoingAudioCallActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (VideoCallManager.isCallActive()) {
+            Toast.makeText(this, "Cannot start voice call while video call is active", Toast.LENGTH_SHORT).show()
+            finish()
+            return
+        }
+
         WindowCompat.setDecorFitsSystemWindows(window, false)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
@@ -70,6 +96,11 @@ class OutgoingAudioCallActivity : AppCompatActivity() {
 
         contactId = intent.getStringExtra(EXTRA_CONTACT_ID).orEmpty()
         contactName = intent.getStringExtra(EXTRA_CONTACT_NAME) ?: "Voice Call"
+
+        if (contactId.isBlank()) {
+            finish()
+            return
+        }
 
         setupEdgeToEdge()
         startPulseAnimation()
@@ -81,7 +112,18 @@ class OutgoingAudioCallActivity : AppCompatActivity() {
             cancelCall()
         }
 
-        startOutgoingCall()
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                cancelCall()
+            }
+        })
+
+        val hasMic = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+        if (hasMic) {
+            startOutgoingCall()
+        } else {
+            micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        }
     }
 
     private fun setupEdgeToEdge() {
@@ -107,14 +149,16 @@ class OutgoingAudioCallActivity : AppCompatActivity() {
     }
 
     private fun startOutgoingCall() {
+        if (hasStartedCall) return
+        hasStartedCall = true
         lifecycleScope.launch {
-            val res = ServiceLocator.callRepository.initiateCall(contactId, "audio")
+            val res = ServiceLocator.callRepository.initiateAudioCall(contactId)
             if (res is Resource.Success && res.data != null) {
                 callId = res.data.id
                 startTimeoutTimer()
                 observeCallSession()
             } else {
-                Toast.makeText(this@OutgoingAudioCallActivity, "Failed to start call", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this@OutgoingAudioCallActivity, "Failed to start voice call", Toast.LENGTH_SHORT).show()
                 finish()
             }
         }

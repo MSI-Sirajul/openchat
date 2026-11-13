@@ -221,9 +221,21 @@ class HomeFragment : Fragment() {
             setHasFixedSize(true)
         }
 
-        // 2. Call History
-        callHistoryAdapter = CallHistoryAdapter(isDark = isDark) { contactId, contactName ->
-            (activity as? MainActivity)?.navigateToCall(contactId, contactName)
+        // 2. Call History (strictly route audio vs video callbacks)
+        callHistoryAdapter = CallHistoryAdapter(isDark = isDark) { contactId, contactName, callType ->
+            if (callType == "video") {
+                com.msi.openchat.feature.videocall.OutgoingVideoCallActivity.start(
+                    context = requireContext(),
+                    peerId = contactId,
+                    peerName = contactName
+                )
+            } else {
+                com.msi.openchat.feature.calls.OutgoingAudioCallActivity.start(
+                    context = requireContext(),
+                    contactId = contactId,
+                    contactName = contactName
+                )
+            }
         }
         binding.recyclerCalls.apply {
             layoutManager = LinearLayoutManager(requireContext())

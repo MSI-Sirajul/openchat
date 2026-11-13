@@ -43,7 +43,8 @@ import kotlinx.coroutines.launch
 class OpenChatKeepAliveService : Service() {
     private val tag = "OpenChat_KeepAlive"
     private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-    private var callListener: ValueEventListener? = null
+    private var audioCallListener: ValueEventListener? = null
+    private var videoCallListener: ValueEventListener? = null
     private var convListener: ChildEventListener? = null
     private var notifListener: ChildEventListener? = null
     private var currentUserId: String? = null
@@ -195,15 +196,15 @@ class OpenChatKeepAliveService : Service() {
             return
         }
 
-        if (currentUserId == uid && callListener != null) return
+        if (currentUserId == uid && audioCallListener != null && videoCallListener != null) return
         currentUserId = uid
 
         removeListeners()
-        Log.i(tag, "Listening to background events for user: $uid")
+        Log.i(tag, "Listening to isolated background events for user: $uid")
 
-        // 1. Incoming Call listener on /users/{uid}/incoming_call
-        val incomingCallNode = FirebaseManager.usersRef.child(uid).child("incoming_call")
-        val cListener = object : ValueEventListener {
+        // 1a. Isolated Incoming AUDIO Call listener on /users/{uid}/incomingAudioCall
+        val incomingAudioCallNode = FirebaseManager.usersRef.child(uid).child("incomingAudioCall")
+        val aListener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 if (snapshot.exists()) {
                     val callId = snapshot.child("call_id").getValue(String::class.java).orEmpty()
@@ -211,77 +212,104 @@ class OpenChatKeepAliveService : Service() {
                     val callerName = snapshot.child("caller_name").getValue(String::class.java) ?: "Friend"
                     val callType = snapshot.child("call_type").getValue(String::class.java) ?: "audio"
 
-                    if (callerId == uid) {
-                        Log.d(tag, "Ignoring incoming call event originating from self ($uid)")
+                    if (callId.isBlank() || callType != "audio" || callId.startsWith("vid_")) {
+                        Log.w(tag, "Audio listener ignored non-audio payload: callId=$callId, type=$callType")
                         return
                     }
 
-                    if (callId.isNotBlank()) {
-                        Log.i(tag, "Incoming background call: $callId from $callerId (type=$callType)")
-                        serviceScope.launch {
-                            val isVideo = com.msi.openchat.service.call.CallSessionGuard.isVideoCall(callId, callType)
-                            if (isVideo) {
-                                // Strictly Video Call branch
-                                // 1. Mutual exclusion: check if audio call is active
-                                if (CallSessionCoordinator.currentCallId.value != null ||
-                                    com.msi.openchat.service.call.CallSessionGuard.isAudioCallActive()) {
-                                    Log.w(tag, "Audio call is active, declining incoming video call as busy: $callId")
-                                    try {
-                                        val signaling = com.msi.openchat.feature.videocall.VideoCallSignaling(ServiceLocator.sessionManager)
-                                        signaling.updateCallStatus(callId, "declined", "Busy on another call")
-                                        signaling.sendSignaling(callId, callerId, "busy", "{\"reason\":\"busy\"}")
-                                    } catch (_: Exception) {}
-                                    return@launch
-                                }
-
-                                try {
-                                    val signaling = com.msi.openchat.feature.videocall.VideoCallSignaling(ServiceLocator.sessionManager)
-                                    signaling.updateCallStatus(callId, "ringing")
-                                    signaling.sendSignaling(callId, callerId, "ringing", "{}")
-                                } catch (_: Exception) {}
-
-                                OpenChatNotificationManager.showIncomingVideoCallNotification(
-                                    context = applicationContext,
+                    Log.i(tag, "Incoming background AUDIO call: $callId from $callerId")
+                    serviceScope.launch {
+                        // Mutual exclusion: block if a video or audio call is already active
+                        if (com.msi.openchat.feature.videocall.VideoCallManager.isCallActive() ||
+                            CallSessionCoordinator.isActive()
+                        ) {
+                            Log.w(tag, "Another call is active, declining incoming audio call as busy: $callId")
+                            try {
+                                ServiceLocator.callRepository.updateAudioCallStatus(
                                     callId = callId,
-                                    callerId = callerId,
-                                    callerName = callerName
+                                    status = "busy",
+                                    endReason = "Busy on another call"
                                 )
-                            } else {
-                                // Strictly Audio Call branch
-                                // 1. Mutual exclusion: check if video call is active
-                                if (com.msi.openchat.feature.videocall.VideoCallManager.isCallActive()) {
-                                    Log.w(tag, "Video call is active, declining incoming audio call as busy: $callId")
-                                    try {
-                                        ServiceLocator.callRepository.updateCallStatus(callId = callId, status = "declined", endReason = "Busy on another call")
-                                        ServiceLocator.callRepository.sendSignaling(callId, callerId, "busy", "{\"reason\":\"busy\"}")
-                                    } catch (_: Exception) {}
-                                    return@launch
-                                }
-
-                                try {
-                                    ServiceLocator.callRepository.sendSignaling(callId, callerId, "ringing", "{}")
-                                    ServiceLocator.callRepository.updateCallStatus(callId, "ringing")
-                                } catch (_: Exception) {}
-
-                                OpenChatNotificationManager.showIncomingCallNotification(
-                                    context = applicationContext,
-                                    callId = callId,
-                                    callerId = callerId,
-                                    callerName = callerName
-                                )
-                            }
+                                ServiceLocator.callRepository.sendSignaling(callId, callerId, "bye", "{\"reason\":\"busy\"}")
+                                ServiceLocator.callRepository.clearIncomingAudioCall(uid)
+                            } catch (_: Exception) {}
+                            return@launch
                         }
+
+                        try {
+                            ServiceLocator.callRepository.sendSignaling(callId, callerId, "ringing", "{}")
+                            ServiceLocator.callRepository.updateAudioCallStatus(callId, "ringing")
+                        } catch (_: Exception) {}
+
+                        OpenChatNotificationManager.showIncomingCallNotification(
+                            context = applicationContext,
+                            callId = callId,
+                            callerId = callerId,
+                            callerName = callerName
+                        )
                     }
                 } else {
                     OpenChatNotificationManager.cancelIncomingCallNotification(applicationContext)
+                }
+            }
+
+            override fun onCancelled(error: DatabaseError) {}
+        }
+        incomingAudioCallNode.addValueEventListener(aListener)
+        audioCallListener = aListener
+
+        // 1b. Isolated Incoming VIDEO Call listener on /users/{uid}/incomingVideoCall
+        val incomingVideoCallNode = FirebaseManager.usersRef.child(uid).child("incomingVideoCall")
+        val vListener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                if (snapshot.exists()) {
+                    val callId = snapshot.child("call_id").getValue(String::class.java).orEmpty()
+                    val callerId = snapshot.child("caller_id").getValue(String::class.java).orEmpty()
+                    val callerName = snapshot.child("caller_name").getValue(String::class.java) ?: "Friend"
+                    val callType = snapshot.child("call_type").getValue(String::class.java) ?: "video"
+
+                    if (callId.isBlank() || callType != "video" || callId.startsWith("aud_")) {
+                        Log.w(tag, "Video listener ignored non-video payload: callId=$callId, type=$callType")
+                        return
+                    }
+
+                    Log.i(tag, "Incoming background VIDEO call: $callId from $callerId")
+                    serviceScope.launch {
+                        // Mutual exclusion: block if an audio or video call is already active
+                        if (CallSessionCoordinator.isActive() ||
+                            com.msi.openchat.feature.videocall.VideoCallManager.isCallActive()
+                        ) {
+                            Log.w(tag, "Another call is active, declining incoming video call as busy: $callId")
+                            try {
+                                val signaling = com.msi.openchat.feature.videocall.VideoCallSignaling(ServiceLocator.sessionManager)
+                                signaling.notifyBusy(callId, callerId)
+                                signaling.clearIncomingVideoCall(uid)
+                            } catch (_: Exception) {}
+                            return@launch
+                        }
+
+                        try {
+                            val signaling = com.msi.openchat.feature.videocall.VideoCallSignaling(ServiceLocator.sessionManager)
+                            signaling.updateCallStatus(callId, "ringing")
+                            signaling.sendSignaling(callId, callerId, "ringing", "{}")
+                        } catch (_: Exception) {}
+
+                        OpenChatNotificationManager.showIncomingVideoCallNotification(
+                            context = applicationContext,
+                            callId = callId,
+                            callerId = callerId,
+                            callerName = callerName
+                        )
+                    }
+                } else {
                     OpenChatNotificationManager.cancelIncomingVideoCallNotification(applicationContext)
                 }
             }
 
             override fun onCancelled(error: DatabaseError) {}
         }
-        incomingCallNode.addValueEventListener(cListener)
-        callListener = cListener
+        incomingVideoCallNode.addValueEventListener(vListener)
+        videoCallListener = vListener
 
         // 2. Incoming Messages listener on /conversations/{uid}
         val convNode = FirebaseManager.conversationsRef.child(uid)
@@ -368,8 +396,11 @@ class OpenChatKeepAliveService : Service() {
 
     private fun removeListeners() {
         val uid = currentUserId ?: return
-        callListener?.let { l: ValueEventListener ->
-            FirebaseManager.usersRef.child(uid).child("incoming_call").removeEventListener(l)
+        audioCallListener?.let { l: ValueEventListener ->
+            FirebaseManager.usersRef.child(uid).child("incomingAudioCall").removeEventListener(l)
+        }
+        videoCallListener?.let { l: ValueEventListener ->
+            FirebaseManager.usersRef.child(uid).child("incomingVideoCall").removeEventListener(l)
         }
         convListener?.let { l: ChildEventListener ->
             FirebaseManager.conversationsRef.child(uid).removeEventListener(l)
@@ -377,7 +408,8 @@ class OpenChatKeepAliveService : Service() {
         notifListener?.let { l: ChildEventListener ->
             FirebaseManager.database.reference.child("notifications").child(uid).removeEventListener(l)
         }
-        callListener = null
+        audioCallListener = null
+        videoCallListener = null
         convListener = null
         notifListener = null
     }

@@ -1,6 +1,148 @@
 {
   "rules": {
-    ".read": true,
-    ".write": true
+    "audioCalls": {
+      ".read": "auth != null",
+      "$callId": {
+        ".read": "auth != null",
+        ".write": "auth != null && (!data.exists() || data.child('caller_id').val() == auth.uid || data.child('receiver_id').val() == auth.uid)",
+        ".validate": "newData.hasChildren(['id', 'caller_id', 'receiver_id', 'call_type', 'status']) && newData.child('call_type').val() == 'audio'"
+      }
+    },
+
+    "audioCallSignaling": {
+      "$callId": {
+        ".read": "auth != null && (root.child('audioCalls').child($callId).child('caller_id').val() == auth.uid || root.child('audioCalls').child($callId).child('receiver_id').val() == auth.uid)",
+        "$msgId": {
+          ".write": "auth != null && newData.child('sender_id').val() == auth.uid",
+          ".validate": "newData.hasChildren(['call_id', 'sender_id', 'receiver_id', 'type', 'payload'])"
+        }
+      }
+    },
+
+    "videoCalls": {
+      ".read": "auth != null",
+      "$callId": {
+        ".read": "auth != null",
+        ".write": "auth != null && (!data.exists() || data.child('caller_id').val() == auth.uid || data.child('receiver_id').val() == auth.uid)",
+        ".validate": "newData.hasChildren(['id', 'caller_id', 'receiver_id', 'call_type', 'status']) && newData.child('call_type').val() == 'video'"
+      }
+    },
+
+    "videoCallSignaling": {
+      "$callId": {
+        ".read": "auth != null && (root.child('videoCalls').child($callId).child('caller_id').val() == auth.uid || root.child('videoCalls').child($callId).child('receiver_id').val() == auth.uid)",
+        "$msgId": {
+          ".write": "auth != null && newData.child('sender_id').val() == auth.uid",
+          ".validate": "newData.hasChildren(['call_id', 'sender_id', 'receiver_id', 'type', 'payload'])"
+        }
+      }
+    },
+
+    "calls": {
+      ".read": "auth != null",
+      "$callId": {
+        ".write": "auth != null"
+      }
+    },
+
+    "call_signaling": {
+      "$callId": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      }
+    },
+
+    "users": {
+      ".read": "auth != null",
+      "$userId": {
+        ".read": "auth != null",
+        ".write": "auth != null && auth.uid == $userId",
+        "incomingAudioCall": {
+          ".read": "auth != null && auth.uid == $userId",
+          ".write": "auth != null",
+          ".validate": "!newData.exists() || (newData.hasChildren(['call_id', 'caller_id', 'call_type']) && newData.child('call_type').val() == 'audio')"
+        },
+        "incomingVideoCall": {
+          ".read": "auth != null && auth.uid == $userId",
+          ".write": "auth != null",
+          ".validate": "!newData.exists() || (newData.hasChildren(['call_id', 'caller_id', 'call_type']) && newData.child('call_type').val() == 'video')"
+        }
+      }
+    },
+
+    "usernames": {
+      ".read": true,
+      "$username": {
+        ".write": "auth != null && (!data.exists() || data.val() == auth.uid) && newData.val() == auth.uid"
+      }
+    },
+
+    "phone_numbers": {
+      ".read": true,
+      "$phone": {
+        ".write": "auth != null && (!data.exists() || data.val() == auth.uid) && newData.val() == auth.uid"
+      }
+    },
+
+    "emails": {
+      "$emailKey": {
+        ".read": "auth != null",
+        ".write": "auth != null && newData.val() == auth.uid"
+      }
+    },
+
+    "friends": {
+      "$userId": {
+        ".read": "auth != null && auth.uid == $userId",
+        ".write": "auth != null"
+      }
+    },
+
+    "friend_requests": {
+      "$userId": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      }
+    },
+
+    "conversations": {
+      "$userId": {
+        ".read": "auth != null && auth.uid == $userId",
+        ".write": "auth != null"
+      }
+    },
+
+    "messages": {
+      "$conversationId": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      }
+    },
+
+    "typing": {
+      "$conversationId": {
+        ".read": "auth != null",
+        "$userId": {
+          ".write": "auth != null && auth.uid == $userId"
+        }
+      }
+    },
+
+    "notifications": {
+      "$userId": {
+        ".read": "auth != null && auth.uid == $userId",
+        ".write": "auth != null"
+      }
+    },
+
+    "media_metadata": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+
+    "conversation_media": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    }
   }
 }

@@ -50,23 +50,62 @@ class OpenChatFirebaseMessagingService : FirebaseMessagingService() {
         OpenChatNotificationManager.initChannels(applicationContext)
 
         when (type) {
+            "incoming_video_call" -> {
+                val callerName = remoteMessage.data["caller_name"] ?: title
+                val id = callId.orEmpty()
+                if (id.isNotBlank() && !id.startsWith("aud_") &&
+                    !com.msi.openchat.service.call.CallSessionCoordinator.isActive() &&
+                    !com.msi.openchat.feature.videocall.VideoCallManager.isCallActive()
+                ) {
+                    OpenChatNotificationManager.showIncomingVideoCallNotification(
+                        context = applicationContext,
+                        callId = id,
+                        callerId = senderId.orEmpty(),
+                        callerName = callerName
+                    )
+                }
+            }
+            "incoming_audio_call" -> {
+                val callerName = remoteMessage.data["caller_name"] ?: title
+                val id = callId.orEmpty()
+                if (id.isNotBlank() && !id.startsWith("vid_") &&
+                    !com.msi.openchat.feature.videocall.VideoCallManager.isCallActive() &&
+                    !com.msi.openchat.service.call.CallSessionCoordinator.isActive()
+                ) {
+                    OpenChatNotificationManager.showIncomingCallNotification(
+                        context = applicationContext,
+                        callId = id,
+                        callerId = senderId.orEmpty(),
+                        callerName = callerName
+                    )
+                }
+            }
             "incoming_call" -> {
                 val callerName = remoteMessage.data["caller_name"] ?: title
                 val callType = remoteMessage.data["call_type"] ?: "audio"
-                if (callType == "video") {
-                    OpenChatNotificationManager.showIncomingVideoCallNotification(
-                        context = applicationContext,
-                        callId = callId.orEmpty(),
-                        callerId = senderId.orEmpty(),
-                        callerName = callerName
-                    )
-                } else {
-                    OpenChatNotificationManager.showIncomingCallNotification(
-                        context = applicationContext,
-                        callId = callId.orEmpty(),
-                        callerId = senderId.orEmpty(),
-                        callerName = callerName
-                    )
+                val id = callId.orEmpty()
+                if (callType == "video" && !id.startsWith("aud_")) {
+                    if (!com.msi.openchat.service.call.CallSessionCoordinator.isActive() &&
+                        !com.msi.openchat.feature.videocall.VideoCallManager.isCallActive()
+                    ) {
+                        OpenChatNotificationManager.showIncomingVideoCallNotification(
+                            context = applicationContext,
+                            callId = id,
+                            callerId = senderId.orEmpty(),
+                            callerName = callerName
+                        )
+                    }
+                } else if (callType == "audio" && !id.startsWith("vid_")) {
+                    if (!com.msi.openchat.feature.videocall.VideoCallManager.isCallActive() &&
+                        !com.msi.openchat.service.call.CallSessionCoordinator.isActive()
+                    ) {
+                        OpenChatNotificationManager.showIncomingCallNotification(
+                            context = applicationContext,
+                            callId = id,
+                            callerId = senderId.orEmpty(),
+                            callerName = callerName
+                        )
+                    }
                 }
             }
             "new_message" -> {

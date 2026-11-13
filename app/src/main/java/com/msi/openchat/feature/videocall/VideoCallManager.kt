@@ -1,12 +1,15 @@
 package com.msi.openchat.feature.videocall
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
 import android.media.AudioAttributes
 import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.os.Build
 import android.os.PowerManager
 import android.util.Log
+import androidx.core.content.ContextCompat
 import com.msi.openchat.core.common.Resource
 import com.msi.openchat.core.di.ServiceLocator
 import com.msi.openchat.data.model.CallSession
@@ -24,6 +27,7 @@ import kotlinx.coroutines.launch
 import org.json.JSONObject
 import org.webrtc.AudioSource
 import org.webrtc.AudioTrack
+import org.webrtc.Camera1Enumerator
 import org.webrtc.Camera2Enumerator
 import org.webrtc.CameraVideoCapturer
 import org.webrtc.DataChannel
@@ -63,13 +67,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 object VideoCallManager {
     private const val TAG = "OpenChat_VideoCallMgr"
 
-    private val eglConfigAttributes: IntArray by lazy {
-        try {
-            EglBase.configBuilder().setOpenGlesVersion(2).createConfigAttributes()
-        } catch (_: Throwable) {
-            EglBase.CONFIG_PLAIN
-        }
-    }
+    private val eglConfigAttributes: IntArray = EglBase.CONFIG_PLAIN
 
     val rootEglBase: EglBase by lazy {
         try {
@@ -77,6 +75,26 @@ object VideoCallManager {
         } catch (_: Throwable) {
             EglBase.create()
         }
+    }
+
+    private fun isEmulator(): Boolean {
+        return (Build.BRAND.startsWith("generic") && Build.DEVICE.startsWith("generic"))
+            || Build.FINGERPRINT.startsWith("generic")
+            || Build.FINGERPRINT.startsWith("unknown")
+            || Build.HARDWARE.contains("goldfish")
+            || Build.HARDWARE.contains("ranchu")
+            || Build.HARDWARE.contains("vsoc")
+            || Build.MODEL.contains("google_sdk")
+            || Build.MODEL.contains("Emulator")
+            || Build.MODEL.contains("Android SDK built for")
+            || Build.MANUFACTURER.contains("Genymotion")
+            || Build.PRODUCT.contains("sdk_gphone")
+            || Build.PRODUCT.contains("google_sdk")
+            || Build.PRODUCT.contains("sdk")
+            || Build.PRODUCT.contains("sdk_x86")
+            || Build.PRODUCT.contains("vbox86p")
+            || Build.PRODUCT.contains("emulator")
+            || Build.PRODUCT.contains("simulator")
     }
 
     private val managerScope = CoroutineScope(Dispatchers.Default + Job())
@@ -131,6 +149,7 @@ object VideoCallManager {
     }
 
     private val isDisposing = AtomicBoolean(false)
+    private val mediaLock = Any()
 
     fun initialize(context: Context) {
         if (appContext != null) return
@@ -163,17 +182,28 @@ object VideoCallManager {
                 JavaAudioDeviceModule.builder(context).createAudioDeviceModule()
             }
 
-            val encoderFactory = try {
-                DefaultVideoEncoderFactory(rootEglBase.eglBaseContext, false, true)
-            } catch (t: Throwable) {
-                Log.w(TAG, "DefaultVideoEncoderFactory fallback to Software: ${t.message}")
+            val useSoftwareCodecs = isEmulator()
+            val encoderFactory = if (useSoftwareCodecs) {
+                Log.i(TAG, "Emulator detected: using SoftwareVideoEncoderFactory")
                 SoftwareVideoEncoderFactory()
+            } else {
+                try {
+                    DefaultVideoEncoderFactory(rootEglBase.eglBaseContext, false, true)
+                } catch (t: Throwable) {
+                    Log.w(TAG, "DefaultVideoEncoderFactory fallback to Software: ${t.message}")
+                    SoftwareVideoEncoderFactory()
+                }
             }
-            val decoderFactory = try {
-                DefaultVideoDecoderFactory(rootEglBase.eglBaseContext)
-            } catch (t: Throwable) {
-                Log.w(TAG, "DefaultVideoDecoderFactory fallback to Software: ${t.message}")
+            val decoderFactory = if (useSoftwareCodecs) {
+                Log.i(TAG, "Emulator detected: using SoftwareVideoDecoderFactory")
                 SoftwareVideoDecoderFactory()
+            } else {
+                try {
+                    DefaultVideoDecoderFactory(rootEglBase.eglBaseContext)
+                } catch (t: Throwable) {
+                    Log.w(TAG, "DefaultVideoDecoderFactory fallback to Software: ${t.message}")
+                    SoftwareVideoDecoderFactory()
+                }
             }
 
             peerConnectionFactory = PeerConnectionFactory.builder()
@@ -204,101 +234,144 @@ object VideoCallManager {
      * Prepares and attaches local camera preview to the provided SurfaceViewRenderer
      */
     fun attachLocalRenderer(renderer: SurfaceViewRenderer) {
+        if (localRenderer === renderer) return
         localRenderer = renderer
         try {
             renderer.init(rootEglBase.eglBaseContext, null, eglConfigAttributes, org.webrtc.GlRectDrawer())
-            renderer.setEnableHardwareScaler(false)
+            renderer.setEnableHardwareScaler(true)
             renderer.setScalingType(RendererCommon.ScalingType.SCALE_ASPECT_FILL)
-            renderer.setMirror(true)
+            renderer.setMirror(_uiState.value.isFrontCamera)
             renderer.setZOrderMediaOverlay(true)
         } catch (e: Exception) {
             Log.w(TAG, "Local renderer already initialized or failed: ${e.message}")
         }
 
-        setupLocalMediaTracks()
-        localVideoTrack?.addSink(renderer)
-        _uiState.value = _uiState.value.copy(isLocalPreviewReady = true)
+        runOnRtc {
+            if (isDisposing.get()) return@runOnRtc
+            setupLocalMediaTracks()
+            if (localRenderer === renderer && !isDisposing.get()) {
+                localVideoTrack?.addSink(renderer)
+                _uiState.value = _uiState.value.copy(isLocalPreviewReady = true)
+            }
+        }
     }
 
     /**
      * Attaches remote stream to the provided fullscreen SurfaceViewRenderer
      */
     fun attachRemoteRenderer(renderer: SurfaceViewRenderer) {
+        if (remoteRenderer === renderer) return
         remoteRenderer = renderer
         try {
             renderer.init(rootEglBase.eglBaseContext, null, eglConfigAttributes, org.webrtc.GlRectDrawer())
-            renderer.setEnableHardwareScaler(false)
+            renderer.setEnableHardwareScaler(true)
             renderer.setScalingType(RendererCommon.ScalingType.SCALE_ASPECT_FIT)
             renderer.setMirror(false)
         } catch (e: Exception) {
             Log.w(TAG, "Remote renderer already initialized or failed: ${e.message}")
         }
 
-        remoteVideoTrack?.addSink(renderer)
+        runOnRtc {
+            if (remoteRenderer === renderer && !isDisposing.get()) {
+                remoteVideoTrack?.addSink(renderer)
+            }
+        }
     }
 
     /**
      * Safely detaches and unbinds SurfaceViewRenderers from media tracks before release
      */
     fun detachRenderers() {
-        try {
-            localRenderer?.let { localVideoTrack?.removeSink(it) }
-        } catch (_: Exception) {}
-        try {
-            remoteRenderer?.let { remoteVideoTrack?.removeSink(it) }
-        } catch (_: Exception) {}
+        val local = localRenderer
+        val remote = remoteRenderer
         localRenderer = null
         remoteRenderer = null
+
+        try {
+            local?.let { localVideoTrack?.removeSink(it) }
+        } catch (_: Exception) {}
+        try {
+            remote?.let { remoteVideoTrack?.removeSink(it) }
+        } catch (_: Exception) {}
+        try {
+            local?.clearImage()
+        } catch (_: Exception) {}
+        try {
+            remote?.clearImage()
+        } catch (_: Exception) {}
     }
 
     private fun setupLocalMediaTracks() {
         val context = appContext ?: return
         val factory = peerConnectionFactory ?: return
 
-        if (localVideoTrack == null) {
-            try {
-                val enumerator = Camera2Enumerator(context)
-                val deviceNames = enumerator.deviceNames
-                var frontCameraName: String? = null
-                var backCameraName: String? = null
+        synchronized(mediaLock) {
+            val hasCameraPerm = ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.CAMERA
+            ) == PackageManager.PERMISSION_GRANTED
+            val hasAudioPerm = ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.RECORD_AUDIO
+            ) == PackageManager.PERMISSION_GRANTED
 
-                for (name in deviceNames) {
-                    if (enumerator.isFrontFacing(name) && frontCameraName == null) {
-                        frontCameraName = name
-                    } else if (enumerator.isBackFacing(name) && backCameraName == null) {
-                        backCameraName = name
+            if (localVideoTrack == null && hasCameraPerm) {
+                try {
+                    val useCamera2 = Camera2Enumerator.isSupported(context)
+                    val enumerator = if (useCamera2) {
+                        Camera2Enumerator(context)
+                    } else {
+                        Camera1Enumerator(true)
                     }
-                }
+                    val deviceNames = enumerator.deviceNames
+                    var frontCameraName: String? = null
+                    var backCameraName: String? = null
 
-                val selectedCamera = frontCameraName ?: backCameraName ?: deviceNames.firstOrNull()
-                if (selectedCamera != null) {
-                    videoCapturer = enumerator.createCapturer(selectedCamera, null)
-                    surfaceTextureHelper = SurfaceTextureHelper.create("CaptureThread", rootEglBase.eglBaseContext)
-                    videoSource = factory.createVideoSource(videoCapturer!!.isScreencast)
-                    videoCapturer!!.initialize(surfaceTextureHelper, context, videoSource!!.capturerObserver)
-                    videoCapturer!!.startCapture(1280, 720, 30)
+                    for (name in deviceNames) {
+                        if (enumerator.isFrontFacing(name) && frontCameraName == null) {
+                            frontCameraName = name
+                        } else if (enumerator.isBackFacing(name) && backCameraName == null) {
+                            backCameraName = name
+                        }
+                    }
 
-                    localVideoTrack = factory.createVideoTrack("VIDEO_TRACK_LOCAL", videoSource)
-                    localVideoTrack?.setEnabled(true)
+                    val selectedCamera = frontCameraName ?: backCameraName ?: deviceNames.firstOrNull()
+                    if (selectedCamera != null) {
+                        val capturer = enumerator.createCapturer(selectedCamera, null)
+                        if (capturer != null) {
+                            videoCapturer = capturer
+                            surfaceTextureHelper = SurfaceTextureHelper.create("CaptureThread", rootEglBase.eglBaseContext)
+                            videoSource = factory.createVideoSource(capturer.isScreencast)
+                            capturer.initialize(surfaceTextureHelper, context, videoSource!!.capturerObserver)
+                            if (isEmulator()) {
+                                capturer.startCapture(640, 480, 24)
+                            } else {
+                                capturer.startCapture(1280, 720, 30)
+                            }
+
+                            localVideoTrack = factory.createVideoTrack("VIDEO_TRACK_LOCAL", videoSource)
+                            localVideoTrack?.setEnabled(true)
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to initialize camera capturer: ${e.message}", e)
                 }
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to initialize camera capturer: ${e.message}", e)
             }
-        }
 
-        if (localAudioTrack == null) {
-            try {
-                val audioConstraints = MediaConstraints().apply {
-                    mandatory.add(MediaConstraints.KeyValuePair("googEchoCancellation", "true"))
-                    mandatory.add(MediaConstraints.KeyValuePair("googAutoGainControl", "true"))
-                    mandatory.add(MediaConstraints.KeyValuePair("googNoiseSuppression", "true"))
-                    mandatory.add(MediaConstraints.KeyValuePair("googHighpassFilter", "true"))
+            if (localAudioTrack == null && hasAudioPerm) {
+                try {
+                    val audioConstraints = MediaConstraints().apply {
+                        mandatory.add(MediaConstraints.KeyValuePair("googEchoCancellation", "true"))
+                        mandatory.add(MediaConstraints.KeyValuePair("googAutoGainControl", "true"))
+                        mandatory.add(MediaConstraints.KeyValuePair("googNoiseSuppression", "true"))
+                        mandatory.add(MediaConstraints.KeyValuePair("googHighpassFilter", "true"))
+                    }
+                    audioSource = factory.createAudioSource(audioConstraints)
+                    localAudioTrack = factory.createAudioTrack("AUDIO_TRACK_LOCAL", audioSource)
+                    localAudioTrack?.setEnabled(true)
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to initialize audio source: ${e.message}", e)
                 }
-                audioSource = factory.createAudioSource(audioConstraints)
-                localAudioTrack = factory.createAudioTrack("AUDIO_TRACK_LOCAL", audioSource)
-                localAudioTrack?.setEnabled(true)
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to initialize audio source: ${e.message}", e)
             }
         }
     }
@@ -307,6 +380,15 @@ object VideoCallManager {
      * Start an outgoing video call to receiver
      */
     fun startOutgoingCall(context: Context, receiverId: String, receiverName: String) {
+        if (com.msi.openchat.service.call.CallSessionCoordinator.isActive()) {
+            Log.w(TAG, "Blocked startOutgoingCall: an audio call is active")
+            return
+        }
+        if (isCallActive()) {
+            Log.w(TAG, "Blocked startOutgoingCall: a video call is already active")
+            return
+        }
+        isDisposing.set(false)
         initialize(context)
         acquireWakeLock(context)
         setCommunicationAudioMode(speakerOn = true)
@@ -324,7 +406,6 @@ object VideoCallManager {
             if (res is Resource.Success && res.data != null) {
                 val session = res.data
                 val callId = session.id
-                com.msi.openchat.service.call.CallSessionGuard.registerVideoCall(callId)
                 _uiState.value = _uiState.value.copy(
                     callId = callId,
                     status = VideoCallStatus.OutgoingCalling(callId, receiverId, receiverName)
@@ -336,7 +417,7 @@ object VideoCallManager {
                 // Watch call status in RTDB
                 observeCallSession(callId, receiverName)
 
-                // Create WebRTC PeerConnection & Offer
+                // Create WebRTC PeerConnection & Offer (ensuring local media tracks are added first)
                 setupPeerConnection(isCaller = true, callId = callId, peerId = receiverId)
             } else {
                 endCall("Failed to initiate call")
@@ -345,10 +426,18 @@ object VideoCallManager {
     }
 
     /**
-     * Receive and answer an incoming call
+     * Receive and answer an incoming video call
      */
     fun acceptIncomingCall(context: Context, callId: String, callerId: String, callerName: String) {
-        com.msi.openchat.service.call.CallSessionGuard.registerVideoCall(callId)
+        if (callId.isBlank() || callId.startsWith("aud_")) {
+            Log.w(TAG, "Blocked acceptIncomingCall for invalid/audio callId=$callId")
+            return
+        }
+        if (com.msi.openchat.service.call.CallSessionCoordinator.isActive()) {
+            Log.w(TAG, "Blocked acceptIncomingCall: an audio call is active")
+            return
+        }
+        isDisposing.set(false)
         initialize(context)
         acquireWakeLock(context)
         setCommunicationAudioMode(speakerOn = true)
@@ -372,13 +461,14 @@ object VideoCallManager {
     }
 
     /**
-     * Decline incoming call
+     * Decline incoming video call
      */
     fun declineIncomingCall(context: Context, callId: String, callerId: String) {
+        if (callId.isBlank() || callId.startsWith("aud_")) return
         initialize(context)
         managerScope.launch {
             signaling?.notifyDecline(callId, callerId)
-            signaling?.clearIncomingCall(ServiceLocator.sessionManager.getUserId().orEmpty())
+            signaling?.clearIncomingVideoCall(ServiceLocator.sessionManager.getUserId().orEmpty())
             endCall("Call declined")
         }
     }
@@ -496,7 +586,8 @@ object VideoCallManager {
                 }
             })
 
-            // Add local tracks to PeerConnection
+            // Ensure local audio + video tracks are initialized before adding to PeerConnection & creating SDP
+            setupLocalMediaTracks()
             localAudioTrack?.let { peerConnection?.addTrack(it, listOf("ARDAMS")) }
             localVideoTrack?.let { peerConnection?.addTrack(it, listOf("ARDAMS")) }
 
@@ -800,8 +891,6 @@ object VideoCallManager {
         val peerId = state.peerId
         val duration = state.durationSeconds
 
-        com.msi.openchat.service.call.CallSessionGuard.unregisterCall(callId)
-
         timerJob?.cancel()
         timeoutJob?.cancel()
         signalingJob?.cancel()
@@ -820,6 +909,8 @@ object VideoCallManager {
         appContext?.let { ctx ->
             VideoCallService.stopService(ctx)
         }
+
+        detachRenderers()
 
         runOnRtc {
             try {
@@ -844,19 +935,33 @@ object VideoCallManager {
             surfaceTextureHelper = null
 
             try {
+                localVideoTrack?.setEnabled(false)
+                localVideoTrack?.dispose()
+            } catch (_: Exception) {}
+            localVideoTrack = null
+
+            try {
+                remoteVideoTrack?.setEnabled(false)
+            } catch (_: Exception) {}
+            remoteVideoTrack = null
+
+            try {
                 videoSource?.dispose()
             } catch (_: Exception) {}
             videoSource = null
+
+            try {
+                localAudioTrack?.setEnabled(false)
+                localAudioTrack?.dispose()
+            } catch (_: Exception) {}
+            localAudioTrack = null
+            remoteAudioTrack = null
 
             try {
                 audioSource?.dispose()
             } catch (_: Exception) {}
             audioSource = null
 
-            localVideoTrack = null
-            localAudioTrack = null
-            remoteVideoTrack = null
-            remoteAudioTrack = null
             isRemoteDescriptionSet = false
             pendingRemoteCandidates.clear()
         }

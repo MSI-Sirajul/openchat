@@ -22,35 +22,45 @@ import kotlin.coroutines.resume
 
 /**
  * CallRepository
- * 1-to-1 Audio & Video WebRTC calling session coordination and signaling
- * using Firebase Realtime Database.
+ * Isolated 1-to-1 AUDIO WebRTC calling session coordination and signaling
+ * using dedicated Firebase Realtime Database paths:
+ * - /audioCalls/{callId}
+ * - /audioCallSignaling/{callId}
+ * - /users/{receiverId}/incomingAudioCall
+ *
+ * Video calls are handled strictly by VideoCallSignaling on /videoCalls and /videoCallSignaling.
  */
 class CallRepository(
     private val sessionManager: SessionManager,
     private val userRepository: UserRepository
 ) {
-    private val tag = "OpenChat_CallRepo"
-    private val callsRef get() = FirebaseManager.callsRef
-    private val callSignalingRef get() = FirebaseManager.callSignalingRef
+    private val tag = "OpenChat_AudioCallRepo"
+    private val audioCallsRef get() = FirebaseManager.audioCallsRef
+    private val audioCallSignalingRef get() = FirebaseManager.audioCallSignalingRef
+
+    suspend fun initiateAudioCall(receiverId: String): Resource<CallSession> =
+        initiateCall(receiverId = receiverId, callType = "audio")
 
     suspend fun initiateCall(receiverId: String, callType: String = "audio"): Resource<CallSession> =
         withContext(Dispatchers.IO) {
+            if (callType != "audio") {
+                Log.e(tag, "Blocked non-audio call ($callType) in audio CallRepository")
+                return@withContext Resource.Error("CallRepository handles audio calls only")
+            }
+
             val callerId = sessionManager.getUserId() ?: FirebaseManager.auth.currentUser?.uid
                 ?: return@withContext Resource.Error("Not authenticated")
 
             try {
-                val callId = if (callType == "audio") {
-                    com.msi.openchat.service.call.CallSessionGuard.generateAudioCallId()
-                } else {
-                    com.msi.openchat.service.call.CallSessionGuard.generateVideoCallId()
-                }
+                val pushKey = audioCallsRef.push().key ?: UUID.randomUUID().toString()
+                val callId = "aud_$pushKey"
                 val nowTime = System.currentTimeMillis().toString()
 
                 val callData = HashMap<String, Any?>()
                 callData["id"] = callId
                 callData["caller_id"] = callerId
                 callData["receiver_id"] = receiverId
-                callData["call_type"] = callType
+                callData["call_type"] = "audio"
                 callData["status"] = "calling"
                 callData["created_at"] = nowTime
                 callData["started_at"] = nowTime
@@ -61,22 +71,16 @@ class CallRepository(
                 }
                 val callerName = callerProfile?.displayName?.ifBlank { callerProfile.username } ?: "OpenChat"
 
-                val incomingData = HashMap<String, Any?>()
-                incomingData["call_id"] = callId
-                incomingData["caller_id"] = callerId
-                incomingData["caller_name"] = callerName
-                incomingData["call_type"] = callType
+                val incomingAudioData = HashMap<String, Any?>()
+                incomingAudioData["call_id"] = callId
+                incomingAudioData["caller_id"] = callerId
+                incomingAudioData["caller_name"] = callerName
+                incomingAudioData["call_type"] = "audio"
+                incomingAudioData["created_at"] = nowTime
 
                 val updates = HashMap<String, Any?>()
-                updates["/calls/$callId"] = callData
-                if (callType == "audio") {
-                    updates["/audio_calls/$callId"] = callData
-                    updates["/users/$receiverId/incoming_audio_call"] = incomingData
-                } else {
-                    updates["/video_calls/$callId"] = callData
-                    updates["/users/$receiverId/incoming_video_call"] = incomingData
-                }
-                updates["/users/$receiverId/incoming_call"] = incomingData
+                updates["/audioCalls/$callId"] = callData
+                updates["/users/$receiverId/incomingAudioCall"] = incomingAudioData
 
                 val receiverProfile = when (val p = userRepository.getUserProfile(receiverId)) {
                     is Resource.Success -> p.data
@@ -86,14 +90,16 @@ class CallRepository(
                 suspendCancellableCoroutine<Resource<CallSession>> { continuation ->
                     FirebaseManager.database.reference.updateChildren(updates).addOnCompleteListener { task ->
                         if (task.isSuccessful) {
-                            callsRef.child(callId).child("status").onDisconnect().setValue("ended")
+                            audioCallsRef.child(callId).child("status").onDisconnect().setValue("ended")
+                            FirebaseManager.usersRef.child(receiverId).child("incomingAudioCall")
+                                .onDisconnect().removeValue()
                             continuation.resume(
                                 Resource.Success(
                                     CallSession(
                                         id = callId,
                                         callerId = callerId,
                                         receiverId = receiverId,
-                                        callType = callType,
+                                        callType = "audio",
                                         status = "calling",
                                         startedAt = nowTime,
                                         callerProfile = callerProfile,
@@ -102,15 +108,22 @@ class CallRepository(
                                 )
                             )
                         } else {
-                            continuation.resume(Resource.Error(task.exception?.message ?: "Failed to initiate call"))
+                            continuation.resume(Resource.Error(task.exception?.message ?: "Failed to initiate audio call"))
                         }
                     }
                 }
             } catch (e: Exception) {
-                Log.e(tag, "initiateCall error: ${e.message}", e)
-                Resource.Error(e.message ?: "Failed to initiate call", e)
+                Log.e(tag, "initiateAudioCall error: ${e.message}", e)
+                Resource.Error(e.message ?: "Failed to initiate audio call", e)
             }
         }
+
+    suspend fun updateAudioCallStatus(
+        callId: String,
+        status: String,
+        durationSeconds: Int = 0,
+        endReason: String? = null
+    ) = updateCallStatus(callId, status, durationSeconds, endReason)
 
     suspend fun updateCallStatus(
         callId: String,
@@ -118,6 +131,11 @@ class CallRepository(
         durationSeconds: Int = 0,
         endReason: String? = null
     ) = withContext(Dispatchers.IO) {
+        if (callId.isBlank() || callId.startsWith("vid_")) {
+            Log.w(tag, "Ignoring updateCallStatus for non-audio callId=$callId")
+            return@withContext
+        }
+
         val updates = HashMap<String, Any?>()
         updates["status"] = status
         if (durationSeconds > 0) {
@@ -126,24 +144,28 @@ class CallRepository(
         if (!endReason.isNullOrBlank()) {
             updates["end_reason"] = endReason
         }
-        if (status in listOf("declined", "missed", "ended", "failed")) {
+        if (status in listOf("declined", "missed", "ended", "failed", "busy")) {
             updates["ended_at"] = System.currentTimeMillis().toString()
         }
 
-        callsRef.child(callId).updateChildren(updates)
+        audioCallsRef.child(callId).updateChildren(updates)
 
-        if (status in listOf("declined", "missed", "ended", "failed")) {
-            callsRef.child(callId).addListenerForSingleValueEvent(object : ValueEventListener {
+        if (status in listOf("declined", "missed", "ended", "failed", "busy")) {
+            audioCallsRef.child(callId).addListenerForSingleValueEvent(object : ValueEventListener {
                 override fun onDataChange(snapshot: DataSnapshot) {
                     val receiverId = snapshot.child("receiver_id").getValue(String::class.java)
                     if (!receiverId.isNullOrBlank()) {
-                        FirebaseManager.usersRef.child(receiverId).child("incoming_call").removeValue()
-                        FirebaseManager.usersRef.child(receiverId).child("incoming_audio_call").removeValue()
-                        FirebaseManager.usersRef.child(receiverId).child("incoming_video_call").removeValue()
+                        FirebaseManager.usersRef.child(receiverId).child("incomingAudioCall").removeValue()
                     }
                 }
                 override fun onCancelled(error: DatabaseError) {}
             })
+        }
+    }
+
+    fun clearIncomingAudioCall(userId: String) {
+        if (userId.isNotBlank()) {
+            FirebaseManager.usersRef.child(userId).child("incomingAudioCall").removeValue()
         }
     }
 
@@ -160,10 +182,14 @@ class CallRepository(
         type: String,
         payload: String
     ): Resource<Unit> = withContext(Dispatchers.IO) {
+        if (callId.isBlank() || callId.startsWith("vid_")) {
+            return@withContext Resource.Error("Invalid audio callId: $callId")
+        }
+
         val senderId = sessionManager.getUserId() ?: FirebaseManager.auth.currentUser?.uid
             ?: return@withContext Resource.Error("Not authenticated")
 
-        val messageId = callSignalingRef.child(callId).push().key ?: UUID.randomUUID().toString()
+        val messageId = audioCallSignalingRef.child(callId).push().key ?: UUID.randomUUID().toString()
         val now = System.currentTimeMillis().toString()
 
         val data = HashMap<String, Any?>()
@@ -176,7 +202,7 @@ class CallRepository(
         data["created_at"] = now
 
         suspendCancellableCoroutine<Resource<Unit>> { continuation ->
-            callSignalingRef.child(callId).child(messageId).setValue(data).addOnCompleteListener { task ->
+            audioCallSignalingRef.child(callId).child(messageId).setValue(data).addOnCompleteListener { task ->
                 if (task.isSuccessful) continuation.resume(Resource.Success(Unit))
                 else continuation.resume(Resource.Error(task.exception?.message ?: "Signaling send failed"))
             }
@@ -187,8 +213,11 @@ class CallRepository(
         callId: String,
         sinceTimestamp: String? = null
     ): Resource<List<CallSignalingMessage>> = withContext(Dispatchers.IO) {
+        if (callId.isBlank() || callId.startsWith("vid_")) {
+            return@withContext Resource.Success(emptyList())
+        }
         suspendCancellableCoroutine<Resource<List<CallSignalingMessage>>> { continuation ->
-            callSignalingRef.child(callId).addListenerForSingleValueEvent(object : ValueEventListener {
+            audioCallSignalingRef.child(callId).addListenerForSingleValueEvent(object : ValueEventListener {
                 override fun onDataChange(snapshot: DataSnapshot) {
                     val list = mutableListOf<CallSignalingMessage>()
                     for (child in snapshot.children) {
@@ -222,6 +251,11 @@ class CallRepository(
     }
 
     fun observeSignalingMessages(callId: String): Flow<CallSignalingMessage> = callbackFlow {
+        if (callId.isBlank() || callId.startsWith("vid_")) {
+            close()
+            return@callbackFlow
+        }
+
         val listener = object : ChildEventListener {
             override fun onChildAdded(snapshot: DataSnapshot, previousChildName: String?) {
                 val id = snapshot.child("id").getValue(String::class.java) ?: snapshot.key.orEmpty()
@@ -250,12 +284,17 @@ class CallRepository(
             override fun onCancelled(error: DatabaseError) {}
         }
 
-        val ref = callSignalingRef.child(callId)
+        val ref = audioCallSignalingRef.child(callId)
         ref.addChildEventListener(listener)
         awaitClose { ref.removeEventListener(listener) }
     }
 
     fun observeCallSession(callId: String): Flow<CallSession> = callbackFlow {
+        if (callId.isBlank() || callId.startsWith("vid_")) {
+            close()
+            return@callbackFlow
+        }
+
         val listener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 if (snapshot.exists()) {
@@ -284,59 +323,78 @@ class CallRepository(
             override fun onCancelled(error: DatabaseError) {}
         }
 
-        val ref = callsRef.child(callId)
+        val ref = audioCallsRef.child(callId)
         ref.addValueEventListener(listener)
         awaitClose { ref.removeEventListener(listener) }
+    }
+
+    private suspend fun fetchCallsSnapshot(ref: com.google.firebase.database.DatabaseReference, limit: Int): DataSnapshot? {
+        return suspendCancellableCoroutine { continuation ->
+            ref.limitToLast(limit).addListenerForSingleValueEvent(object : ValueEventListener {
+                override fun onDataChange(snap: DataSnapshot) = continuation.resume(snap)
+                override fun onCancelled(error: DatabaseError) = continuation.resume(null)
+            })
+        }
     }
 
     suspend fun getCallHistory(): Resource<List<CallSession>> = withContext(Dispatchers.IO) {
         val currentUserId = sessionManager.getUserId() ?: FirebaseManager.auth.currentUser?.uid
             ?: return@withContext Resource.Error("Not authenticated")
 
-        val snapshot = suspendCancellableCoroutine<DataSnapshot?> { continuation ->
-            callsRef.limitToLast(40).addListenerForSingleValueEvent(object : ValueEventListener {
-                override fun onDataChange(snap: DataSnapshot) = continuation.resume(snap)
-                override fun onCancelled(error: DatabaseError) = continuation.resume(null)
-            })
-        } ?: return@withContext Resource.Error("Failed to fetch call history")
+        val audioSnap = fetchCallsSnapshot(audioCallsRef, 40)
+        val videoSnap = fetchCallsSnapshot(FirebaseManager.videoCallsRef, 40)
+        val legacySnap = fetchCallsSnapshot(FirebaseManager.callsRef, 20)
 
-        val calls = mutableListOf<CallSession>()
-        val userIdsToFetch = mutableListOf<String>()
+        val callsById = LinkedHashMap<String, CallSession>()
+        val userIdsToFetch = mutableSetOf<String>()
 
-        for (child in snapshot.children) {
-            val callerId = child.child("caller_id").getValue(String::class.java).orEmpty()
-            val receiverId = child.child("receiver_id").getValue(String::class.java).orEmpty()
+        fun collectFrom(snap: DataSnapshot?, defaultType: String) {
+            if (snap == null) return
+            for (child in snap.children) {
+                val callerId = child.child("caller_id").getValue(String::class.java).orEmpty()
+                val receiverId = child.child("receiver_id").getValue(String::class.java).orEmpty()
+                if (callerId == currentUserId || receiverId == currentUserId) {
+                    val id = child.child("id").getValue(String::class.java) ?: child.key.orEmpty()
+                    val callType = child.child("call_type").getValue(String::class.java) ?: defaultType
+                    val status = child.child("status").getValue(String::class.java) ?: "ended"
+                    val startedAt = child.child("started_at").getValue(String::class.java)
+                    val endedAt = child.child("ended_at").getValue(String::class.java)
+                    val duration = child.child("duration_seconds").getValue(Int::class.java) ?: 0
 
-            if (callerId == currentUserId || receiverId == currentUserId) {
-                val id = child.child("id").getValue(String::class.java) ?: child.key.orEmpty()
-                val callType = child.child("call_type").getValue(String::class.java) ?: "audio"
-                val status = child.child("status").getValue(String::class.java) ?: "ended"
-                val startedAt = child.child("started_at").getValue(String::class.java)
-                val endedAt = child.child("ended_at").getValue(String::class.java)
-
-                calls.add(
-                    CallSession(
+                    callsById[id] = CallSession(
                         id = id,
                         callerId = callerId,
                         receiverId = receiverId,
                         callType = callType,
                         status = status,
                         startedAt = startedAt,
-                        endedAt = endedAt
+                        endedAt = endedAt,
+                        durationSeconds = duration
                     )
-                )
-                userIdsToFetch.add(if (callerId == currentUserId) receiverId else callerId)
+                    userIdsToFetch.add(if (callerId == currentUserId) receiverId else callerId)
+                }
             }
         }
 
-        val profiles = userRepository.getUserProfiles(userIdsToFetch)
-        val populated = calls.map { call ->
-            val otherId = if (call.callerId == currentUserId) call.receiverId else call.callerId
-            call.copy(
-                callerProfile = if (call.callerId == currentUserId) null else profiles[otherId],
-                receiverProfile = if (call.callerId == currentUserId) profiles[otherId] else null
-            )
-        }.reversed()
+        collectFrom(audioSnap, "audio")
+        collectFrom(videoSnap, "video")
+        collectFrom(legacySnap, "audio")
+
+        val profiles = if (userIdsToFetch.isNotEmpty()) {
+            userRepository.getUserProfiles(userIdsToFetch.toList())
+        } else {
+            emptyMap()
+        }
+
+        val populated = callsById.values
+            .sortedByDescending { it.startedAt?.toLongOrNull() ?: 0L }
+            .map { call ->
+                val otherId = if (call.callerId == currentUserId) call.receiverId else call.callerId
+                call.copy(
+                    callerProfile = if (call.callerId == currentUserId) null else profiles[otherId],
+                    receiverProfile = if (call.callerId == currentUserId) profiles[otherId] else null
+                )
+            }
 
         Resource.Success(populated)
     }

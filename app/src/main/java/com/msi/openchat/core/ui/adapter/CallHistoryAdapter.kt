@@ -15,7 +15,7 @@ import com.msi.openchat.data.model.CallSession
 
 class CallHistoryAdapter(
     private val isDark: Boolean = false,
-    private val onCallback: (contactId: String, contactName: String) -> Unit
+    private val onCallback: (contactId: String, contactName: String, callType: String) -> Unit
 ) : ListAdapter<CallSession, CallHistoryAdapter.CallHistoryViewHolder>(DiffCallback) {
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): CallHistoryViewHolder {
@@ -34,7 +34,7 @@ class CallHistoryAdapter(
     class CallHistoryViewHolder(
         private val binding: ItemCallHistoryBinding,
         private val isDark: Boolean,
-        private val onCallback: (contactId: String, contactName: String) -> Unit
+        private val onCallback: (contactId: String, contactName: String, callType: String) -> Unit
     ) : RecyclerView.ViewHolder(binding.root) {
 
         fun bind(call: CallSession) {
@@ -43,6 +43,7 @@ class CallHistoryAdapter(
                 val contactName = other?.getResolvedName()?.ifBlank { "Contact" } ?: "Contact"
                 val contactId = other?.id?.takeIf { it.isNotBlank() } ?: if (call.callerProfile != null) call.callerId else call.receiverId
                 val status = call.status ?: "ended"
+                val callType = if (call.callType == "video" || call.id.startsWith("vid_")) "video" else "audio"
                 val isMissed = status in listOf("missed", "declined", "failed")
 
                 val nameColor = if (isDark) Color.parseColor("#E8EEF5") else Color.parseColor("#17212B")
@@ -63,8 +64,9 @@ class CallHistoryAdapter(
                 val durationText = if (call.durationSeconds > 0) " • ${call.durationSeconds}s" else ""
                 val timeText = if (formattedTime.isNotBlank()) " • $formattedTime" else ""
                 val statusDisplay = status.replaceFirstChar { it.uppercase() }
+                val typeLabel = if (callType == "video") "Video" else "Audio"
 
-                binding.textCallDetails.text = "$statusDisplay$durationText$timeText"
+                binding.textCallDetails.text = "$typeLabel • $statusDisplay$durationText$timeText"
 
                 if (isMissed) {
                     binding.imageStatus.setImageResource(R.drawable.ic_call_missed_24)
@@ -74,8 +76,14 @@ class CallHistoryAdapter(
                     binding.textAvatar.setTextColor(Color.parseColor(if (isDark) "#54B9EA" else "#087EBA"))
                 }
 
+                binding.btnCallback.setImageResource(
+                    if (callType == "video") R.drawable.ic_video_24 else R.drawable.ic_call_24
+                )
+                binding.btnCallback.contentDescription =
+                    if (callType == "video") "Start Video Call" else "Start Voice Call"
+
                 binding.btnCallback.setOnClickListener {
-                    onCallback(contactId, contactName)
+                    onCallback(contactId, contactName, callType)
                 }
             } catch (e: Exception) {
                 android.util.Log.e("CallHistoryAdapter", "Error binding call item: ${e.message}")

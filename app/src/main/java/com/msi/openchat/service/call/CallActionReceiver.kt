@@ -44,9 +44,12 @@ class CallActionReceiver : BroadcastReceiver() {
 
         when (action) {
             ACTION_DECLINE_CALL -> {
+                if (callId.startsWith("vid_")) {
+                    Log.w(tag, "Audio receiver ignored video callId=$callId")
+                    return
+                }
                 AppServiceManager.stopCallRinging(context)
                 OpenChatNotificationManager.cancelIncomingCallNotification(context)
-                OpenChatNotificationManager.cancelIncomingVideoCallNotification(context)
                 context.sendBroadcast(Intent(ACTION_DISMISS_INCOMING_UI).apply {
                     setPackage(context.packageName)
                     putExtra(EXTRA_CALL_ID, callId)
@@ -56,7 +59,7 @@ class CallActionReceiver : BroadcastReceiver() {
                     CoroutineScope(Dispatchers.IO).launch {
                         try {
                             ServiceLocator.initialize(context.applicationContext)
-                            ServiceLocator.callRepository.updateCallStatus(
+                            ServiceLocator.callRepository.updateAudioCallStatus(
                                 callId = callId,
                                 status = "declined",
                                 endReason = "Declined from notification"
@@ -69,15 +72,19 @@ class CallActionReceiver : BroadcastReceiver() {
                                     payload = "{\"reason\":\"declined\"}"
                                 )
                             }
-                            Log.i(tag, "Successfully declined call $callId from notification action")
+                            Log.i(tag, "Successfully declined audio call $callId from notification action")
                         } catch (e: Exception) {
-                            Log.e(tag, "Error declining call from receiver: ${e.message}")
+                            Log.e(tag, "Error declining audio call from receiver: ${e.message}")
                         }
                     }
                 }
             }
 
             ACTION_ACCEPT_CALL -> {
+                if (callId.startsWith("vid_")) {
+                    Log.w(tag, "Audio receiver ignored video accept callId=$callId")
+                    return
+                }
                 AppServiceManager.stopCallRinging(context)
                 OpenChatNotificationManager.cancelIncomingCallNotification(context)
                 context.sendBroadcast(Intent(ACTION_DISMISS_INCOMING_UI).apply {
@@ -85,7 +92,7 @@ class CallActionReceiver : BroadcastReceiver() {
                     putExtra(EXTRA_CALL_ID, callId)
                 })
 
-                // Keep channel alive in foreground immediately showing duration and end call action
+                // Keep audio channel alive in foreground immediately showing duration and end call action
                 OpenChatCallService.startCallService(context, callId, callerName)
 
                 // Launch ActiveAudioCallActivity directly

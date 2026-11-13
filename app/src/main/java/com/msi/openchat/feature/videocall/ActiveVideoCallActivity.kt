@@ -1,9 +1,11 @@
 package com.msi.openchat.feature.videocall
 
+import android.Manifest
 import android.annotation.SuppressLint
 import android.app.PictureInPictureParams
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.hardware.Sensor
 import android.hardware.SensorEvent
@@ -18,7 +20,9 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -26,6 +30,7 @@ import androidx.core.view.updatePadding
 import androidx.lifecycle.lifecycleScope
 import com.example.R
 import com.example.databinding.ActivityActiveVideoCallBinding
+import com.msi.openchat.service.call.CallSessionCoordinator
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
@@ -53,6 +58,29 @@ class ActiveVideoCallActivity : AppCompatActivity(), SensorEventListener {
     private var peerId: String = ""
     private var peerName: String = "OpenChat Contact"
     private var isIncoming: Boolean = false
+    private var sessionStarted = false
+    private var renderersAttached = false
+
+    private val videoPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { results ->
+        val camGranted = results[Manifest.permission.CAMERA] == true ||
+            ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+        val micGranted = results[Manifest.permission.RECORD_AUDIO] == true ||
+            ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+
+        if (camGranted && micGranted) {
+            startVideoCallSession()
+        } else {
+            Toast.makeText(this, "Camera and microphone permissions are required for video calls", Toast.LENGTH_SHORT).show()
+            if (isIncoming && callId.isNotBlank()) {
+                repository.declineIncomingCall(this, callId, peerId)
+            } else {
+                repository.endCall("Permissions denied")
+            }
+            finish()
+        }
+    }
 
     companion object {
         const val EXTRA_CALL_ID = "active_video_call_id"
@@ -85,28 +113,48 @@ class ActiveVideoCallActivity : AppCompatActivity(), SensorEventListener {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        callId = intent.getStringExtra(EXTRA_CALL_ID).orEmpty()
+        peerId = intent.getStringExtra(EXTRA_PEER_ID).orEmpty()
+        peerName = intent.getStringExtra(EXTRA_PEER_NAME) ?: "OpenChat Contact"
+        isIncoming = intent.getBooleanExtra(EXTRA_IS_INCOMING, false)
+
+        if (callId.startsWith("aud_") || CallSessionCoordinator.isActive()) {
+            finish()
+            return
+        }
+
         WindowCompat.setDecorFitsSystemWindows(window, false)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         binding = ActivityActiveVideoCallBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        callId = intent.getStringExtra(EXTRA_CALL_ID).orEmpty()
-        peerId = intent.getStringExtra(EXTRA_PEER_ID).orEmpty()
-        peerName = intent.getStringExtra(EXTRA_PEER_NAME) ?: "OpenChat Contact"
-        isIncoming = intent.getBooleanExtra(EXTRA_IS_INCOMING, false)
-
         setupEdgeToEdge()
         setupSensors()
+        observeState()
+
+        val hasCam = ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+        val hasMic = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+        if (hasCam && hasMic) {
+            startVideoCallSession()
+        } else {
+            val missing = mutableListOf<String>()
+            if (!hasCam) missing.add(Manifest.permission.CAMERA)
+            if (!hasMic) missing.add(Manifest.permission.RECORD_AUDIO)
+            videoPermissionLauncher.launch(missing.toTypedArray())
+        }
+    }
+
+    private fun startVideoCallSession() {
+        if (sessionStarted) return
+        sessionStarted = true
         setupViews()
         setupDraggablePreview()
 
-        // If arriving from an incoming call accept, connect to the call
+        // If arriving from an incoming video call accept, connect to the video call
         if (isIncoming && callId.isNotBlank()) {
             repository.acceptIncomingCall(this, callId, peerId, peerName)
         }
-
-        observeState()
     }
 
     private fun setupEdgeToEdge() {
@@ -142,6 +190,7 @@ class ActiveVideoCallActivity : AppCompatActivity(), SensorEventListener {
         binding.localVideoView.setZOrderMediaOverlay(true)
         repository.attachLocalRenderer(binding.localVideoView)
         repository.attachRemoteRenderer(binding.remoteVideoView)
+        renderersAttached = true
 
         // Minimize / PiP
         binding.btnMinimize.setOnClickListener {
@@ -367,8 +416,13 @@ class ActiveVideoCallActivity : AppCompatActivity(), SensorEventListener {
         releaseProximityLock()
         try {
             repository.detachRenderers()
-            binding.localVideoView.release()
-            binding.remoteVideoView.release()
         } catch (_: Exception) {}
+        if (renderersAttached) {
+            renderersAttached = false
+            try { binding.localVideoView.clearImage() } catch (_: Exception) {}
+            try { binding.localVideoView.release() } catch (_: Exception) {}
+            try { binding.remoteVideoView.clearImage() } catch (_: Exception) {}
+            try { binding.remoteVideoView.release() } catch (_: Exception) {}
+        }
     }
 }

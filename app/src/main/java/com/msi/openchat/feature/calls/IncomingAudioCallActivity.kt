@@ -78,6 +78,13 @@ class IncomingAudioCallActivity : AppCompatActivity() {
         callerId = intent.getStringExtra(EXTRA_CALLER_ID).orEmpty()
         callerName = intent.getStringExtra(EXTRA_CALLER_NAME) ?: "OpenChat Caller"
 
+        if (callId.isBlank() || callId.startsWith("vid_") ||
+            com.msi.openchat.feature.videocall.VideoCallManager.isCallActive()
+        ) {
+            finish()
+            return
+        }
+
         setupEdgeToEdge()
         acquireWakeLock()
         registerDismissReceiver()

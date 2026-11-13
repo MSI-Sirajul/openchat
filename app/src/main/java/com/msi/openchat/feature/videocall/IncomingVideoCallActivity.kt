@@ -75,6 +75,13 @@ class IncomingVideoCallActivity : AppCompatActivity() {
         callerId = intent.getStringExtra(EXTRA_CALLER_ID).orEmpty()
         callerName = intent.getStringExtra(EXTRA_CALLER_NAME) ?: "OpenChat Caller"
 
+        if (callId.isBlank() || callId.startsWith("aud_") ||
+            com.msi.openchat.service.call.CallSessionCoordinator.isActive()
+        ) {
+            finish()
+            return
+        }
+
         setupEdgeToEdge()
         acquireWakeLock()
         registerDismissReceiver()
