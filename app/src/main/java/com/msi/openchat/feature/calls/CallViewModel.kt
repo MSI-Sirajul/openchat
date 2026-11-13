@@ -8,6 +8,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.msi.openchat.core.common.Resource
 import com.msi.openchat.core.di.ServiceLocator
+import com.msi.openchat.data.remote.firebase.FirebaseManager
 import com.msi.openchat.data.repository.CallRepository
 import com.msi.openchat.data.repository.UserRepository
 import com.msi.openchat.service.call.CallNetworkStats
@@ -75,11 +76,13 @@ class CallViewModel(
     private val processedSignalingIds = ConcurrentHashMap.newKeySet<String>()
     @Volatile private var hasProcessedOffer = false
     @Volatile private var hasProcessedAnswer = false
+    @Volatile private var hasEnded = false
 
     init {
         val callId = initialCallId.orEmpty()
-        if (callId.startsWith("vid_") ||
-            com.msi.openchat.feature.videocall.VideoCallManager.isCallActive()
+        if (com.msi.openchat.service.call.CallSessionGuard.isVideoCall(callId, null) ||
+            com.msi.openchat.feature.videocall.VideoCallManager.isCallActive() ||
+            com.msi.openchat.service.call.CallSessionGuard.isVideoCallActive()
         ) {
             _uiState.value = _uiState.value.copy(
                 callStatus = "Call Blocked",
@@ -89,7 +92,9 @@ class CallViewModel(
         } else {
             initWebRtc()
 
-            CallSessionCoordinator.registerActiveCall(this, callId, contactId, contactName)
+            if (callId.isNotBlank()) {
+                CallSessionCoordinator.registerActiveCall(this, callId, contactId, contactName)
+            }
 
             val hasMicPermission = ContextCompat.checkSelfPermission(
                 context,
@@ -99,10 +104,14 @@ class CallViewModel(
             if (isIncoming && callId.isNotBlank()) {
                 startObservingSignaling(callId)
                 if (isAlreadyAnswered) {
-                    // Already answered from notification or incoming activity
+                    val currentUid = FirebaseManager.auth.currentUser?.uid ?: ServiceLocator.sessionManager.getUserId()
+                    if (!currentUid.isNullOrBlank()) {
+                        callRepository.clearIncomingAudioCall(currentUid)
+                    }
+                    // Already answered from notification or IncomingAudioCallActivity
                     viewModelScope.launch {
                         try {
-                            callRepository.updateAudioCallStatus(callId, "connected")
+                            callRepository.updateAudioCallStatus(callId, "connecting")
                         } catch (_: Exception) {}
                     }
                     if (hasMicPermission) {
@@ -117,8 +126,15 @@ class CallViewModel(
                         } catch (_: Exception) {}
                     }
                 }
+            } else if (!isIncoming && callId.isNotBlank()) {
+                // Outgoing call already initiated in OutgoingAudioCallActivity — attach and send Offer
+                _uiState.value = _uiState.value.copy(callId = callId, callStatus = "Connecting...")
+                startObservingSignaling(callId)
+                if (hasMicPermission) {
+                    startWebRtcCall(isCaller = true)
+                }
             } else if (!isIncoming) {
-                // Initiating outgoing call if permission granted
+                // Fallback: initiate outgoing call directly if no callId was supplied
                 if (hasMicPermission) {
                     initiateOutgoingCall()
                 }
@@ -127,16 +143,21 @@ class CallViewModel(
     }
 
     fun acceptCall() {
+        if (!_uiState.value.isIncomingWaiting) return
         val callId = _uiState.value.callId
         _uiState.value = _uiState.value.copy(
             isIncomingWaiting = false,
             callStatus = "Connecting..."
         )
+        val currentUid = FirebaseManager.auth.currentUser?.uid ?: ServiceLocator.sessionManager.getUserId()
+        if (!currentUid.isNullOrBlank()) {
+            callRepository.clearIncomingAudioCall(currentUid)
+        }
         if (callId.isNotBlank()) {
             startObservingSignaling(callId)
             viewModelScope.launch {
                 try {
-                    callRepository.updateCallStatus(callId, "connected")
+                    callRepository.updateAudioCallStatus(callId, "connecting")
                 } catch (_: Exception) {}
             }
         }
@@ -176,6 +197,8 @@ class CallViewModel(
         val currentCallId = _uiState.value.callId
         if (isIncoming && currentCallId.isNotBlank() && !_uiState.value.isIncomingWaiting) {
             startWebRtcCall(isCaller = false)
+        } else if (!isIncoming && currentCallId.isNotBlank()) {
+            startWebRtcCall(isCaller = true)
         } else if (!isIncoming && currentCallId.isBlank()) {
             initiateOutgoingCall()
         }
@@ -201,7 +224,9 @@ class CallViewModel(
     }
 
     private fun initiateOutgoingCall() {
-        if (com.msi.openchat.feature.videocall.VideoCallManager.isCallActive()) {
+        if (com.msi.openchat.feature.videocall.VideoCallManager.isCallActive() ||
+            com.msi.openchat.service.call.CallSessionGuard.isVideoCallActive()
+        ) {
             _uiState.value = _uiState.value.copy(
                 callStatus = "Busy",
                 errorMessage = "Video call is active",
@@ -248,6 +273,11 @@ class CallViewModel(
     }
 
     private fun startWebRtcCall(isCaller: Boolean) {
+        if (webRtcManager?.callState?.value == WebRtcCallState.CONNECTING ||
+            webRtcManager?.callState?.value == WebRtcCallState.CONNECTED
+        ) {
+            return
+        }
         viewModelScope.launch {
             val iceServers = callRepository.getIceServers()
             webRtcManager?.startCall(
@@ -312,9 +342,12 @@ class CallViewModel(
         // 1. Observe real-time WebRTC signaling messages
         signalingJob?.cancel()
         signalingJob = viewModelScope.launch {
+            val myUid = FirebaseManager.auth.currentUser?.uid ?: ServiceLocator.sessionManager.getUserId()
             callRepository.observeSignalingMessages(targetCallId).collect { msg ->
                 if (!_uiState.value.isCallActive) return@collect
-                if (msg.senderId == contactId) {
+                val isFromRemotePeer = (contactId.isNotBlank() && msg.senderId == contactId) ||
+                    (myUid != null && msg.senderId.isNotBlank() && msg.senderId != myUid)
+                if (isFromRemotePeer) {
                     val id = msg.id
                     if (id == null || processedSignalingIds.add(id)) {
                         handleIncomingSignalingMessage(msg.type, msg.payload)
@@ -341,12 +374,13 @@ class CallViewModel(
                     }
                     "connected" -> {
                         callTimeoutJob?.cancel()
-                        if (_uiState.value.callStatus != "Connected") {
+                        if (webRtcManager?.callState?.value == WebRtcCallState.CONNECTED && _uiState.value.callStatus != "Connected") {
                             _uiState.value = _uiState.value.copy(callStatus = "Connected")
                             startDurationTimer()
                         }
                     }
                     "declined" -> endCallInternal("Call Declined")
+                    "busy" -> endCallInternal("User Busy")
                     "missed" -> endCallInternal("No Answer")
                     "ended" -> endCallInternal("Call Ended")
                     "failed" -> endCallInternal("Call Failed")
@@ -442,7 +476,15 @@ class CallViewModel(
         when (state) {
             WebRtcCallState.CONNECTED -> {
                 startDurationTimer()
-                OpenChatCallService.startCallService(context, _uiState.value.callId, contactName)
+                val hasMic = ContextCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.RECORD_AUDIO
+                ) == PackageManager.PERMISSION_GRANTED
+                if (hasMic) {
+                    try {
+                        OpenChatCallService.startCallService(context, _uiState.value.callId, contactName)
+                    } catch (_: Exception) {}
+                }
                 val callId = _uiState.value.callId
                 if (callId.isNotBlank()) {
                     viewModelScope.launch {
@@ -459,7 +501,7 @@ class CallViewModel(
 
     private fun startDurationTimer() {
         callTimeoutJob?.cancel()
-        durationTimerJob?.cancel()
+        if (durationTimerJob?.isActive == true) return
         durationTimerJob = viewModelScope.launch {
             while (isActive && _uiState.value.isCallActive) {
                 delay(1000)
@@ -493,6 +535,8 @@ class CallViewModel(
     }
 
     private fun endCallInternal(reason: String) {
+        if (hasEnded) return
+        hasEnded = true
         callTimeoutJob?.cancel()
         durationTimerJob?.cancel()
         signalingJob?.cancel()
@@ -502,7 +546,9 @@ class CallViewModel(
         processedSignalingIds.clear()
         webRtcManager?.endCall()
         CallSessionCoordinator.unregisterActiveCall(_uiState.value.callId)
-        OpenChatCallService.stopCallService(context)
+        try {
+            OpenChatCallService.stopCallService(context)
+        } catch (_: Exception) {}
         _uiState.value = _uiState.value.copy(
             callStatus = reason,
             isCallActive = false

@@ -25,13 +25,14 @@ import com.msi.openchat.core.common.Resource
 import com.msi.openchat.core.di.ServiceLocator
 import com.msi.openchat.feature.videocall.VideoCallManager
 import com.msi.openchat.service.call.CallSessionCoordinator
+import com.msi.openchat.service.call.CallSessionGuard
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
  * Dedicated full-screen edge-to-edge Activity for outgoing voice calls.
- * Displays "Calling..." and transitions to ActiveAudioCallActivity when connected.
+ * Displays "Calling..." and transitions to ActiveAudioCallActivity when answered/connecting.
  */
 class OutgoingAudioCallActivity : AppCompatActivity() {
     private val tag = "OpenChat_OutgoingAudio"
@@ -62,11 +63,11 @@ class OutgoingAudioCallActivity : AppCompatActivity() {
 
         fun start(context: Context, contactId: String, contactName: String) {
             // Guard: Mutual exclusion check against active video or audio calls
-            if (VideoCallManager.isCallActive()) {
+            if (CallSessionGuard.isVideoCallActive() || VideoCallManager.isCallActive()) {
                 Toast.makeText(context, "Cannot start voice call: a video call is active", Toast.LENGTH_SHORT).show()
                 return
             }
-            if (CallSessionCoordinator.isActive()) {
+            if (CallSessionGuard.isAudioCallActive() || CallSessionCoordinator.isActive()) {
                 Toast.makeText(context, "A voice call is already in progress", Toast.LENGTH_SHORT).show()
                 return
             }
@@ -82,8 +83,13 @@ class OutgoingAudioCallActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        if (VideoCallManager.isCallActive()) {
+        if (CallSessionGuard.isVideoCallActive() || VideoCallManager.isCallActive()) {
             Toast.makeText(this, "Cannot start voice call while video call is active", Toast.LENGTH_SHORT).show()
+            finish()
+            return
+        }
+        if (CallSessionGuard.isAudioCallActive() || CallSessionCoordinator.isActive()) {
+            Toast.makeText(this, "A voice call is already in progress", Toast.LENGTH_SHORT).show()
             finish()
             return
         }
@@ -155,9 +161,11 @@ class OutgoingAudioCallActivity : AppCompatActivity() {
             val res = ServiceLocator.callRepository.initiateAudioCall(contactId)
             if (res is Resource.Success && res.data != null) {
                 callId = res.data.id
+                CallSessionGuard.registerAudioCall(callId)
                 startTimeoutTimer()
                 observeCallSession()
             } else {
+                CallSessionGuard.unregisterCall(callId.ifBlank { null })
                 Toast.makeText(this@OutgoingAudioCallActivity, "Failed to start voice call", Toast.LENGTH_SHORT).show()
                 finish()
             }
@@ -168,12 +176,15 @@ class OutgoingAudioCallActivity : AppCompatActivity() {
         timeoutJob?.cancel()
         timeoutJob = lifecycleScope.launch {
             delay(35_000L)
-            if (callId.isNotBlank()) {
-                ServiceLocator.callRepository.updateCallStatus(callId = callId, status = "ended", endReason = "No answer")
+            if (!hasNavigatedToActive && callId.isNotBlank()) {
+                ServiceLocator.callRepository.updateCallStatus(callId = callId, status = "missed", endReason = "No answer")
                 ServiceLocator.callRepository.sendSignaling(callId, contactId, "bye", "{\"reason\":\"timeout\"}")
+                CallSessionGuard.unregisterCall(callId)
             }
-            Toast.makeText(this@OutgoingAudioCallActivity, "No answer", Toast.LENGTH_SHORT).show()
-            finish()
+            if (!hasNavigatedToActive) {
+                Toast.makeText(this@OutgoingAudioCallActivity, "No answer", Toast.LENGTH_SHORT).show()
+                finish()
+            }
         }
     }
 
@@ -182,7 +193,7 @@ class OutgoingAudioCallActivity : AppCompatActivity() {
         lifecycleScope.launch {
             ServiceLocator.callRepository.observeCallSession(callId).collect { session ->
                 when (session.status) {
-                    "connected" -> {
+                    "connecting", "connected" -> {
                         timeoutJob?.cancel()
                         if (!hasNavigatedToActive) {
                             hasNavigatedToActive = true
@@ -199,16 +210,31 @@ class OutgoingAudioCallActivity : AppCompatActivity() {
                     }
                     "declined" -> {
                         timeoutJob?.cancel()
+                        CallSessionGuard.unregisterCall(callId)
                         Toast.makeText(this@OutgoingAudioCallActivity, "Call declined", Toast.LENGTH_SHORT).show()
                         finish()
                     }
                     "busy" -> {
                         timeoutJob?.cancel()
+                        CallSessionGuard.unregisterCall(callId)
                         Toast.makeText(this@OutgoingAudioCallActivity, "Contact is on another call", Toast.LENGTH_SHORT).show()
+                        finish()
+                    }
+                    "missed" -> {
+                        timeoutJob?.cancel()
+                        CallSessionGuard.unregisterCall(callId)
+                        Toast.makeText(this@OutgoingAudioCallActivity, "No answer", Toast.LENGTH_SHORT).show()
+                        finish()
+                    }
+                    "failed" -> {
+                        timeoutJob?.cancel()
+                        CallSessionGuard.unregisterCall(callId)
+                        Toast.makeText(this@OutgoingAudioCallActivity, "Call failed", Toast.LENGTH_SHORT).show()
                         finish()
                     }
                     "ended" -> {
                         timeoutJob?.cancel()
+                        CallSessionGuard.unregisterCall(callId)
                         finish()
                     }
                 }
@@ -219,6 +245,7 @@ class OutgoingAudioCallActivity : AppCompatActivity() {
     private fun cancelCall() {
         timeoutJob?.cancel()
         if (callId.isNotBlank()) {
+            CallSessionGuard.unregisterCall(callId)
             lifecycleScope.launch {
                 ServiceLocator.callRepository.updateCallStatus(callId = callId, status = "ended", endReason = "Cancelled by caller")
                 ServiceLocator.callRepository.sendSignaling(callId, contactId, "bye", "{\"reason\":\"cancelled\"}")
@@ -231,5 +258,8 @@ class OutgoingAudioCallActivity : AppCompatActivity() {
         super.onDestroy()
         pulseAnimator?.cancel()
         timeoutJob?.cancel()
+        if (!hasNavigatedToActive && callId.isNotBlank()) {
+            CallSessionGuard.unregisterCall(callId)
+        }
     }
 }

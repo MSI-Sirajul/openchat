@@ -70,7 +70,7 @@ object CallSessionGuard {
      */
     fun isVideoCall(callId: String?, callType: String?): Boolean {
         if (callType.equals("video", ignoreCase = true)) return true
-        if (callId != null && (callId.startsWith("video_") || callId.contains("_video_") || callId.contains("video_call"))) return true
+        if (callId != null && (callId.startsWith("video_") || callId.startsWith("vid_") || callId.contains("_video_") || callId.contains("video_call"))) return true
         return false
     }
 

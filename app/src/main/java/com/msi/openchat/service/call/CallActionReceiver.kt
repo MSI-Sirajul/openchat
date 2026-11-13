@@ -1,12 +1,15 @@
 package com.msi.openchat.service.call
 
+import android.Manifest
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.util.Log
-import com.example.MainActivity
+import androidx.core.content.ContextCompat
 import com.msi.openchat.core.di.ServiceLocator
 import com.msi.openchat.core.service.AppServiceManager
+import com.msi.openchat.data.remote.firebase.FirebaseManager
 import com.msi.openchat.service.notification.OpenChatNotificationManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -44,7 +47,7 @@ class CallActionReceiver : BroadcastReceiver() {
 
         when (action) {
             ACTION_DECLINE_CALL -> {
-                if (callId.startsWith("vid_")) {
+                if (CallSessionGuard.isVideoCall(callId, null)) {
                     Log.w(tag, "Audio receiver ignored video callId=$callId")
                     return
                 }
@@ -59,6 +62,10 @@ class CallActionReceiver : BroadcastReceiver() {
                     CoroutineScope(Dispatchers.IO).launch {
                         try {
                             ServiceLocator.initialize(context.applicationContext)
+                            val currentUid = FirebaseManager.auth.currentUser?.uid ?: ServiceLocator.sessionManager.getUserId()
+                            if (!currentUid.isNullOrBlank()) {
+                                ServiceLocator.callRepository.clearIncomingAudioCall(currentUid)
+                            }
                             ServiceLocator.callRepository.updateAudioCallStatus(
                                 callId = callId,
                                 status = "declined",
@@ -81,7 +88,7 @@ class CallActionReceiver : BroadcastReceiver() {
             }
 
             ACTION_ACCEPT_CALL -> {
-                if (callId.startsWith("vid_")) {
+                if (CallSessionGuard.isVideoCall(callId, null)) {
                     Log.w(tag, "Audio receiver ignored video accept callId=$callId")
                     return
                 }
@@ -92,8 +99,25 @@ class CallActionReceiver : BroadcastReceiver() {
                     putExtra(EXTRA_CALL_ID, callId)
                 })
 
-                // Keep audio channel alive in foreground immediately showing duration and end call action
-                OpenChatCallService.startCallService(context, callId, callerName)
+                CoroutineScope(Dispatchers.IO).launch {
+                    try {
+                        ServiceLocator.initialize(context.applicationContext)
+                        val currentUid = FirebaseManager.auth.currentUser?.uid ?: ServiceLocator.sessionManager.getUserId()
+                        if (!currentUid.isNullOrBlank()) {
+                            ServiceLocator.callRepository.clearIncomingAudioCall(currentUid)
+                        }
+                    } catch (_: Exception) {}
+                }
+
+                // Start foreground call service only if RECORD_AUDIO permission is already granted;
+                // otherwise ActiveAudioCallActivity requests permission first to prevent Android 14+ FGS SecurityException.
+                val hasMicPermission = ContextCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.RECORD_AUDIO
+                ) == PackageManager.PERMISSION_GRANTED
+                if (hasMicPermission) {
+                    OpenChatCallService.startCallService(context, callId, callerName)
+                }
 
                 // Launch ActiveAudioCallActivity directly
                 val launchIntent = com.msi.openchat.feature.calls.ActiveAudioCallActivity.createIntent(

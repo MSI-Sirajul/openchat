@@ -23,7 +23,10 @@ import androidx.lifecycle.lifecycleScope
 import com.example.databinding.ActivityIncomingAudioCallBinding
 import com.msi.openchat.core.di.ServiceLocator
 import com.msi.openchat.core.service.AppServiceManager
+import com.msi.openchat.data.remote.firebase.FirebaseManager
+import com.msi.openchat.feature.videocall.VideoCallManager
 import com.msi.openchat.service.call.CallActionReceiver
+import com.msi.openchat.service.call.CallSessionGuard
 import com.msi.openchat.service.notification.OpenChatNotificationManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -67,6 +70,8 @@ class IncomingAudioCallActivity : AppCompatActivity() {
         }
     }
 
+    private var isHandled = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setupWindowAndLockScreen()
@@ -78,8 +83,10 @@ class IncomingAudioCallActivity : AppCompatActivity() {
         callerId = intent.getStringExtra(EXTRA_CALLER_ID).orEmpty()
         callerName = intent.getStringExtra(EXTRA_CALLER_NAME) ?: "OpenChat Caller"
 
-        if (callId.isBlank() || callId.startsWith("vid_") ||
-            com.msi.openchat.feature.videocall.VideoCallManager.isCallActive()
+        if (callId.isBlank() ||
+            CallSessionGuard.isVideoCall(callId, null) ||
+            CallSessionGuard.isVideoCallActive() ||
+            VideoCallManager.isCallActive()
         ) {
             finish()
             return
@@ -159,7 +166,10 @@ class IncomingAudioCallActivity : AppCompatActivity() {
         dismissReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
                 if (intent?.action == CallActionReceiver.ACTION_DISMISS_INCOMING_UI) {
-                    cleanupAndFinish()
+                    val targetId = intent.getStringExtra(CallActionReceiver.EXTRA_CALL_ID).orEmpty()
+                    if (targetId.isBlank() || targetId == callId) {
+                        cleanupAndFinish()
+                    }
                 }
             }
         }
@@ -195,8 +205,15 @@ class IncomingAudioCallActivity : AppCompatActivity() {
     }
 
     private fun answerCall() {
+        if (isHandled) return
+        isHandled = true
         AppServiceManager.stopCallRinging(this)
         OpenChatNotificationManager.cancelIncomingCallNotification(this)
+
+        val currentUid = FirebaseManager.auth.currentUser?.uid ?: ServiceLocator.sessionManager.getUserId()
+        if (!currentUid.isNullOrBlank()) {
+            ServiceLocator.callRepository.clearIncomingAudioCall(currentUid)
+        }
 
         val intent = ActiveAudioCallActivity.createIntent(
             context = this,
@@ -210,8 +227,15 @@ class IncomingAudioCallActivity : AppCompatActivity() {
     }
 
     private fun declineCall() {
+        if (isHandled) return
+        isHandled = true
         AppServiceManager.stopCallRinging(this)
         OpenChatNotificationManager.cancelIncomingCallNotification(this)
+
+        val currentUid = FirebaseManager.auth.currentUser?.uid ?: ServiceLocator.sessionManager.getUserId()
+        if (!currentUid.isNullOrBlank()) {
+            ServiceLocator.callRepository.clearIncomingAudioCall(currentUid)
+        }
 
         CoroutineScope(Dispatchers.IO).launch {
             try {

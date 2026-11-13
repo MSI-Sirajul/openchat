@@ -48,12 +48,11 @@ class CallRepository(
                 return@withContext Resource.Error("CallRepository handles audio calls only")
             }
 
-            val callerId = sessionManager.getUserId() ?: FirebaseManager.auth.currentUser?.uid
+            val callerId = FirebaseManager.auth.currentUser?.uid ?: sessionManager.getUserId()
                 ?: return@withContext Resource.Error("Not authenticated")
 
             try {
-                val pushKey = audioCallsRef.push().key ?: UUID.randomUUID().toString()
-                val callId = "aud_$pushKey"
+                val callId = com.msi.openchat.service.call.CallSessionGuard.generateAudioCallId()
                 val nowTime = System.currentTimeMillis().toString()
 
                 val callData = HashMap<String, Any?>()
@@ -90,7 +89,6 @@ class CallRepository(
                 suspendCancellableCoroutine<Resource<CallSession>> { continuation ->
                     FirebaseManager.database.reference.updateChildren(updates).addOnCompleteListener { task ->
                         if (task.isSuccessful) {
-                            audioCallsRef.child(callId).child("status").onDisconnect().setValue("ended")
                             FirebaseManager.usersRef.child(receiverId).child("incomingAudioCall")
                                 .onDisconnect().removeValue()
                             continuation.resume(
@@ -131,7 +129,7 @@ class CallRepository(
         durationSeconds: Int = 0,
         endReason: String? = null
     ) = withContext(Dispatchers.IO) {
-        if (callId.isBlank() || callId.startsWith("vid_")) {
+        if (callId.isBlank() || com.msi.openchat.service.call.CallSessionGuard.isVideoCall(callId, null)) {
             Log.w(tag, "Ignoring updateCallStatus for non-audio callId=$callId")
             return@withContext
         }
@@ -182,11 +180,11 @@ class CallRepository(
         type: String,
         payload: String
     ): Resource<Unit> = withContext(Dispatchers.IO) {
-        if (callId.isBlank() || callId.startsWith("vid_")) {
+        if (callId.isBlank() || com.msi.openchat.service.call.CallSessionGuard.isVideoCall(callId, null)) {
             return@withContext Resource.Error("Invalid audio callId: $callId")
         }
 
-        val senderId = sessionManager.getUserId() ?: FirebaseManager.auth.currentUser?.uid
+        val senderId = FirebaseManager.auth.currentUser?.uid ?: sessionManager.getUserId()
             ?: return@withContext Resource.Error("Not authenticated")
 
         val messageId = audioCallSignalingRef.child(callId).push().key ?: UUID.randomUUID().toString()
@@ -213,7 +211,7 @@ class CallRepository(
         callId: String,
         sinceTimestamp: String? = null
     ): Resource<List<CallSignalingMessage>> = withContext(Dispatchers.IO) {
-        if (callId.isBlank() || callId.startsWith("vid_")) {
+        if (callId.isBlank() || com.msi.openchat.service.call.CallSessionGuard.isVideoCall(callId, null)) {
             return@withContext Resource.Success(emptyList())
         }
         suspendCancellableCoroutine<Resource<List<CallSignalingMessage>>> { continuation ->
@@ -251,7 +249,7 @@ class CallRepository(
     }
 
     fun observeSignalingMessages(callId: String): Flow<CallSignalingMessage> = callbackFlow {
-        if (callId.isBlank() || callId.startsWith("vid_")) {
+        if (callId.isBlank() || com.msi.openchat.service.call.CallSessionGuard.isVideoCall(callId, null)) {
             close()
             return@callbackFlow
         }
@@ -281,7 +279,9 @@ class CallRepository(
             override fun onChildChanged(snapshot: DataSnapshot, previousChildName: String?) {}
             override fun onChildRemoved(snapshot: DataSnapshot) {}
             override fun onChildMoved(snapshot: DataSnapshot, previousChildName: String?) {}
-            override fun onCancelled(error: DatabaseError) {}
+            override fun onCancelled(error: DatabaseError) {
+                Log.w(tag, "observeSignalingMessages cancelled for $callId: ${error.message}")
+            }
         }
 
         val ref = audioCallSignalingRef.child(callId)
@@ -290,7 +290,7 @@ class CallRepository(
     }
 
     fun observeCallSession(callId: String): Flow<CallSession> = callbackFlow {
-        if (callId.isBlank() || callId.startsWith("vid_")) {
+        if (callId.isBlank() || com.msi.openchat.service.call.CallSessionGuard.isVideoCall(callId, null)) {
             close()
             return@callbackFlow
         }
@@ -320,7 +320,9 @@ class CallRepository(
                 }
             }
 
-            override fun onCancelled(error: DatabaseError) {}
+            override fun onCancelled(error: DatabaseError) {
+                Log.w(tag, "observeCallSession cancelled for $callId: ${error.message}")
+            }
         }
 
         val ref = audioCallsRef.child(callId)

@@ -1,7 +1,9 @@
 package com.msi.openchat.feature.calls
 
+import android.Manifest
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
@@ -11,7 +13,10 @@ import android.os.Bundle
 import android.os.PowerManager
 import android.util.Log
 import android.view.WindowManager
+import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -21,7 +26,8 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import com.example.R
 import com.example.databinding.ActivityActiveAudioCallBinding
-import com.msi.openchat.service.call.CallSessionCoordinator
+import com.msi.openchat.feature.videocall.VideoCallManager
+import com.msi.openchat.service.call.CallSessionGuard
 import com.msi.openchat.service.call.OpenChatCallService
 import com.msi.openchat.service.call.WebRtcCallState
 import kotlinx.coroutines.flow.collectLatest
@@ -45,6 +51,25 @@ class ActiveAudioCallActivity : AppCompatActivity(), SensorEventListener {
     private var proximityWakeLock: PowerManager.WakeLock? = null
 
     private lateinit var callViewModel: CallViewModel
+
+    private val micPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            if (callId.isNotBlank()) {
+                OpenChatCallService.startCallService(this, callId, contactName)
+            }
+            if (::callViewModel.isInitialized) {
+                callViewModel.onPermissionGranted()
+            }
+        } else {
+            Toast.makeText(this, "Microphone permission is required for voice calls", Toast.LENGTH_SHORT).show()
+            if (::callViewModel.isInitialized) {
+                callViewModel.endCall()
+            }
+            finish()
+        }
+    }
 
     companion object {
         const val EXTRA_CALL_ID = "active_audio_call_id"
@@ -71,16 +96,27 @@ class ActiveAudioCallActivity : AppCompatActivity(), SensorEventListener {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        WindowCompat.setDecorFitsSystemWindows(window, false)
-        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-
-        binding = ActivityActiveAudioCallBinding.inflate(layoutInflater)
-        setContentView(binding.root)
 
         callId = intent.getStringExtra(EXTRA_CALL_ID).orEmpty()
         contactId = intent.getStringExtra(EXTRA_CONTACT_ID).orEmpty()
         contactName = intent.getStringExtra(EXTRA_CONTACT_NAME) ?: "Voice Call"
         isIncoming = intent.getBooleanExtra(EXTRA_IS_INCOMING, false)
+
+        if (callId.isBlank() ||
+            CallSessionGuard.isVideoCall(callId, null) ||
+            CallSessionGuard.isVideoCallActive() ||
+            VideoCallManager.isCallActive()
+        ) {
+            Log.w(tag, "Blocked invalid/video session in ActiveAudioCallActivity: callId=$callId")
+            finish()
+            return
+        }
+
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+
+        binding = ActivityActiveAudioCallBinding.inflate(layoutInflater)
+        setContentView(binding.root)
 
         setupEdgeToEdge()
         setupSensors()
@@ -88,8 +124,15 @@ class ActiveAudioCallActivity : AppCompatActivity(), SensorEventListener {
         setupViews()
         observeViewModel()
 
-        // Start ongoing call foreground service
-        OpenChatCallService.startCallService(this, callId, contactName)
+        val hasMic = ContextCompat.checkSelfPermission(
+            this,
+            Manifest.permission.RECORD_AUDIO
+        ) == PackageManager.PERMISSION_GRANTED
+        if (hasMic) {
+            OpenChatCallService.startCallService(this, callId, contactName)
+        } else {
+            micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        }
     }
 
     private fun setupEdgeToEdge() {
@@ -130,14 +173,11 @@ class ActiveAudioCallActivity : AppCompatActivity(), SensorEventListener {
                     contactId = contactId,
                     contactName = contactName,
                     isIncoming = isIncoming,
-                    isAlreadyAnswered = isIncoming // If arriving from Incoming screen, already answered
+                    isAlreadyAnswered = isIncoming // Incoming calls arrive here after user answered
                 ) as T
             }
         }
         callViewModel = ViewModelProvider(this, factory)[CallViewModel::class.java]
-        if (isIncoming) {
-            callViewModel.acceptCall()
-        }
     }
 
     private fun setupViews() {
@@ -161,9 +201,13 @@ class ActiveAudioCallActivity : AppCompatActivity(), SensorEventListener {
     private fun observeViewModel() {
         lifecycleScope.launch {
             callViewModel.uiState.collectLatest { state ->
-                val mins = state.durationSeconds / 60
-                val secs = state.durationSeconds % 60
-                binding.textCallTimer.text = String.format("%02d:%02d", mins, secs)
+                if (state.durationSeconds > 0 || state.connectionState == WebRtcCallState.CONNECTED) {
+                    val mins = state.durationSeconds / 60
+                    val secs = state.durationSeconds % 60
+                    binding.textCallTimer.text = String.format("%02d:%02d", mins, secs)
+                } else {
+                    binding.textCallTimer.text = state.callStatus
+                }
 
                 // Microphone mute state
                 if (state.isMuted) {
@@ -183,7 +227,7 @@ class ActiveAudioCallActivity : AppCompatActivity(), SensorEventListener {
                     binding.btnSpeaker.setColorFilter(0xFFFFFFFF.toInt())
                 }
 
-                if (state.connectionState == WebRtcCallState.ENDED) {
+                if (!state.isCallActive || state.connectionState == WebRtcCallState.ENDED) {
                     finish()
                 }
             }

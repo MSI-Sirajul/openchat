@@ -43,10 +43,14 @@ class OpenChatCallService : Service() {
                 putExtra(EXTRA_CALL_ID, callId)
                 putExtra(EXTRA_CONTACT_NAME, contactName)
             }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(intent)
-            } else {
-                context.startService(intent)
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    context.startForegroundService(intent)
+                } else {
+                    context.startService(intent)
+                }
+            } catch (e: Exception) {
+                Log.w("OpenChatCallService", "Unable to start call service: ${e.message}")
             }
         }
 
@@ -54,7 +58,9 @@ class OpenChatCallService : Service() {
             val intent = Intent(context, OpenChatCallService::class.java).apply {
                 action = ACTION_STOP_CALL
             }
-            context.startService(intent)
+            try {
+                context.startService(intent)
+            } catch (_: Exception) {}
         }
     }
 
@@ -63,6 +69,27 @@ class OpenChatCallService : Service() {
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
+    }
+
+    private fun promoteCallForeground(notification: Notification): Boolean {
+        return try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(
+                    Constants.NOTIFICATION_ID_ACTIVE_CALL,
+                    notification,
+                    getCallForegroundServiceType()
+                )
+            } else {
+                startForeground(
+                    Constants.NOTIFICATION_ID_ACTIVE_CALL,
+                    notification
+                )
+            }
+            true
+        } catch (e: Exception) {
+            Log.e(tag, "Failed to promote call service to foreground: ${e.message}", e)
+            false
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -75,17 +102,9 @@ class OpenChatCallService : Service() {
                 currentCallId = activeId
                 currentContactName = activeName.ifBlank { "OpenChat Call" }
                 val recoveryNotification = buildOngoingCallNotification(currentContactName, CallSessionCoordinator.durationSeconds.value, CallSessionCoordinator.isSpeakerOn.value)
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    startForeground(
-                        Constants.NOTIFICATION_ID_ACTIVE_CALL,
-                        recoveryNotification,
-                        getCallForegroundServiceType()
-                    )
-                } else {
-                    startForeground(
-                        Constants.NOTIFICATION_ID_ACTIVE_CALL,
-                        recoveryNotification
-                    )
+                if (!promoteCallForeground(recoveryNotification)) {
+                    stopSelf()
+                    return START_NOT_STICKY
                 }
                 startStateObserver()
                 return START_STICKY
@@ -100,17 +119,9 @@ class OpenChatCallService : Service() {
                 currentCallId = intent.getStringExtra(EXTRA_CALL_ID).orEmpty()
                 currentContactName = intent.getStringExtra(EXTRA_CONTACT_NAME) ?: "OpenChat Call"
                 val initialNotification = buildOngoingCallNotification(currentContactName, 0, false)
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    startForeground(
-                        Constants.NOTIFICATION_ID_ACTIVE_CALL,
-                        initialNotification,
-                        getCallForegroundServiceType()
-                    )
-                } else {
-                    startForeground(
-                        Constants.NOTIFICATION_ID_ACTIVE_CALL,
-                        initialNotification
-                    )
+                if (!promoteCallForeground(initialNotification)) {
+                    stopSelf()
+                    return START_NOT_STICKY
                 }
                 startStateObserver()
             }

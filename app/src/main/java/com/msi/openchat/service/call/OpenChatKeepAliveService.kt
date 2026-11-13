@@ -191,7 +191,7 @@ class OpenChatKeepAliveService : Service() {
     }
 
     private fun observeSignalingAndIncoming() {
-        val uid = ServiceLocator.sessionManager.getUserId() ?: FirebaseManager.auth.currentUser?.uid
+        val uid = FirebaseManager.auth.currentUser?.uid ?: ServiceLocator.sessionManager.getUserId()
         if (uid.isNullOrBlank()) {
             return
         }
@@ -212,15 +212,24 @@ class OpenChatKeepAliveService : Service() {
                     val callerName = snapshot.child("caller_name").getValue(String::class.java) ?: "Friend"
                     val callType = snapshot.child("call_type").getValue(String::class.java) ?: "audio"
 
-                    if (callId.isBlank() || callType != "audio" || callId.startsWith("vid_")) {
+                    if (callId.isBlank() || callType != "audio" || CallSessionGuard.isVideoCall(callId, callType)) {
                         Log.w(tag, "Audio listener ignored non-audio payload: callId=$callId, type=$callType")
+                        return
+                    }
+
+                    // Do not treat re-delivered snapshots for the currently active call as a new busy call
+                    if (CallSessionCoordinator.currentCallId.value == callId ||
+                        CallSessionGuard.activeCallId.value == callId
+                    ) {
+                        Log.d(tag, "Audio listener ignored snapshot for already-active callId=$callId")
                         return
                     }
 
                     Log.i(tag, "Incoming background AUDIO call: $callId from $callerId")
                     serviceScope.launch {
-                        // Mutual exclusion: block if a video or audio call is already active
-                        if (com.msi.openchat.feature.videocall.VideoCallManager.isCallActive() ||
+                        // Mutual exclusion: block if a video or different audio call is already active
+                        if (CallSessionGuard.isAnyCallActive() ||
+                            com.msi.openchat.feature.videocall.VideoCallManager.isCallActive() ||
                             CallSessionCoordinator.isActive()
                         ) {
                             Log.w(tag, "Another call is active, declining incoming audio call as busy: $callId")
@@ -253,7 +262,9 @@ class OpenChatKeepAliveService : Service() {
                 }
             }
 
-            override fun onCancelled(error: DatabaseError) {}
+            override fun onCancelled(error: DatabaseError) {
+                Log.w(tag, "incomingAudioCall listener cancelled: ${error.message}")
+            }
         }
         incomingAudioCallNode.addValueEventListener(aListener)
         audioCallListener = aListener
@@ -268,15 +279,20 @@ class OpenChatKeepAliveService : Service() {
                     val callerName = snapshot.child("caller_name").getValue(String::class.java) ?: "Friend"
                     val callType = snapshot.child("call_type").getValue(String::class.java) ?: "video"
 
-                    if (callId.isBlank() || callType != "video" || callId.startsWith("aud_")) {
+                    if (callId.isBlank() || callType != "video" || !CallSessionGuard.isVideoCall(callId, callType)) {
                         Log.w(tag, "Video listener ignored non-video payload: callId=$callId, type=$callType")
+                        return
+                    }
+
+                    if (CallSessionGuard.activeCallId.value == callId) {
                         return
                     }
 
                     Log.i(tag, "Incoming background VIDEO call: $callId from $callerId")
                     serviceScope.launch {
                         // Mutual exclusion: block if an audio or video call is already active
-                        if (CallSessionCoordinator.isActive() ||
+                        if (CallSessionGuard.isAnyCallActive() ||
+                            CallSessionCoordinator.isActive() ||
                             com.msi.openchat.feature.videocall.VideoCallManager.isCallActive()
                         ) {
                             Log.w(tag, "Another call is active, declining incoming video call as busy: $callId")
@@ -306,7 +322,9 @@ class OpenChatKeepAliveService : Service() {
                 }
             }
 
-            override fun onCancelled(error: DatabaseError) {}
+            override fun onCancelled(error: DatabaseError) {
+                Log.w(tag, "incomingVideoCall listener cancelled: ${error.message}")
+            }
         }
         incomingVideoCallNode.addValueEventListener(vListener)
         videoCallListener = vListener

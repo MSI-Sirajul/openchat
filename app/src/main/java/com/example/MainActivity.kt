@@ -406,13 +406,18 @@ class MainActivity : AppCompatActivity() {
 
         val action = intent.action
         val callType = intent.getStringExtra("call_type") ?: intent.getStringExtra("incoming_call_type")
-        if (callType == "video" || action?.contains("VIDEO") == true || intent.hasExtra("extra_video_call_id")) {
+        val incomingCallId = intent.getStringExtra(OpenChatNotificationManager.EXTRA_CALL_ID)
+            ?: intent.getStringExtra("incoming_call_id")
+
+        if (callType == "video" ||
+            action?.contains("VIDEO") == true ||
+            intent.hasExtra("extra_video_call_id") ||
+            com.msi.openchat.service.call.CallSessionGuard.isVideoCall(incomingCallId, callType)
+        ) {
             // Strictly ignore video calls in MainActivity - handled exclusively by video activities/receivers
             return
         }
 
-        val incomingCallId = intent.getStringExtra(OpenChatNotificationManager.EXTRA_CALL_ID)
-            ?: intent.getStringExtra("incoming_call_id")
         val incomingCallerId = intent.getStringExtra(OpenChatNotificationManager.EXTRA_CALLER_ID)
             ?: intent.getStringExtra("incoming_caller_id")
         val incomingCallerName = intent.getStringExtra(OpenChatNotificationManager.EXTRA_CALLER_NAME)
@@ -423,6 +428,11 @@ class MainActivity : AppCompatActivity() {
         if (action == OpenChatNotificationManager.ACTION_DECLINE_CALL && !incomingCallId.isNullOrBlank()) {
             OpenChatNotificationManager.cancelIncomingCallNotification(this)
             CoroutineScope(Dispatchers.IO).launch {
+                val uid = com.msi.openchat.data.remote.firebase.FirebaseManager.auth.currentUser?.uid
+                    ?: ServiceLocator.sessionManager.getUserId()
+                if (!uid.isNullOrBlank()) {
+                    ServiceLocator.callRepository.clearIncomingAudioCall(uid)
+                }
                 ServiceLocator.callRepository.updateCallStatus(
                     callId = incomingCallId,
                     status = "declined",
@@ -439,6 +449,11 @@ class MainActivity : AppCompatActivity() {
                     intent.getBooleanExtra("is_already_answered", false)
 
             if (isAnswered) {
+                val uid = com.msi.openchat.data.remote.firebase.FirebaseManager.auth.currentUser?.uid
+                    ?: ServiceLocator.sessionManager.getUserId()
+                if (!uid.isNullOrBlank()) {
+                    ServiceLocator.callRepository.clearIncomingAudioCall(uid)
+                }
                 val activeIntent = com.msi.openchat.feature.calls.ActiveAudioCallActivity.createIntent(
                     context = this,
                     callId = incomingCallId,

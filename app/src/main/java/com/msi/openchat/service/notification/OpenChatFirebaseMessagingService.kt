@@ -53,7 +53,9 @@ class OpenChatFirebaseMessagingService : FirebaseMessagingService() {
             "incoming_video_call" -> {
                 val callerName = remoteMessage.data["caller_name"] ?: title
                 val id = callId.orEmpty()
-                if (id.isNotBlank() && !id.startsWith("aud_") &&
+                if (id.isNotBlank() &&
+                    com.msi.openchat.service.call.CallSessionGuard.isVideoCall(id, "video") &&
+                    !com.msi.openchat.service.call.CallSessionGuard.isAnyCallActive() &&
                     !com.msi.openchat.service.call.CallSessionCoordinator.isActive() &&
                     !com.msi.openchat.feature.videocall.VideoCallManager.isCallActive()
                 ) {
@@ -68,7 +70,9 @@ class OpenChatFirebaseMessagingService : FirebaseMessagingService() {
             "incoming_audio_call" -> {
                 val callerName = remoteMessage.data["caller_name"] ?: title
                 val id = callId.orEmpty()
-                if (id.isNotBlank() && !id.startsWith("vid_") &&
+                if (id.isNotBlank() &&
+                    !com.msi.openchat.service.call.CallSessionGuard.isVideoCall(id, null) &&
+                    !com.msi.openchat.service.call.CallSessionGuard.isAnyCallActive() &&
                     !com.msi.openchat.feature.videocall.VideoCallManager.isCallActive() &&
                     !com.msi.openchat.service.call.CallSessionCoordinator.isActive()
                 ) {
@@ -84,8 +88,9 @@ class OpenChatFirebaseMessagingService : FirebaseMessagingService() {
                 val callerName = remoteMessage.data["caller_name"] ?: title
                 val callType = remoteMessage.data["call_type"] ?: "audio"
                 val id = callId.orEmpty()
-                if (callType == "video" && !id.startsWith("aud_")) {
-                    if (!com.msi.openchat.service.call.CallSessionCoordinator.isActive() &&
+                if (id.isNotBlank() && com.msi.openchat.service.call.CallSessionGuard.isVideoCall(id, callType)) {
+                    if (!com.msi.openchat.service.call.CallSessionGuard.isAnyCallActive() &&
+                        !com.msi.openchat.service.call.CallSessionCoordinator.isActive() &&
                         !com.msi.openchat.feature.videocall.VideoCallManager.isCallActive()
                     ) {
                         OpenChatNotificationManager.showIncomingVideoCallNotification(
@@ -95,8 +100,9 @@ class OpenChatFirebaseMessagingService : FirebaseMessagingService() {
                             callerName = callerName
                         )
                     }
-                } else if (callType == "audio" && !id.startsWith("vid_")) {
-                    if (!com.msi.openchat.feature.videocall.VideoCallManager.isCallActive() &&
+                } else if (id.isNotBlank() && !com.msi.openchat.service.call.CallSessionGuard.isVideoCall(id, callType)) {
+                    if (!com.msi.openchat.service.call.CallSessionGuard.isAnyCallActive() &&
+                        !com.msi.openchat.feature.videocall.VideoCallManager.isCallActive() &&
                         !com.msi.openchat.service.call.CallSessionCoordinator.isActive()
                     ) {
                         OpenChatNotificationManager.showIncomingCallNotification(
