@@ -114,28 +114,53 @@ class VideoCallService : Service() {
 
     private fun startForegroundWithNotification(peerName: String, duration: String, isMuted: Boolean) {
         val notification = buildOngoingNotification(peerName, duration, isMuted)
+        val hasCamera = androidx.core.content.ContextCompat.checkSelfPermission(
+            this,
+            android.Manifest.permission.CAMERA
+        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        val hasMic = androidx.core.content.ContextCompat.checkSelfPermission(
+            this,
+            android.Manifest.permission.RECORD_AUDIO
+        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+
+        var serviceType = 0
+        if (hasCamera) {
+            serviceType = serviceType or ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA
+        }
+        if (hasMic) {
+            serviceType = serviceType or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+        }
+
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                // Android 14+ requires declaring foregroundServiceType flags
-                startForeground(
-                    NOTIFICATION_ID,
-                    notification,
-                    ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA or
-                            ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE or
-                            ServiceInfo.FOREGROUND_SERVICE_TYPE_PHONE_CALL
-                )
+                if (serviceType == 0) {
+                    serviceType = ServiceInfo.FOREGROUND_SERVICE_TYPE_PHONE_CALL
+                }
+                startForeground(NOTIFICATION_ID, notification, serviceType)
             } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                startForeground(
-                    NOTIFICATION_ID,
-                    notification,
-                    ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA or
-                            ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
-                )
+                if (serviceType != 0) {
+                    startForeground(NOTIFICATION_ID, notification, serviceType)
+                } else {
+                    startForeground(NOTIFICATION_ID, notification)
+                }
             } else {
                 startForeground(NOTIFICATION_ID, notification)
             }
+        } catch (e: SecurityException) {
+            Log.w(tag, "startForeground permission/eligibility fallback triggered: ${e.message}")
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_PHONE_CALL)
+                } else {
+                    startForeground(NOTIFICATION_ID, notification)
+                }
+            } catch (fallbackEx: Exception) {
+                Log.e(tag, "startForeground fallback failed, stopping VideoCallService: ${fallbackEx.message}")
+                stopSelf()
+            }
         } catch (e: Exception) {
             Log.e(tag, "startForeground error: ${e.message}")
+            stopSelf()
         }
     }
 
