@@ -211,26 +211,35 @@ object OpenChatNotificationManager {
         )
         val fullScreenPendingIntent = PendingIntent.getActivity(
             context,
-            callId.hashCode(),
+            Constants.audioFullScreenRequestCode(callId),
             fullScreenIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        // 2. Accept Call Action (via CallActionReceiver)
-        val acceptIntent = Intent(context, CallActionReceiver::class.java).apply {
-            action = CallActionReceiver.ACTION_ACCEPT_CALL
-            putExtra(CallActionReceiver.EXTRA_CALL_ID, callId)
-            putExtra(CallActionReceiver.EXTRA_CALLER_ID, callerId)
-            putExtra(CallActionReceiver.EXTRA_CALLER_NAME, callerName)
-        }
-        val acceptPendingIntent = PendingIntent.getBroadcast(
-            context,
-            (callId + "_accept").hashCode(),
-            acceptIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        // 2. Accept Call Action -> starts OpenChatCallService foreground service directly (no Activity start)
+        val acceptIntent = com.msi.openchat.service.call.OpenChatCallService.createAcceptIntent(
+            context = context,
+            callId = callId,
+            contactId = callerId,
+            contactName = callerName
         )
+        val acceptPendingIntent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            PendingIntent.getForegroundService(
+                context,
+                Constants.audioAcceptRequestCode(callId),
+                acceptIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+        } else {
+            PendingIntent.getService(
+                context,
+                Constants.audioAcceptRequestCode(callId),
+                acceptIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+        }
 
-        // 3. Decline Call Action (via CallActionReceiver)
+        // 3. Decline Call Action (via CallActionReceiver with isolated request code)
         val declineIntent = Intent(context, CallActionReceiver::class.java).apply {
             action = CallActionReceiver.ACTION_DECLINE_CALL
             putExtra(CallActionReceiver.EXTRA_CALL_ID, callId)
@@ -238,7 +247,7 @@ object OpenChatNotificationManager {
         }
         val declinePendingIntent = PendingIntent.getBroadcast(
             context,
-            (callId + "_decline").hashCode(),
+            Constants.audioDeclineRequestCode(callId),
             declineIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
@@ -360,21 +369,21 @@ object OpenChatNotificationManager {
         )
         val fullScreenPendingIntent = PendingIntent.getActivity(
             context,
-            (callId + "_video").hashCode(),
+            Constants.videoFullScreenRequestCode(callId),
             fullScreenIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        // Accept Action via VideoCallActionReceiver (strictly isolated from audio)
-        val acceptIntent = Intent(context, com.msi.openchat.feature.videocall.VideoCallActionReceiver::class.java).apply {
-            action = com.msi.openchat.feature.videocall.VideoCallActionReceiver.ACTION_ACCEPT_VIDEO_CALL
-            putExtra(com.msi.openchat.feature.videocall.VideoCallActionReceiver.EXTRA_CALL_ID, callId)
-            putExtra(com.msi.openchat.feature.videocall.VideoCallActionReceiver.EXTRA_CALLER_ID, callerId)
-            putExtra(com.msi.openchat.feature.videocall.VideoCallActionReceiver.EXTRA_CALLER_NAME, callerName)
-        }
-        val acceptPendingIntent = PendingIntent.getBroadcast(
+        // Accept Action -> PendingIntent.getActivity launching VideoCallActivity directly with autoAccept=true (UNIQUE request code)
+        val acceptIntent = com.msi.openchat.feature.videocall.VideoCallActivity.createAutoAcceptIntent(
+            context = context,
+            callId = callId,
+            peerUserId = callerId,
+            peerName = callerName
+        )
+        val acceptPendingIntent = PendingIntent.getActivity(
             context,
-            (callId + "_v_accept").hashCode(),
+            Constants.videoAcceptRequestCode(callId),
             acceptIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
@@ -387,7 +396,7 @@ object OpenChatNotificationManager {
         }
         val declinePendingIntent = PendingIntent.getBroadcast(
             context,
-            (callId + "_v_decline").hashCode(),
+            Constants.videoDeclineRequestCode(callId),
             declineIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )

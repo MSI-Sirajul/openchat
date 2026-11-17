@@ -64,18 +64,19 @@ class WebRtcManager(
     private val tag = "OpenChatWebRtc"
     private val scope = CoroutineScope(Dispatchers.Default + Job())
 
-    // Dedicated single-threaded executor for all WebRTC operations
-    private val rtcExecutor = Executors.newSingleThreadExecutor { runnable ->
-        Thread(runnable, "OpenChat-WebRtc-Worker").apply {
-            priority = Thread.NORM_PRIORITY + 1
-        }
-    }
-
     companion object {
         @Volatile
         private var isFactoryInitialized = false
         private var sharedAdm: JavaAudioDeviceModule? = null
         private var sharedFactory: PeerConnectionFactory? = null
+
+        // Single shared worker across all WebRtcManager instances to strictly serialize
+        // PeerConnection creation, signaling, and teardown without cross-call races.
+        private val sharedRtcExecutor = Executors.newSingleThreadExecutor { runnable ->
+            Thread(runnable, "OpenChat-WebRtc-Worker").apply {
+                priority = Thread.NORM_PRIORITY + 1
+            }
+        }
 
         @Synchronized
         fun initializeWebRtc(context: Context) {
@@ -105,6 +106,34 @@ class WebRtcManager(
                             .setAudioSource(android.media.MediaRecorder.AudioSource.VOICE_COMMUNICATION)
                             .setUseStereoInput(false)
                             .setUseStereoOutput(false)
+                            .setAudioRecordErrorCallback(object : JavaAudioDeviceModule.AudioRecordErrorCallback {
+                                override fun onWebRtcAudioRecordInitError(errorMessage: String?) {
+                                    Log.e("OpenChatWebRtc", "AudioRecordInitError: $errorMessage")
+                                }
+                                override fun onWebRtcAudioRecordStartError(
+                                    errorCode: JavaAudioDeviceModule.AudioRecordStartErrorCode?,
+                                    errorMessage: String?
+                                ) {
+                                    Log.e("OpenChatWebRtc", "AudioRecordStartError($errorCode): $errorMessage")
+                                }
+                                override fun onWebRtcAudioRecordError(errorMessage: String?) {
+                                    Log.e("OpenChatWebRtc", "AudioRecordError: $errorMessage")
+                                }
+                            })
+                            .setAudioTrackErrorCallback(object : JavaAudioDeviceModule.AudioTrackErrorCallback {
+                                override fun onWebRtcAudioTrackInitError(errorMessage: String?) {
+                                    Log.e("OpenChatWebRtc", "AudioTrackInitError: $errorMessage")
+                                }
+                                override fun onWebRtcAudioTrackStartError(
+                                    errorCode: JavaAudioDeviceModule.AudioTrackStartErrorCode?,
+                                    errorMessage: String?
+                                ) {
+                                    Log.e("OpenChatWebRtc", "AudioTrackStartError($errorCode): $errorMessage")
+                                }
+                                override fun onWebRtcAudioTrackError(errorMessage: String?) {
+                                    Log.e("OpenChatWebRtc", "AudioTrackError: $errorMessage")
+                                }
+                            })
                             .createAudioDeviceModule()
                     } catch (t: Throwable) {
                         Log.w("OpenChatWebRtc", "Custom ADM init failed: ${t.message}, fallback to default", t)
@@ -125,6 +154,8 @@ class WebRtcManager(
             return sharedFactory
         }
     }
+
+    private val rtcExecutor get() = sharedRtcExecutor
 
     private var currentObserver: OpenChatPeerConnectionObserver? = null
     private var peerConnection: PeerConnection? = null
@@ -157,6 +188,9 @@ class WebRtcManager(
     private val isDisposed = java.util.concurrent.atomic.AtomicBoolean(false)
     private val teardownLock = Any()
 
+    @Volatile
+    private var isCallEnded = false
+
     init {
         getSharedFactory(context)
     }
@@ -182,8 +216,10 @@ class WebRtcManager(
     ) {
         executeOnRtcThread {
             try {
-                isDisposing.set(false)
-                isDisposed.set(false)
+                if (isCallEnded || isDisposing.get() || isDisposed.get()) {
+                    Log.w(tag, "startCall aborted: call already ended or disposed")
+                    return@executeOnRtcThread
+                }
                 audioSwitchManager.startCallAudio()
                 updateCallState(WebRtcCallState.CONNECTING)
 
@@ -693,6 +729,7 @@ class WebRtcManager(
     }
 
     fun endCall() {
+        isCallEnded = true
         if (isDisposed.get() || isDisposing.getAndSet(true)) {
             Log.d(tag, "endCall skipped: already disposing or disposed")
             return
@@ -720,31 +757,25 @@ class WebRtcManager(
                     pendingRemoteOffer = null
                     pendingOnAnswerCreated = null
 
-                    // 1. Disable and dispose local/remote audio tracks
+                    // 1. Mute tracks safely while native tracks are still valid (never dispose before PeerConnection!)
+                    val trackToDisposeIfUnattached = localAudioTrack
                     try {
                         localAudioTrack?.setEnabled(false)
-                        localAudioTrack?.dispose()
                     } catch (t: Throwable) {
-                        Log.w(tag, "Safe catch disposing localAudioTrack: ${t.message}")
+                        Log.w(tag, "Safe catch disabling localAudioTrack: ${t.message}")
                     }
                     localAudioTrack = null
 
                     try {
                         remoteAudioTrack?.setEnabled(false)
-                        remoteAudioTrack?.dispose()
                     } catch (t: Throwable) {
-                        Log.w(tag, "Safe catch disposing remoteAudioTrack: ${t.message}")
+                        Log.w(tag, "Safe catch disabling remoteAudioTrack: ${t.message}")
                     }
+                    // remoteAudioTrack is owned by PeerConnection's RtpReceiver; never manually dispose it
                     remoteAudioTrack = null
 
-                    try {
-                        localAudioSource?.dispose()
-                    } catch (t: Throwable) {
-                        Log.w(tag, "Safe catch disposing localAudioSource: ${t.message}")
-                    }
-                    localAudioSource = null
-
-                    // 2. Call peerConnection.close() BEFORE dispose()
+                    // 2. Call peerConnection.close() then peerConnection.dispose() BEFORE disposing localAudioSource.
+                    // PeerConnection.dispose() automatically disposes its RtpSenders/RtpReceivers and their tracks.
                     val pcToDispose = peerConnection
                     peerConnection = null
 
@@ -762,14 +793,28 @@ class WebRtcManager(
                             Thread.sleep(60)
                         } catch (_: InterruptedException) {}
 
-                        // 3. Dispose PeerConnection safely, exactly once
                         try {
                             Log.d(tag, "Disposing PeerConnection safely...")
                             pcToDispose.dispose()
                         } catch (t: Throwable) {
                             Log.w(tag, "Safe catch disposing PeerConnection: ${t.message}")
                         }
+                    } else {
+                        // Only dispose localAudioTrack manually if it was never attached to a PeerConnection
+                        try {
+                            trackToDisposeIfUnattached?.dispose()
+                        } catch (t: Throwable) {
+                            Log.w(tag, "Safe catch disposing unattached localAudioTrack: ${t.message}")
+                        }
                     }
+
+                    // 3. Dispose localAudioSource AFTER PeerConnection is fully disposed
+                    try {
+                        localAudioSource?.dispose()
+                    } catch (t: Throwable) {
+                        Log.w(tag, "Safe catch disposing localAudioSource: ${t.message}")
+                    }
+                    localAudioSource = null
 
                     // NOTE: The shared PeerConnectionFactory and JavaAudioDeviceModule are intentionally kept alive
                     // across calls. Repeatedly destroying and recreating the global PeerConnectionFactory causes

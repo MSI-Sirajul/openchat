@@ -215,6 +215,13 @@ class IncomingAudioCallActivity : AppCompatActivity() {
             ServiceLocator.callRepository.clearIncomingAudioCall(currentUid)
         }
 
+        com.msi.openchat.service.call.OpenChatCallService.acceptCallService(
+            context = applicationContext,
+            callId = callId,
+            contactId = callerId,
+            contactName = callerName
+        )
+
         val intent = ActiveAudioCallActivity.createIntent(
             context = this,
             callId = callId,

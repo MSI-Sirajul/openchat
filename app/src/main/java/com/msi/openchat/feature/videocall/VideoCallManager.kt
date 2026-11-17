@@ -144,6 +144,9 @@ object VideoCallManager {
     private val _uiState = MutableStateFlow(VideoCallUiState())
     val uiState: StateFlow<VideoCallUiState> = _uiState.asStateFlow()
 
+    @Volatile
+    var resumeActivityClassName: String = VideoCallActivity::class.java.name
+
     fun isCallActive(): Boolean {
         val s = _uiState.value.status
         return s !is VideoCallStatus.Idle && s !is VideoCallStatus.Ended
@@ -164,10 +167,7 @@ object VideoCallManager {
     private fun initPeerConnectionFactory(context: Context) {
         if (peerConnectionFactory != null) return
         try {
-            val options = PeerConnectionFactory.InitializationOptions.builder(context)
-                .setEnableInternalTracer(false)
-                .createInitializationOptions()
-            PeerConnectionFactory.initialize(options)
+            com.msi.openchat.service.call.WebRtcManager.initializeWebRtc(context)
 
             val isAecSupported = JavaAudioDeviceModule.isBuiltInAcousticEchoCancelerSupported()
             val isNsSupported = JavaAudioDeviceModule.isBuiltInNoiseSuppressorSupported()
@@ -451,6 +451,10 @@ object VideoCallManager {
             Log.w(TAG, "Blocked acceptIncomingCall: an audio call is active")
             return
         }
+        if (isCallActive() && _uiState.value.callId == callId) {
+            Log.d(TAG, "Video call $callId already active; skipping duplicate accept")
+            return
+        }
         resetStateJob?.cancel()
         isDisposing.set(false)
         initialize(context)
@@ -469,7 +473,11 @@ object VideoCallManager {
         )
 
         managerScope.launch {
-            signaling?.updateCallStatus(callId, "connecting")
+            val uid = ServiceLocator.sessionManager.getUserId().orEmpty()
+            if (uid.isNotBlank()) {
+                signaling?.clearIncomingVideoCall(uid)
+            }
+            signaling?.updateCallStatus(callId, "accepted")
             observeCallSession(callId, callerName)
             setupPeerConnection(isCaller = false, callId = callId, peerId = callerId)
         }
@@ -506,73 +514,95 @@ object VideoCallManager {
 
             peerConnection = factory.createPeerConnection(rtcConfig, object : PeerConnection.Observer {
                 override fun onSignalingChange(state: PeerConnection.SignalingState?) {
-                    Log.d(TAG, "SignalingState: $state")
+                    try {
+                        Log.d(TAG, "SignalingState: $state")
+                    } catch (_: Throwable) {}
                 }
 
                 override fun onIceConnectionChange(state: PeerConnection.IceConnectionState?) {
-                    Log.d(TAG, "IceConnectionState: $state")
-                    when (state) {
-                        PeerConnection.IceConnectionState.CONNECTED,
-                        PeerConnection.IceConnectionState.COMPLETED -> {
-                            timeoutJob?.cancel()
-                            managerScope.launch {
-                                signaling?.updateCallStatus(callId, "connected")
+                    try {
+                        Log.d(TAG, "IceConnectionState: $state")
+                        if (isDisposing.get()) return
+                        when (state) {
+                            PeerConnection.IceConnectionState.CONNECTED,
+                            PeerConnection.IceConnectionState.COMPLETED -> {
+                                timeoutJob?.cancel()
+                                managerScope.launch {
+                                    signaling?.updateCallStatus(callId, "connected")
+                                }
+                                _uiState.value = _uiState.value.copy(
+                                    status = VideoCallStatus.Connected(callId, _uiState.value.peerName),
+                                    isReconnecting = false
+                                )
+                                startDurationTimer()
                             }
-                            _uiState.value = _uiState.value.copy(
-                                status = VideoCallStatus.Connected(callId, _uiState.value.peerName),
-                                isReconnecting = false
-                            )
-                            startDurationTimer()
+                            PeerConnection.IceConnectionState.DISCONNECTED -> {
+                                _uiState.value = _uiState.value.copy(
+                                    isReconnecting = true,
+                                    status = VideoCallStatus.Reconnecting(callId, _uiState.value.peerName)
+                                )
+                            }
+                            PeerConnection.IceConnectionState.FAILED -> {
+                                managerScope.launch { endCall("Connection failed") }
+                            }
+                            PeerConnection.IceConnectionState.CLOSED -> {
+                                managerScope.launch { endCall("Call closed") }
+                            }
+                            else -> {}
                         }
-                        PeerConnection.IceConnectionState.DISCONNECTED -> {
-                            _uiState.value = _uiState.value.copy(
-                                isReconnecting = true,
-                                status = VideoCallStatus.Reconnecting(callId, _uiState.value.peerName)
-                            )
-                        }
-                        PeerConnection.IceConnectionState.FAILED -> {
-                            endCall("Connection failed")
-                        }
-                        PeerConnection.IceConnectionState.CLOSED -> {
-                            endCall("Call closed")
-                        }
-                        else -> {}
+                    } catch (t: Throwable) {
+                        Log.e(TAG, "onIceConnectionChange error: ${t.message}", t)
                     }
                 }
 
                 override fun onIceConnectionReceivingChange(receiving: Boolean) {}
 
                 override fun onIceGatheringChange(state: PeerConnection.IceGatheringState?) {
-                    Log.d(TAG, "IceGatheringState: $state")
+                    try {
+                        Log.d(TAG, "IceGatheringState: $state")
+                    } catch (_: Throwable) {}
                 }
 
                 override fun onIceCandidate(candidate: IceCandidate?) {
-                    if (candidate != null) {
+                    try {
+                        if (isDisposing.get() || candidate == null || candidate.sdp.isNullOrBlank()) return
                         managerScope.launch {
                             val payload = JSONObject().apply {
-                                put("sdpMid", candidate.sdpMid)
+                                put("sdpMid", candidate.sdpMid ?: "0")
                                 put("sdpMLineIndex", candidate.sdpMLineIndex)
                                 put("sdp", candidate.sdp)
                             }.toString()
                             signaling?.sendSignaling(callId, peerId, "ice_candidate", payload)
                         }
+                    } catch (t: Throwable) {
+                        Log.e(TAG, "onIceCandidate error: ${t.message}", t)
                     }
                 }
 
                 override fun onIceCandidatesRemoved(candidates: Array<out IceCandidate>?) {}
 
                 override fun onAddStream(stream: MediaStream?) {
-                    Log.d(TAG, "onAddStream with ${stream?.videoTracks?.size} video tracks")
-                    if (stream != null && stream.videoTracks.isNotEmpty()) {
-                        val videoTrack = stream.videoTracks[0]
-                        remoteVideoTrack = videoTrack
-                        remoteRenderer?.let { videoTrack.addSink(it) }
-                        _uiState.value = _uiState.value.copy(hasRemoteVideo = true)
+                    try {
+                        if (isDisposing.get() || stream == null) return
+                        Log.d(TAG, "onAddStream with ${stream.videoTracks.size} video tracks")
+                        if (stream.videoTracks.isNotEmpty()) {
+                            val videoTrack = stream.videoTracks[0]
+                            remoteVideoTrack = videoTrack
+                            val r = remoteRenderer
+                            if (r != null) {
+                                try { videoTrack.addSink(r) } catch (_: Throwable) {}
+                            }
+                            _uiState.value = _uiState.value.copy(hasRemoteVideo = true)
+                        }
+                    } catch (t: Throwable) {
+                        Log.e(TAG, "onAddStream error: ${t.message}", t)
                     }
                 }
 
                 override fun onRemoveStream(stream: MediaStream?) {
-                    _uiState.value = _uiState.value.copy(hasRemoteVideo = false)
+                    try {
+                        _uiState.value = _uiState.value.copy(hasRemoteVideo = false)
+                    } catch (_: Throwable) {}
                 }
 
                 override fun onDataChannel(channel: DataChannel?) {}
@@ -580,23 +610,41 @@ object VideoCallManager {
                 override fun onRenegotiationNeeded() {}
 
                 override fun onAddTrack(receiver: RtpReceiver?, streams: Array<out MediaStream>?) {
-                    val track = receiver?.track()
-                    Log.d(TAG, "onAddTrack: kind=${track?.kind()}")
-                    if (track is VideoTrack) {
-                        remoteVideoTrack = track
-                        remoteRenderer?.let { track.addSink(it) }
-                        _uiState.value = _uiState.value.copy(hasRemoteVideo = true)
-                    } else if (track is AudioTrack) {
-                        remoteAudioTrack = track
+                    try {
+                        if (isDisposing.get()) return
+                        val track = receiver?.track()
+                        Log.d(TAG, "onAddTrack: kind=${track?.kind()}")
+                        if (track is VideoTrack) {
+                            remoteVideoTrack = track
+                            val r = remoteRenderer
+                            if (r != null) {
+                                try { track.addSink(r) } catch (_: Throwable) {}
+                            }
+                            _uiState.value = _uiState.value.copy(hasRemoteVideo = true)
+                        } else if (track is AudioTrack) {
+                            remoteAudioTrack = track
+                        }
+                    } catch (t: Throwable) {
+                        Log.e(TAG, "onAddTrack error: ${t.message}", t)
                     }
                 }
 
                 override fun onTrack(transceiver: RtpTransceiver?) {
-                    val track = transceiver?.receiver?.track()
-                    if (track is VideoTrack) {
-                        remoteVideoTrack = track
-                        remoteRenderer?.let { track.addSink(it) }
-                        _uiState.value = _uiState.value.copy(hasRemoteVideo = true)
+                    try {
+                        if (isDisposing.get()) return
+                        val track = transceiver?.receiver?.track()
+                        if (track is VideoTrack) {
+                            remoteVideoTrack = track
+                            val r = remoteRenderer
+                            if (r != null) {
+                                try { track.addSink(r) } catch (_: Throwable) {}
+                            }
+                            _uiState.value = _uiState.value.copy(hasRemoteVideo = true)
+                        } else if (track is AudioTrack) {
+                            remoteAudioTrack = track
+                        }
+                    } catch (t: Throwable) {
+                        Log.e(TAG, "onTrack error: ${t.message}", t)
                     }
                 }
             })
@@ -623,21 +671,32 @@ object VideoCallManager {
 
         peerConnection?.createOffer(object : SdpObserver {
             override fun onCreateSuccess(desc: SessionDescription?) {
-                if (desc == null) return
-                peerConnection?.setLocalDescription(object : SdpObserver {
-                    override fun onCreateSuccess(p0: SessionDescription?) {}
-                    override fun onSetSuccess() {
-                        managerScope.launch {
-                            val payload = JSONObject().apply {
-                                put("type", desc.type.canonicalForm())
-                                put("sdp", desc.description)
-                            }.toString()
-                            signaling?.sendSignaling(callId, peerId, "offer", payload)
-                        }
+                try {
+                    if (desc == null || isDisposing.get()) return
+                    runOnRtc {
+                        if (isDisposing.get()) return@runOnRtc
+                        peerConnection?.setLocalDescription(object : SdpObserver {
+                            override fun onCreateSuccess(p0: SessionDescription?) {}
+                            override fun onSetSuccess() {
+                                try {
+                                    managerScope.launch {
+                                        val payload = JSONObject().apply {
+                                            put("type", desc.type.canonicalForm())
+                                            put("sdp", desc.description)
+                                        }.toString()
+                                        signaling?.sendSignaling(callId, peerId, "offer", payload)
+                                    }
+                                } catch (t: Throwable) {
+                                    Log.e(TAG, "onSetSuccess offer error: ${t.message}", t)
+                                }
+                            }
+                            override fun onCreateFailure(err: String?) { Log.e(TAG, "setLocalDescription failed: $err") }
+                            override fun onSetFailure(err: String?) { Log.e(TAG, "setLocalDescription failed: $err") }
+                        }, desc)
                     }
-                    override fun onCreateFailure(err: String?) { Log.e(TAG, "setLocalDescription failed: $err") }
-                    override fun onSetFailure(err: String?) { Log.e(TAG, "setLocalDescription failed: $err") }
-                }, desc)
+                } catch (t: Throwable) {
+                    Log.e(TAG, "createOffer onCreateSuccess error: ${t.message}", t)
+                }
             }
             override fun onSetSuccess() {}
             override fun onCreateFailure(err: String?) { Log.e(TAG, "createOffer failed: $err") }
@@ -653,21 +712,32 @@ object VideoCallManager {
 
         peerConnection?.createAnswer(object : SdpObserver {
             override fun onCreateSuccess(desc: SessionDescription?) {
-                if (desc == null) return
-                peerConnection?.setLocalDescription(object : SdpObserver {
-                    override fun onCreateSuccess(p0: SessionDescription?) {}
-                    override fun onSetSuccess() {
-                        managerScope.launch {
-                            val payload = JSONObject().apply {
-                                put("type", desc.type.canonicalForm())
-                                put("sdp", desc.description)
-                            }.toString()
-                            signaling?.sendSignaling(callId, peerId, "answer", payload)
-                        }
+                try {
+                    if (desc == null || isDisposing.get()) return
+                    runOnRtc {
+                        if (isDisposing.get()) return@runOnRtc
+                        peerConnection?.setLocalDescription(object : SdpObserver {
+                            override fun onCreateSuccess(p0: SessionDescription?) {}
+                            override fun onSetSuccess() {
+                                try {
+                                    managerScope.launch {
+                                        val payload = JSONObject().apply {
+                                            put("type", desc.type.canonicalForm())
+                                            put("sdp", desc.description)
+                                        }.toString()
+                                        signaling?.sendSignaling(callId, peerId, "answer", payload)
+                                    }
+                                } catch (t: Throwable) {
+                                    Log.e(TAG, "onSetSuccess answer error: ${t.message}", t)
+                                }
+                            }
+                            override fun onCreateFailure(err: String?) { Log.e(TAG, "setLocalDescription answer failed: $err") }
+                            override fun onSetFailure(err: String?) { Log.e(TAG, "setLocalDescription answer failed: $err") }
+                        }, desc)
                     }
-                    override fun onCreateFailure(err: String?) { Log.e(TAG, "setLocalDescription answer failed: $err") }
-                    override fun onSetFailure(err: String?) { Log.e(TAG, "setLocalDescription answer failed: $err") }
-                }, desc)
+                } catch (t: Throwable) {
+                    Log.e(TAG, "createAnswer onCreateSuccess error: ${t.message}", t)
+                }
             }
             override fun onSetSuccess() {}
             override fun onCreateFailure(err: String?) { Log.e(TAG, "createAnswer failed: $err") }
@@ -687,6 +757,7 @@ object VideoCallManager {
 
     private fun handleSignalingMessage(msg: CallSignalingMessage) {
         runOnRtc {
+            if (isDisposing.get()) return@runOnRtc
             try {
                 when (msg.type) {
                     "offer" -> {
@@ -697,9 +768,16 @@ object VideoCallManager {
                         peerConnection?.setRemoteDescription(object : SdpObserver {
                             override fun onCreateSuccess(p0: SessionDescription?) {}
                             override fun onSetSuccess() {
-                                isRemoteDescriptionSet = true
-                                drainPendingCandidates()
-                                createAnswer(msg.callId, msg.senderId)
+                                runOnRtc {
+                                    try {
+                                        if (isDisposing.get()) return@runOnRtc
+                                        isRemoteDescriptionSet = true
+                                        drainPendingCandidates()
+                                        createAnswer(msg.callId, msg.senderId)
+                                    } catch (t: Throwable) {
+                                        Log.e(TAG, "offer post-set error: ${t.message}", t)
+                                    }
+                                }
                             }
                             override fun onCreateFailure(err: String?) {}
                             override fun onSetFailure(err: String?) {
@@ -715,8 +793,15 @@ object VideoCallManager {
                         peerConnection?.setRemoteDescription(object : SdpObserver {
                             override fun onCreateSuccess(p0: SessionDescription?) {}
                             override fun onSetSuccess() {
-                                isRemoteDescriptionSet = true
-                                drainPendingCandidates()
+                                runOnRtc {
+                                    try {
+                                        if (isDisposing.get()) return@runOnRtc
+                                        isRemoteDescriptionSet = true
+                                        drainPendingCandidates()
+                                    } catch (t: Throwable) {
+                                        Log.e(TAG, "answer post-set error: ${t.message}", t)
+                                    }
+                                }
                             }
                             override fun onCreateFailure(err: String?) {}
                             override fun onSetFailure(err: String?) {
@@ -726,15 +811,18 @@ object VideoCallManager {
                     }
                     "ice_candidate" -> {
                         val json = JSONObject(msg.payload)
-                        val candidate = IceCandidate(
-                            json.getString("sdpMid"),
-                            json.getInt("sdpMLineIndex"),
-                            json.getString("sdp")
-                        )
-                        if (isRemoteDescriptionSet && peerConnection != null) {
-                            peerConnection?.addIceCandidate(candidate)
-                        } else {
-                            pendingRemoteCandidates.add(candidate)
+                        val sdpStr = json.optString("sdp")
+                        if (sdpStr.isNotBlank()) {
+                            val candidate = IceCandidate(
+                                json.optString("sdpMid").ifBlank { "0" },
+                                json.optInt("sdpMLineIndex", 0).coerceAtLeast(0),
+                                sdpStr
+                            )
+                            if (isRemoteDescriptionSet && peerConnection != null) {
+                                peerConnection?.addIceCandidate(candidate)
+                            } else {
+                                pendingRemoteCandidates.add(candidate)
+                            }
                         }
                     }
                     "bye" -> {
@@ -819,8 +907,15 @@ object VideoCallManager {
     fun toggleMute() {
         val currentMuted = _uiState.value.isMicMuted
         val newMuted = !currentMuted
-        localAudioTrack?.setEnabled(!newMuted)
         _uiState.value = _uiState.value.copy(isMicMuted = newMuted)
+        runOnRtc {
+            if (isDisposing.get()) return@runOnRtc
+            try {
+                localAudioTrack?.setEnabled(!newMuted)
+            } catch (t: Throwable) {
+                Log.w(TAG, "toggleMute failed safely: ${t.message}")
+            }
+        }
     }
 
     /**
@@ -829,24 +924,40 @@ object VideoCallManager {
     fun toggleCamera() {
         val currentEnabled = _uiState.value.isCameraEnabled
         val newEnabled = !currentEnabled
-        localVideoTrack?.setEnabled(newEnabled)
         _uiState.value = _uiState.value.copy(isCameraEnabled = newEnabled)
+        runOnRtc {
+            if (isDisposing.get()) return@runOnRtc
+            try {
+                localVideoTrack?.setEnabled(newEnabled)
+            } catch (t: Throwable) {
+                Log.w(TAG, "toggleCamera failed safely: ${t.message}")
+            }
+        }
     }
 
     /**
      * Flip camera front <-> back
      */
     fun switchCamera() {
-        videoCapturer?.switchCamera(object : CameraVideoCapturer.CameraSwitchHandler {
-            override fun onCameraSwitchDone(isFront: Boolean) {
-                _uiState.value = _uiState.value.copy(isFrontCamera = isFront)
-                localRenderer?.setMirror(isFront)
-            }
+        runOnRtc {
+            if (isDisposing.get()) return@runOnRtc
+            try {
+                videoCapturer?.switchCamera(object : CameraVideoCapturer.CameraSwitchHandler {
+                    override fun onCameraSwitchDone(isFront: Boolean) {
+                        _uiState.value = _uiState.value.copy(isFrontCamera = isFront)
+                        try {
+                            localRenderer?.setMirror(isFront)
+                        } catch (_: Throwable) {}
+                    }
 
-            override fun onCameraSwitchError(errorDescription: String?) {
-                Log.w(TAG, "Failed to switch camera: $errorDescription")
+                    override fun onCameraSwitchError(errorDescription: String?) {
+                        Log.w(TAG, "Failed to switch camera: $errorDescription")
+                    }
+                })
+            } catch (t: Throwable) {
+                Log.w(TAG, "switchCamera failed safely: ${t.message}")
             }
-        })
+        }
     }
 
     /**
@@ -928,11 +1039,26 @@ object VideoCallManager {
         detachRenderers()
 
         runOnRtc {
-            try {
-                peerConnection?.close()
-                peerConnection?.dispose()
-            } catch (_: Exception) {}
+            val unattachedVideoTrack = localVideoTrack
+            val unattachedAudioTrack = localAudioTrack
+            try { localVideoTrack?.setEnabled(false) } catch (_: Exception) {}
+            try { remoteVideoTrack?.setEnabled(false) } catch (_: Exception) {}
+            try { localAudioTrack?.setEnabled(false) } catch (_: Exception) {}
+            localVideoTrack = null
+            remoteVideoTrack = null
+            localAudioTrack = null
+            remoteAudioTrack = null
+
+            val pcToDispose = peerConnection
             peerConnection = null
+            if (pcToDispose != null) {
+                try { pcToDispose.close() } catch (_: Exception) {}
+                try { Thread.sleep(50) } catch (_: InterruptedException) {}
+                try { pcToDispose.dispose() } catch (_: Exception) {}
+            } else {
+                try { unattachedVideoTrack?.dispose() } catch (_: Exception) {}
+                try { unattachedAudioTrack?.dispose() } catch (_: Exception) {}
+            }
 
             try {
                 surfaceTextureHelper?.stopListening()
@@ -950,27 +1076,9 @@ object VideoCallManager {
             surfaceTextureHelper = null
 
             try {
-                localVideoTrack?.setEnabled(false)
-                localVideoTrack?.dispose()
-            } catch (_: Exception) {}
-            localVideoTrack = null
-
-            try {
-                remoteVideoTrack?.setEnabled(false)
-            } catch (_: Exception) {}
-            remoteVideoTrack = null
-
-            try {
                 videoSource?.dispose()
             } catch (_: Exception) {}
             videoSource = null
-
-            try {
-                localAudioTrack?.setEnabled(false)
-                localAudioTrack?.dispose()
-            } catch (_: Exception) {}
-            localAudioTrack = null
-            remoteAudioTrack = null
 
             try {
                 audioSource?.dispose()

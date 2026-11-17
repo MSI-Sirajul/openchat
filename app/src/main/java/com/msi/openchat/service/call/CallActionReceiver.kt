@@ -30,6 +30,7 @@ class CallActionReceiver : BroadcastReceiver() {
         const val ACTION_DECLINE_CALL = "com.msi.openchat.action.DECLINE_CALL"
         const val ACTION_END_CALL = "com.msi.openchat.action.END_CALL"
         const val ACTION_TOGGLE_SPEAKER = "com.msi.openchat.action.TOGGLE_SPEAKER"
+        const val ACTION_TOGGLE_MUTE = "com.msi.openchat.action.TOGGLE_MUTE"
         const val ACTION_DISMISS_INCOMING_UI = "com.msi.openchat.action.DISMISS_INCOMING_UI"
 
         const val EXTRA_CALL_ID = "extra_call_id"
@@ -99,35 +100,13 @@ class CallActionReceiver : BroadcastReceiver() {
                     putExtra(EXTRA_CALL_ID, callId)
                 })
 
-                CoroutineScope(Dispatchers.IO).launch {
-                    try {
-                        ServiceLocator.initialize(context.applicationContext)
-                        val currentUid = FirebaseManager.auth.currentUser?.uid ?: ServiceLocator.sessionManager.getUserId()
-                        if (!currentUid.isNullOrBlank()) {
-                            ServiceLocator.callRepository.clearIncomingAudioCall(currentUid)
-                        }
-                    } catch (_: Exception) {}
-                }
-
-                // Start foreground call service only if RECORD_AUDIO permission is already granted;
-                // otherwise ActiveAudioCallActivity requests permission first to prevent Android 14+ FGS SecurityException.
-                val hasMicPermission = ContextCompat.checkSelfPermission(
-                    context,
-                    Manifest.permission.RECORD_AUDIO
-                ) == PackageManager.PERMISSION_GRANTED
-                if (hasMicPermission) {
-                    OpenChatCallService.startCallService(context, callId, callerName)
-                }
-
-                // Launch ActiveAudioCallActivity directly
-                val launchIntent = com.msi.openchat.feature.calls.ActiveAudioCallActivity.createIntent(
-                    context = context,
+                // Connect audio immediately inside OpenChatCallService in background — NO Activity start
+                OpenChatCallService.acceptCallService(
+                    context = context.applicationContext,
                     callId = callId,
                     contactId = callerId,
-                    contactName = callerName,
-                    isIncoming = true
+                    contactName = callerName
                 )
-                context.startActivity(launchIntent)
             }
 
             ACTION_END_CALL -> {
@@ -139,6 +118,11 @@ class CallActionReceiver : BroadcastReceiver() {
             ACTION_TOGGLE_SPEAKER -> {
                 Log.i(tag, "Toggling speakerphone via CallSessionCoordinator")
                 CallSessionCoordinator.toggleSpeaker()
+            }
+
+            ACTION_TOGGLE_MUTE -> {
+                Log.i(tag, "Toggling mute via CallSessionCoordinator")
+                CallSessionCoordinator.toggleMute()
             }
         }
     }

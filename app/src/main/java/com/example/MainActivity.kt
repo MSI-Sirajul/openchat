@@ -366,6 +366,14 @@ class MainActivity : AppCompatActivity() {
             }
         }
         lastBackgroundTimestamp = 0L
+
+        val activeAudioCallId = com.msi.openchat.service.call.CallSessionCoordinator.currentCallId.value
+        if (com.msi.openchat.service.call.CallSessionCoordinator.isActive() &&
+            !activeAudioCallId.isNullOrBlank() &&
+            !com.msi.openchat.service.call.CallSessionCoordinator.hasPresentedUiFor(activeAudioCallId)
+        ) {
+            startActivity(com.msi.openchat.feature.calls.ActiveAudioCallActivity.createResumeIntent(this))
+        }
     }
 
     override fun onResume() {
@@ -449,10 +457,19 @@ class MainActivity : AppCompatActivity() {
                     intent.getBooleanExtra("is_already_answered", false)
 
             if (isAnswered) {
-                val uid = com.msi.openchat.data.remote.firebase.FirebaseManager.auth.currentUser?.uid
-                    ?: ServiceLocator.sessionManager.getUserId()
-                if (!uid.isNullOrBlank()) {
-                    ServiceLocator.callRepository.clearIncomingAudioCall(uid)
+                if (action == OpenChatNotificationManager.ACTION_ACCEPT_CALL) {
+                    com.msi.openchat.service.call.OpenChatCallService.acceptCallService(
+                        context = this,
+                        callId = incomingCallId,
+                        contactId = incomingCallerId,
+                        contactName = incomingCallerName
+                    )
+                } else {
+                    val uid = com.msi.openchat.data.remote.firebase.FirebaseManager.auth.currentUser?.uid
+                        ?: ServiceLocator.sessionManager.getUserId()
+                    if (!uid.isNullOrBlank()) {
+                        ServiceLocator.callRepository.clearIncomingAudioCall(uid)
+                    }
                 }
                 val activeIntent = com.msi.openchat.feature.calls.ActiveAudioCallActivity.createIntent(
                     context = this,

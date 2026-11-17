@@ -2,9 +2,11 @@ package com.msi.openchat.feature.videocall
 
 import android.Manifest
 import android.annotation.SuppressLint
-import android.app.PictureInPictureParams
+import android.app.KeyguardManager
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.ServiceConnection
 import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.hardware.Sensor
@@ -13,13 +15,14 @@ import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.os.Build
 import android.os.Bundle
+import android.os.IBinder
 import android.os.PowerManager
 import android.util.Log
-import android.util.Rational
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
 import android.widget.Toast
+import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
@@ -35,15 +38,32 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 /**
- * Full-screen edge-to-edge Active Video Call Activity
- * Hosts full-screen remote video, draggable local self-view preview,
- * Picture-in-Picture (PiP), proximity detection, and call controls.
+ * Full-screen edge-to-edge Active Video Call Activity.
+ * Binds to VideoCallService (which owns WebRTC + foreground notification),
+ * renders local & remote streams, and enters 16:9 Picture-in-Picture on Back / leave.
  */
 class ActiveVideoCallActivity : AppCompatActivity(), SensorEventListener {
     private val tag = "OpenChat_ActiveVideo"
 
     private lateinit var binding: ActivityActiveVideoCallBinding
-    private val repository = VideoCallRepository()
+    private var videoService: VideoCallService? = null
+    private var isServiceBound = false
+
+    private val serviceConnection = object : ServiceConnection {
+        override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
+            val binder = service as? VideoCallService.LocalBinder ?: return
+            videoService = binder.getService()
+            isServiceBound = true
+            if (sessionStarted && !isFinishing && hasCameraAndMicPermissions()) {
+                attachRenderers()
+            }
+        }
+
+        override fun onServiceDisconnected(name: ComponentName?) {
+            videoService = null
+            isServiceBound = false
+        }
+    }
 
     private var sensorManager: SensorManager? = null
     private var proximitySensor: Sensor? = null
@@ -75,9 +95,9 @@ class ActiveVideoCallActivity : AppCompatActivity(), SensorEventListener {
         } else {
             Toast.makeText(this, "Camera and microphone permissions are required for video calls", Toast.LENGTH_SHORT).show()
             if (isIncoming && callId.isNotBlank()) {
-                repository.declineIncomingCall(this, callId, peerId)
+                VideoCallManager.declineIncomingCall(applicationContext, callId, peerId)
             } else {
-                repository.endCall("Permissions denied")
+                VideoCallManager.endCall("Permissions denied")
             }
             finish()
         }
@@ -99,7 +119,9 @@ class ActiveVideoCallActivity : AppCompatActivity(), SensorEventListener {
             return Intent(context, ActiveVideoCallActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
                 putExtra(EXTRA_CALL_ID, callId)
+                putExtra("callId", callId)
                 putExtra(EXTRA_PEER_ID, peerId)
+                putExtra("peerUserId", peerId)
                 putExtra(EXTRA_PEER_NAME, peerName)
                 putExtra(EXTRA_IS_INCOMING, isIncoming)
             }
@@ -114,38 +136,107 @@ class ActiveVideoCallActivity : AppCompatActivity(), SensorEventListener {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val currentState = repository.callState.value
-        callId = intent.getStringExtra(EXTRA_CALL_ID).orEmpty().ifBlank { currentState.callId }
-        peerId = intent.getStringExtra(EXTRA_PEER_ID).orEmpty().ifBlank { currentState.peerId }
+        VideoCallManager.initialize(applicationContext)
+        VideoCallManager.resumeActivityClassName = ActiveVideoCallActivity::class.java.name
+
+        val currentState = VideoCallManager.uiState.value
+        callId = intent.getStringExtra(EXTRA_CALL_ID)?.ifBlank { null }
+            ?: intent.getStringExtra("callId")?.ifBlank { null }
+            ?: currentState.callId
+        peerId = intent.getStringExtra(EXTRA_PEER_ID)?.ifBlank { null }
+            ?: intent.getStringExtra("peerUserId")?.ifBlank { null }
+            ?: currentState.peerId
         peerName = intent.getStringExtra(EXTRA_PEER_NAME)?.takeIf { it.isNotBlank() }
             ?: currentState.peerName.ifBlank { "OpenChat Contact" }
-        isIncoming = intent.getBooleanExtra(EXTRA_IS_INCOMING, false)
+        isIncoming = intent.getBooleanExtra(EXTRA_IS_INCOMING, false) ||
+            intent.getBooleanExtra("autoAccept", false)
 
         if (callId.startsWith("aud_") || CallSessionCoordinator.isActive()) {
             finish()
             return
         }
 
-        WindowCompat.setDecorFitsSystemWindows(window, false)
-        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        setupWindowAndLockScreen()
 
         binding = ActivityActiveVideoCallBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
         setupEdgeToEdge()
         setupSensors()
+        setupBackNavigation()
+        bindVideoService()
         observeState()
 
-        val hasCam = ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
-        val hasMic = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
-        if (hasCam && hasMic) {
+        if (hasCameraAndMicPermissions()) {
             startVideoCallSession()
         } else {
             val missing = mutableListOf<String>()
-            if (!hasCam) missing.add(Manifest.permission.CAMERA)
-            if (!hasMic) missing.add(Manifest.permission.RECORD_AUDIO)
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+                missing.add(Manifest.permission.CAMERA)
+            }
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                missing.add(Manifest.permission.RECORD_AUDIO)
+            }
             videoPermissionLauncher.launch(missing.toTypedArray())
         }
+    }
+
+    private fun setupWindowAndLockScreen() {
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+            setShowWhenLocked(true)
+            setTurnScreenOn(true)
+            val km = getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager
+            km?.requestDismissKeyguard(this, null)
+        } else {
+            @Suppress("DEPRECATION")
+            window.addFlags(
+                WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
+                    WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD or
+                    WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
+            )
+        }
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+    }
+
+    private fun setupBackNavigation() {
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                if (!isInPictureInPictureMode && isCallPipEligible()) {
+                    val entered = enterPipMode()
+                    if (entered) return
+                }
+                if (isCallPipEligible()) {
+                    moveTaskToBack(true)
+                    return
+                }
+                releaseRenderers()
+                videoService?.endCall("Call ended") ?: VideoCallManager.endCall("Call ended")
+                finish()
+            }
+        })
+    }
+
+    private fun isCallPipEligible(): Boolean {
+        val status = VideoCallManager.uiState.value.status
+        return status is VideoCallStatus.Connected ||
+            status is VideoCallStatus.Connecting ||
+            status is VideoCallStatus.Reconnecting
+    }
+
+    private fun bindVideoService() {
+        if (isServiceBound) return
+        try {
+            bindService(VideoCallService.bindIntent(this), serviceConnection, Context.BIND_AUTO_CREATE)
+        } catch (e: Exception) {
+            Log.w(tag, "Unable to bind VideoCallService: ${e.message}")
+        }
+    }
+
+    private fun hasCameraAndMicPermissions(): Boolean {
+        val hasCam = ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+        val hasMic = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+        return hasCam && hasMic
     }
 
     private fun startVideoCallSession() {
@@ -154,9 +245,14 @@ class ActiveVideoCallActivity : AppCompatActivity(), SensorEventListener {
         setupViews()
         setupDraggablePreview()
 
-        // If arriving from an incoming video call accept, connect to the video call
         if (isIncoming && callId.isNotBlank()) {
-            repository.acceptIncomingCall(this, callId, peerId, peerName)
+            VideoCallService.startAndAcceptCall(
+                context = this,
+                callId = callId,
+                peerUserId = peerId,
+                peerName = peerName,
+                targetActivityClass = ActiveVideoCallActivity::class.java.name
+            )
         }
     }
 
@@ -189,18 +285,24 @@ class ActiveVideoCallActivity : AppCompatActivity(), SensorEventListener {
     }
 
     private fun attachRenderers() {
-        if (!localRendererAttached && binding.cardLocalPreview.visibility == View.VISIBLE) {
-            repository.attachLocalRenderer(binding.localVideoView)
+        if (!hasCameraAndMicPermissions()) return
+        val inPip = Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && isInPictureInPictureMode
+        if (!inPip && !localRendererAttached && binding.cardLocalPreview.visibility == View.VISIBLE) {
+            videoService?.attachLocalRenderer(binding.localVideoView)
+                ?: VideoCallManager.attachLocalRenderer(binding.localVideoView)
             localRendererAttached = true
         }
         if (!remoteRendererAttached) {
-            repository.attachRemoteRenderer(binding.remoteVideoView)
+            videoService?.attachRemoteRenderer(binding.remoteVideoView)
+                ?: VideoCallManager.attachRemoteRenderer(binding.remoteVideoView)
             remoteRendererAttached = true
         }
     }
 
     private fun releaseLocalRenderer() {
-        try { repository.detachLocalRenderer() } catch (_: Exception) {}
+        try {
+            videoService?.detachLocalRenderer() ?: VideoCallManager.detachLocalRenderer()
+        } catch (_: Exception) {}
         if (localRendererAttached) {
             localRendererAttached = false
             try { binding.localVideoView.release() } catch (_: Exception) {}
@@ -208,7 +310,9 @@ class ActiveVideoCallActivity : AppCompatActivity(), SensorEventListener {
     }
 
     private fun releaseRenderers() {
-        try { repository.detachRenderers() } catch (_: Exception) {}
+        try {
+            videoService?.detachRenderers() ?: VideoCallManager.detachRenderers()
+        } catch (_: Exception) {}
         if (localRendererAttached) {
             localRendererAttached = false
             try { binding.localVideoView.release() } catch (_: Exception) {}
@@ -220,35 +324,32 @@ class ActiveVideoCallActivity : AppCompatActivity(), SensorEventListener {
     }
 
     private fun setupViews() {
-        // Attach WebRTC SurfaceViewRenderers
         binding.localVideoView.setZOrderMediaOverlay(true)
         attachRenderers()
 
-        // Minimize / PiP
         binding.btnMinimize.setOnClickListener {
             enterPipMode()
         }
 
-        // Controls
         binding.btnMute.setOnClickListener {
-            repository.toggleMute()
+            videoService?.toggleMute() ?: VideoCallManager.toggleMute()
         }
 
         binding.btnCameraToggle.setOnClickListener {
-            repository.toggleCamera()
+            videoService?.toggleCamera() ?: VideoCallManager.toggleCamera()
         }
 
         binding.btnSwitchCamera.setOnClickListener {
-            repository.switchCamera()
+            videoService?.switchCamera() ?: VideoCallManager.switchCamera()
         }
 
         binding.btnSpeaker.setOnClickListener {
-            repository.toggleSpeaker()
+            videoService?.toggleSpeaker() ?: VideoCallManager.toggleSpeaker()
         }
 
         binding.btnEndCall.setOnClickListener {
             releaseRenderers()
-            repository.endCall("Call ended by user")
+            videoService?.endCall("Call ended by user") ?: VideoCallManager.endCall("Call ended by user")
             finish()
         }
 
@@ -278,8 +379,8 @@ class ActiveVideoCallActivity : AppCompatActivity(), SensorEventListener {
                     var newX = initialCardX + dx
                     var newY = initialCardY + dy
 
-                    newX = newX.coerceIn(0f, parentWidth - cardWidth)
-                    newY = newY.coerceIn(0f, parentHeight - cardHeight)
+                    newX = newX.coerceIn(0f, (parentWidth - cardWidth).coerceAtLeast(0f))
+                    newY = newY.coerceIn(0f, (parentHeight - cardHeight).coerceAtLeast(0f))
 
                     view.x = newX
                     view.y = newY
@@ -293,7 +394,7 @@ class ActiveVideoCallActivity : AppCompatActivity(), SensorEventListener {
                     val targetX = if (centerX < (parentWidth / 2f)) {
                         16f * resources.displayMetrics.density
                     } else {
-                        parentWidth - cardWidth - (16f * resources.displayMetrics.density)
+                        (parentWidth - cardWidth - (16f * resources.displayMetrics.density)).coerceAtLeast(0f)
                     }
 
                     view.animate()
@@ -309,17 +410,17 @@ class ActiveVideoCallActivity : AppCompatActivity(), SensorEventListener {
 
     private fun observeState() {
         lifecycleScope.launch {
-            repository.callState.collectLatest { state ->
+            VideoCallManager.uiState.collectLatest { state ->
                 updateUiForState(state)
             }
         }
     }
 
     private fun updateUiForState(state: VideoCallUiState) {
+        val inPip = Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && isInPictureInPictureMode
         binding.textPeerName.text = state.peerName.ifBlank { peerName }
         binding.textCallTimer.text = state.formattedDuration
 
-        // Microphone mute
         if (state.isMicMuted) {
             binding.btnMute.setImageResource(R.drawable.ic_mic_off_24)
             binding.btnMute.setColorFilter(0xFFFF8A80.toInt())
@@ -328,7 +429,6 @@ class ActiveVideoCallActivity : AppCompatActivity(), SensorEventListener {
             binding.btnMute.setColorFilter(0xFFFFFFFF.toInt())
         }
 
-        // Camera toggle
         if (state.isCameraEnabled) {
             binding.btnCameraToggle.setImageResource(R.drawable.ic_camera_24)
             binding.btnCameraToggle.setColorFilter(0xFFFFFFFF.toInt())
@@ -339,7 +439,6 @@ class ActiveVideoCallActivity : AppCompatActivity(), SensorEventListener {
             binding.layoutLocalCameraOff.visibility = View.VISIBLE
         }
 
-        // Speakerphone
         if (state.isSpeakerOn) {
             binding.btnSpeaker.setImageResource(R.drawable.ic_volume_up_24)
             binding.btnSpeaker.setColorFilter(0xFFFFFFFF.toInt())
@@ -348,10 +447,13 @@ class ActiveVideoCallActivity : AppCompatActivity(), SensorEventListener {
             binding.btnSpeaker.setColorFilter(0xFFB0BEC5.toInt())
         }
 
-        // Reconnecting overlay
-        binding.textReconnectingBanner.visibility = if (state.isReconnecting) View.VISIBLE else View.GONE
+        binding.textReconnectingBanner.visibility =
+            if (!inPip && state.isReconnecting) View.VISIBLE else View.GONE
 
-        // Remote video visibility
+        if (inPip) {
+            VideoCallPipHelper.updateParamsIfInPip(this, binding.remoteVideoView, state.isMicMuted)
+        }
+
         if (state.hasRemoteVideo) {
             binding.layoutRemotePlaceholder.visibility = View.GONE
         } else {
@@ -367,28 +469,22 @@ class ActiveVideoCallActivity : AppCompatActivity(), SensorEventListener {
         }
     }
 
-    private fun enterPipMode() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            try {
-                val params = PictureInPictureParams.Builder()
-                    .setAspectRatio(Rational(9, 16))
-                    .build()
-                enterPictureInPictureMode(params)
-            } catch (e: Exception) {
-                Log.w(tag, "PiP entry failed: ${e.message}")
-            }
-        }
+    private fun enterPipMode(): Boolean {
+        val isMuted = VideoCallManager.uiState.value.isMicMuted
+        return VideoCallPipHelper.enterPip(this, binding.remoteVideoView, isMuted)
     }
 
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()
-        val state = repository.callState.value
-        if (state.status is VideoCallStatus.Connected) {
+        if (!isInPictureInPictureMode && isCallPipEligible()) {
             enterPipMode()
         }
     }
 
-    override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: Configuration) {
+    override fun onPictureInPictureModeChanged(
+        isInPictureInPictureMode: Boolean,
+        newConfig: Configuration
+    ) {
         super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
         if (isInPictureInPictureMode) {
             releaseLocalRenderer()
@@ -427,8 +523,6 @@ class ActiveVideoCallActivity : AppCompatActivity(), SensorEventListener {
     }
 
     override fun onStop() {
-        // Release renderers before super.onStop() triggers SurfaceView.surfaceDestroyed(),
-        // ensuring EglRenderer cleans up GL resources while EGL context is still current.
         releaseRenderers()
         super.onStop()
     }
@@ -466,6 +560,11 @@ class ActiveVideoCallActivity : AppCompatActivity(), SensorEventListener {
     override fun onDestroy() {
         releaseProximityLock()
         releaseRenderers()
+        if (isServiceBound) {
+            try { unbindService(serviceConnection) } catch (_: Exception) {}
+            isServiceBound = false
+        }
+        videoService = null
         super.onDestroy()
     }
 }

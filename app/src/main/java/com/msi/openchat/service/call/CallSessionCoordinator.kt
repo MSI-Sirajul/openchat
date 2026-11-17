@@ -1,22 +1,21 @@
 package com.msi.openchat.service.call
 
-import android.content.Context
 import android.util.Log
-import com.msi.openchat.feature.calls.CallViewModel
+import com.msi.openchat.feature.calls.CallUiState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.lang.ref.WeakReference
 
 /**
- * Single source of truth for active call state and controls.
- * Synchronizes CallViewModel, OpenChatCallService (ongoing call notification),
- * and CallActionReceiver (notification Answer/Decline/End/Speaker actions).
+ * Single source of truth for active audio call state and controls.
+ * Synchronizes OpenChatCallService (WebRTC + foreground notification),
+ * thin call UI Activities/Fragments, and CallActionReceiver.
  */
 object CallSessionCoordinator {
     private const val TAG = "CallCoordinator"
 
-    private var activeCallViewModelRef: WeakReference<CallViewModel>? = null
+    private var activeServiceRef: WeakReference<OpenChatCallService>? = null
 
     private val _currentCallId = MutableStateFlow<String?>(null)
     val currentCallId: StateFlow<String?> = _currentCallId.asStateFlow()
@@ -39,34 +38,73 @@ object CallSessionCoordinator {
     private val _callState = MutableStateFlow(WebRtcCallState.IDLE)
     val callState: StateFlow<WebRtcCallState> = _callState.asStateFlow()
 
-    fun registerActiveCall(
-        viewModel: CallViewModel,
+    private val _uiState = MutableStateFlow(CallUiState(isCallActive = false))
+    val uiState: StateFlow<CallUiState> = _uiState.asStateFlow()
+
+    @Volatile
+    private var presentedUiCallId: String? = null
+
+    fun registerService(
+        service: OpenChatCallService,
         callId: String,
         contactId: String,
         contactName: String
     ) {
-        Log.i(TAG, "Registering active call session: $callId with $contactName")
+        Log.i(TAG, "Registering OpenChatCallService for callId=$callId, peer=$contactName")
         CallSessionGuard.registerAudioCall(callId)
-        activeCallViewModelRef = WeakReference(viewModel)
+        activeServiceRef = WeakReference(service)
         _currentCallId.value = callId
         _contactId.value = contactId
         _contactName.value = contactName
-        _durationSeconds.value = 0
-        _isSpeakerOn.value = false
-        _isMuted.value = false
         _callState.value = WebRtcCallState.CONNECTING
+    }
+
+    fun updateUiState(state: CallUiState) {
+        _uiState.value = state
+        if (state.callId.isNotBlank() && state.isCallActive) {
+            _currentCallId.value = state.callId
+        }
+        if (state.contactId.isNotBlank()) {
+            _contactId.value = state.contactId
+        }
+        if (state.contactName.isNotBlank()) {
+            _contactName.value = state.contactName
+        }
+        _durationSeconds.value = state.durationSeconds
+        _isSpeakerOn.value = state.isSpeakerOn
+        _isMuted.value = state.isMuted
+        _callState.value = state.connectionState
+    }
+
+    fun markUiPresented(callId: String) {
+        if (callId.isNotBlank()) {
+            presentedUiCallId = callId
+        }
+    }
+
+    fun hasPresentedUiFor(callId: String?): Boolean {
+        return !callId.isNullOrBlank() && presentedUiCallId == callId
     }
 
     fun updateDuration(seconds: Int) {
         _durationSeconds.value = seconds
+        if (_uiState.value.durationSeconds != seconds) {
+            _uiState.value = _uiState.value.copy(durationSeconds = seconds)
+        }
     }
 
     fun updateSpeakerState(speakerOn: Boolean) {
         _isSpeakerOn.value = speakerOn
+        if (_uiState.value.isSpeakerOn != speakerOn) {
+            _uiState.value = _uiState.value.copy(isSpeakerOn = speakerOn)
+        }
     }
 
     fun updateMuteState(muted: Boolean) {
         _isMuted.value = muted
+        if (_uiState.value.isMuted != muted) {
+            _uiState.value = _uiState.value.copy(isMuted = muted)
+        }
     }
 
     fun updateCallState(state: WebRtcCallState) {
@@ -74,18 +112,18 @@ object CallSessionCoordinator {
     }
 
     fun toggleSpeaker() {
-        val vm = activeCallViewModelRef?.get()
-        if (vm != null) {
-            vm.toggleSpeaker()
+        val svc = activeServiceRef?.get()
+        if (svc != null) {
+            svc.toggleSpeaker()
         } else {
             _isSpeakerOn.value = !_isSpeakerOn.value
         }
     }
 
     fun toggleMute() {
-        val vm = activeCallViewModelRef?.get()
-        if (vm != null) {
-            vm.toggleMute()
+        val svc = activeServiceRef?.get()
+        if (svc != null) {
+            svc.toggleMute()
         } else {
             _isMuted.value = !_isMuted.value
         }
@@ -93,23 +131,33 @@ object CallSessionCoordinator {
 
     fun endCall() {
         Log.i(TAG, "endCall requested via CallSessionCoordinator")
-        val vm = activeCallViewModelRef?.get()
-        if (vm != null) {
-            vm.endCall()
+        val svc = activeServiceRef?.get()
+        if (svc != null) {
+            svc.endCall()
+        } else {
+            unregisterActiveCall()
         }
-        unregisterActiveCall()
     }
 
-    fun isActive(): Boolean = _currentCallId.value != null
+    fun isActive(): Boolean =
+        _currentCallId.value != null &&
+            _callState.value != WebRtcCallState.ENDED &&
+            _uiState.value.isCallActive
 
     fun unregisterActiveCall(callId: String? = null) {
         if (callId == null || _currentCallId.value == callId) {
-            Log.i(TAG, "Unregistering active call session")
+            Log.i(TAG, "Unregistering active audio call session: ${_currentCallId.value}")
             CallSessionGuard.unregisterCall(callId ?: _currentCallId.value)
-            activeCallViewModelRef = null
+            activeServiceRef = null
             _currentCallId.value = null
             _callState.value = WebRtcCallState.ENDED
             _durationSeconds.value = 0
+            presentedUiCallId = null
+            _uiState.value = _uiState.value.copy(
+                connectionState = WebRtcCallState.ENDED,
+                isCallActive = false
+            )
         }
     }
 }
+

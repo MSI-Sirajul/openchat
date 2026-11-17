@@ -175,6 +175,8 @@
                 <action android:name="com.msi.openchat.action.DECLINE_VIDEO_CALL" />
                 <action android:name="com.msi.openchat.action.END_VIDEO_CALL" />
                 <action android:name="com.msi.openchat.action.DISMISS_INCOMING_VIDEO_UI" />
+                <action android:name="com.msi.openchat.action.TOGGLE_MUTE_VIDEO_CALL" />
+                <action android:name="com.msi.openchat.action.SWITCH_CAMERA_VIDEO_CALL" />
             </intent-filter>
         </receiver>
 
@@ -187,6 +189,7 @@
                 <action android:name="com.msi.openchat.action.DECLINE_CALL" />
                 <action android:name="com.msi.openchat.action.END_CALL" />
                 <action android:name="com.msi.openchat.action.TOGGLE_SPEAKER" />
+                <action android:name="com.msi.openchat.action.TOGGLE_MUTE" />
             </intent-filter>
         </receiver>
 

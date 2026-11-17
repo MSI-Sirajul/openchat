@@ -11,7 +11,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 /**
- * Dedicated BroadcastReceiver for Video Call notification actions.
+ * Dedicated BroadcastReceiver for Video Call notification & PiP actions.
  * Strictly isolated from Audio Call actions to ensure no cross-triggering.
  */
 class VideoCallActionReceiver : BroadcastReceiver() {
@@ -22,6 +22,8 @@ class VideoCallActionReceiver : BroadcastReceiver() {
         const val ACTION_DECLINE_VIDEO_CALL = "com.msi.openchat.action.DECLINE_VIDEO_CALL"
         const val ACTION_END_VIDEO_CALL = "com.msi.openchat.action.END_VIDEO_CALL"
         const val ACTION_DISMISS_INCOMING_VIDEO_UI = "com.msi.openchat.action.DISMISS_INCOMING_VIDEO_UI"
+        const val ACTION_TOGGLE_MUTE_VIDEO_CALL = "com.msi.openchat.action.TOGGLE_MUTE_VIDEO_CALL"
+        const val ACTION_SWITCH_CAMERA_VIDEO_CALL = "com.msi.openchat.action.SWITCH_CAMERA_VIDEO_CALL"
 
         const val EXTRA_CALL_ID = "extra_video_call_id"
         const val EXTRA_CALLER_ID = "extra_video_caller_id"
@@ -30,8 +32,12 @@ class VideoCallActionReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
         val action = intent.action ?: return
-        val callId = intent.getStringExtra(EXTRA_CALL_ID).orEmpty()
-        val callerId = intent.getStringExtra(EXTRA_CALLER_ID).orEmpty()
+        val callId = intent.getStringExtra(EXTRA_CALL_ID)
+            ?.ifBlank { null }
+            ?: intent.getStringExtra("callId").orEmpty()
+        val callerId = intent.getStringExtra(EXTRA_CALLER_ID)
+            ?.ifBlank { null }
+            ?: intent.getStringExtra("peerUserId").orEmpty()
         val callerName = intent.getStringExtra(EXTRA_CALLER_NAME) ?: "Caller"
 
         Log.i(tag, "Received video action: $action for callId=$callId")
@@ -74,15 +80,21 @@ class VideoCallActionReceiver : BroadcastReceiver() {
                     putExtra(EXTRA_CALL_ID, callId)
                 })
 
-                // Launch ActiveVideoCallActivity directly
-                val launchIntent = ActiveVideoCallActivity.createIntent(
+                val launchIntent = VideoCallActivity.createAutoAcceptIntent(
                     context = context,
                     callId = callId,
-                    peerId = callerId,
-                    peerName = callerName,
-                    isIncoming = true
+                    peerUserId = callerId,
+                    peerName = callerName
                 )
                 context.startActivity(launchIntent)
+            }
+
+            ACTION_TOGGLE_MUTE_VIDEO_CALL -> {
+                VideoCallManager.toggleMute()
+            }
+
+            ACTION_SWITCH_CAMERA_VIDEO_CALL -> {
+                VideoCallManager.switchCamera()
             }
 
             ACTION_END_VIDEO_CALL -> {

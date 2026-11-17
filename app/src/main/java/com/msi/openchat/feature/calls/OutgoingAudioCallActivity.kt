@@ -162,6 +162,12 @@ class OutgoingAudioCallActivity : AppCompatActivity() {
             if (res is Resource.Success && res.data != null) {
                 callId = res.data.id
                 CallSessionGuard.registerAudioCall(callId)
+                com.msi.openchat.service.call.OpenChatCallService.startOutgoingCallService(
+                    context = applicationContext,
+                    callId = callId,
+                    contactId = contactId,
+                    contactName = contactName
+                )
                 startTimeoutTimer()
                 observeCallSession()
             } else {
@@ -180,6 +186,7 @@ class OutgoingAudioCallActivity : AppCompatActivity() {
                 ServiceLocator.callRepository.updateCallStatus(callId = callId, status = "missed", endReason = "No answer")
                 ServiceLocator.callRepository.sendSignaling(callId, contactId, "bye", "{\"reason\":\"timeout\"}")
                 CallSessionGuard.unregisterCall(callId)
+                com.msi.openchat.service.call.OpenChatCallService.stopCallService(applicationContext)
             }
             if (!hasNavigatedToActive) {
                 Toast.makeText(this@OutgoingAudioCallActivity, "No answer", Toast.LENGTH_SHORT).show()
@@ -193,7 +200,7 @@ class OutgoingAudioCallActivity : AppCompatActivity() {
         lifecycleScope.launch {
             ServiceLocator.callRepository.observeCallSession(callId).collect { session ->
                 when (session.status) {
-                    "connecting", "connected" -> {
+                    "accepted", "connecting", "connected" -> {
                         timeoutJob?.cancel()
                         if (!hasNavigatedToActive) {
                             hasNavigatedToActive = true

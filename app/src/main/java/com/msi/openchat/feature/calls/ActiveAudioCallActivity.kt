@@ -1,16 +1,13 @@
 package com.msi.openchat.feature.calls
 
 import android.Manifest
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.ServiceConnection
 import android.content.pm.PackageManager
-import android.hardware.Sensor
-import android.hardware.SensorEvent
-import android.hardware.SensorEventListener
-import android.hardware.SensorManager
-import android.os.Build
 import android.os.Bundle
-import android.os.PowerManager
+import android.os.IBinder
 import android.util.Log
 import android.view.WindowManager
 import android.widget.Toast
@@ -27,6 +24,7 @@ import androidx.lifecycle.lifecycleScope
 import com.example.R
 import com.example.databinding.ActivityActiveAudioCallBinding
 import com.msi.openchat.feature.videocall.VideoCallManager
+import com.msi.openchat.service.call.CallSessionCoordinator
 import com.msi.openchat.service.call.CallSessionGuard
 import com.msi.openchat.service.call.OpenChatCallService
 import com.msi.openchat.service.call.WebRtcCallState
@@ -34,10 +32,11 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 /**
- * Dedicated full-screen edge-to-edge Activity for active ongoing voice calls.
- * Displays contact info, duration timer, mute/speaker toggles, and manages proximity sensor.
+ * Thin full-screen edge-to-edge Activity for active voice calls.
+ * Binds directly to OpenChatCallService (which owns WebRTC, signaling, AudioManager, and proximity lock),
+ * so opening this screen later seamlessly displays the ongoing call without reconnecting.
  */
-class ActiveAudioCallActivity : AppCompatActivity(), SensorEventListener {
+class ActiveAudioCallActivity : AppCompatActivity() {
     private val tag = "OpenChat_ActiveAudio"
 
     private lateinit var binding: ActivityActiveAudioCallBinding
@@ -46,19 +45,34 @@ class ActiveAudioCallActivity : AppCompatActivity(), SensorEventListener {
     private var contactName: String = "Voice Call"
     private var isIncoming: Boolean = false
 
-    private var sensorManager: SensorManager? = null
-    private var proximitySensor: Sensor? = null
-    private var proximityWakeLock: PowerManager.WakeLock? = null
-
     private lateinit var callViewModel: CallViewModel
+    private var callService: OpenChatCallService? = null
+    private var isBound = false
+
+    private val serviceConnection = object : ServiceConnection {
+        override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
+            val binder = service as? OpenChatCallService.LocalBinder ?: return
+            val svc = binder.getService()
+            callService = svc
+            isBound = true
+            if (::callViewModel.isInitialized) {
+                callViewModel.attachBoundService(svc)
+            }
+        }
+
+        override fun onServiceDisconnected(name: ComponentName?) {
+            callService = null
+            isBound = false
+            if (::callViewModel.isInitialized) {
+                callViewModel.attachBoundService(null)
+            }
+        }
+    }
 
     private val micPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted ->
         if (isGranted) {
-            if (callId.isNotBlank()) {
-                OpenChatCallService.startCallService(this, callId, contactName)
-            }
             if (::callViewModel.isInitialized) {
                 callViewModel.onPermissionGranted()
             }
@@ -92,14 +106,27 @@ class ActiveAudioCallActivity : AppCompatActivity(), SensorEventListener {
                 putExtra(EXTRA_IS_INCOMING, isIncoming)
             }
         }
+
+        fun createResumeIntent(
+            context: Context,
+            callId: String = CallSessionCoordinator.currentCallId.value.orEmpty(),
+            contactId: String = CallSessionCoordinator.contactId.value,
+            contactName: String = CallSessionCoordinator.contactName.value.ifBlank { "Voice Call" },
+            isIncoming: Boolean = false
+        ): Intent {
+            return createIntent(context, callId, contactId, contactName, isIncoming)
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        callId = intent.getStringExtra(EXTRA_CALL_ID).orEmpty()
-        contactId = intent.getStringExtra(EXTRA_CONTACT_ID).orEmpty()
-        contactName = intent.getStringExtra(EXTRA_CONTACT_NAME) ?: "Voice Call"
+        val activeCoordinatorId = CallSessionCoordinator.currentCallId.value.orEmpty()
+        callId = intent.getStringExtra(EXTRA_CALL_ID).orEmpty().ifBlank { activeCoordinatorId }
+        contactId = intent.getStringExtra(EXTRA_CONTACT_ID).orEmpty().ifBlank { CallSessionCoordinator.contactId.value }
+        contactName = intent.getStringExtra(EXTRA_CONTACT_NAME)
+            ?.takeIf { it.isNotBlank() }
+            ?: CallSessionCoordinator.contactName.value.ifBlank { "Voice Call" }
         isIncoming = intent.getBooleanExtra(EXTRA_IS_INCOMING, false)
 
         if (callId.isBlank() ||
@@ -112,6 +139,8 @@ class ActiveAudioCallActivity : AppCompatActivity(), SensorEventListener {
             return
         }
 
+        CallSessionCoordinator.markUiPresented(callId)
+
         WindowCompat.setDecorFitsSystemWindows(window, false)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
@@ -119,20 +148,23 @@ class ActiveAudioCallActivity : AppCompatActivity(), SensorEventListener {
         setContentView(binding.root)
 
         setupEdgeToEdge()
-        setupSensors()
         setupViewModel()
         setupViews()
         observeViewModel()
+        bindToAudioCallService()
 
         val hasMic = ContextCompat.checkSelfPermission(
             this,
             Manifest.permission.RECORD_AUDIO
         ) == PackageManager.PERMISSION_GRANTED
-        if (hasMic) {
-            OpenChatCallService.startCallService(this, callId, contactName)
-        } else {
+        if (!hasMic) {
             micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
         }
+    }
+
+    private fun bindToAudioCallService() {
+        val bindIntent = Intent(this, OpenChatCallService::class.java)
+        bindService(bindIntent, serviceConnection, Context.BIND_AUTO_CREATE)
     }
 
     private fun setupEdgeToEdge() {
@@ -141,25 +173,6 @@ class ActiveAudioCallActivity : AppCompatActivity(), SensorEventListener {
             binding.layoutTopCapsule.updatePadding(top = systemBars.top)
             binding.layoutBottomControls.updatePadding(bottom = systemBars.bottom)
             insets
-        }
-    }
-
-    private fun setupSensors() {
-        try {
-            sensorManager = getSystemService(Context.SENSOR_SERVICE) as? SensorManager
-            proximitySensor = sensorManager?.getDefaultSensor(Sensor.TYPE_PROXIMITY)
-
-            val powerManager = getSystemService(Context.POWER_SERVICE) as? PowerManager
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP && powerManager != null) {
-                if (powerManager.isWakeLockLevelSupported(PowerManager.PROXIMITY_SCREEN_OFF_WAKE_LOCK)) {
-                    proximityWakeLock = powerManager.newWakeLock(
-                        PowerManager.PROXIMITY_SCREEN_OFF_WAKE_LOCK,
-                        "OpenChat:ActiveAudioProximityLock"
-                    )
-                }
-            }
-        } catch (e: Exception) {
-            Log.w(tag, "Proximity setup error: ${e.message}")
         }
     }
 
@@ -173,7 +186,7 @@ class ActiveAudioCallActivity : AppCompatActivity(), SensorEventListener {
                     contactId = contactId,
                     contactName = contactName,
                     isIncoming = isIncoming,
-                    isAlreadyAnswered = isIncoming // Incoming calls arrive here after user answered
+                    isAlreadyAnswered = isIncoming
                 ) as T
             }
         }
@@ -201,6 +214,10 @@ class ActiveAudioCallActivity : AppCompatActivity(), SensorEventListener {
     private fun observeViewModel() {
         lifecycleScope.launch {
             callViewModel.uiState.collectLatest { state ->
+                if (state.contactName.isNotBlank()) {
+                    binding.textContactName.text = state.contactName
+                    binding.textContactInitial.text = state.contactName.take(1).uppercase()
+                }
                 if (state.durationSeconds > 0 || state.connectionState == WebRtcCallState.CONNECTED) {
                     val mins = state.durationSeconds / 60
                     val secs = state.durationSeconds % 60
@@ -209,7 +226,6 @@ class ActiveAudioCallActivity : AppCompatActivity(), SensorEventListener {
                     binding.textCallTimer.text = state.callStatus
                 }
 
-                // Microphone mute state
                 if (state.isMuted) {
                     binding.btnMute.setImageResource(R.drawable.ic_mic_off_24)
                     binding.btnMute.setColorFilter(0xFFFF8A80.toInt())
@@ -218,7 +234,6 @@ class ActiveAudioCallActivity : AppCompatActivity(), SensorEventListener {
                     binding.btnMute.setColorFilter(0xFFFFFFFF.toInt())
                 }
 
-                // Speakerphone state
                 if (state.isSpeakerOn) {
                     binding.btnSpeaker.setImageResource(R.drawable.ic_volume_up_24)
                     binding.btnSpeaker.setColorFilter(0xFF5DD69A.toInt())
@@ -234,52 +249,15 @@ class ActiveAudioCallActivity : AppCompatActivity(), SensorEventListener {
         }
     }
 
-    override fun onResume() {
-        super.onResume()
-        proximitySensor?.let {
-            sensorManager?.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL)
-        }
-    }
-
-    override fun onPause() {
-        super.onPause()
-        sensorManager?.unregisterListener(this)
-        releaseProximityLock()
-    }
-
-    override fun onSensorChanged(event: SensorEvent?) {
-        if (event?.sensor?.type == Sensor.TYPE_PROXIMITY) {
-            val distance = event.values[0]
-            val maxRange = proximitySensor?.maximumRange ?: 5f
-            if (distance < maxRange) {
-                acquireProximityLock()
-            } else {
-                releaseProximityLock()
-            }
-        }
-    }
-
-    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
-
-    private fun acquireProximityLock() {
-        try {
-            if (proximityWakeLock?.isHeld == false) {
-                proximityWakeLock?.acquire(30 * 60 * 1000L)
-            }
-        } catch (_: Exception) {}
-    }
-
-    private fun releaseProximityLock() {
-        try {
-            if (proximityWakeLock?.isHeld == true) {
-                proximityWakeLock?.release()
-            }
-        } catch (_: Exception) {}
-    }
-
     override fun onDestroy() {
+        if (isBound) {
+            try { unbindService(serviceConnection) } catch (_: Exception) {}
+            isBound = false
+        }
+        callService = null
         super.onDestroy()
-        releaseProximityLock()
-        OpenChatCallService.stopCallService(this)
+        // Intentionally DO NOT call OpenChatCallService.stopCallService(this):
+        // Active calls continue running in OpenChatCallService when the UI is closed.
     }
 }
+
