@@ -169,6 +169,15 @@ class VideoCallActivity : AppCompatActivity(), SensorEventListener {
         }
     }
 
+    private fun releaseRenderers() {
+        try { repository.detachRenderers() } catch (_: Exception) {}
+        if (renderersAttached) {
+            renderersAttached = false
+            try { binding.localVideoView.release() } catch (_: Exception) {}
+            try { binding.remoteVideoView.release() } catch (_: Exception) {}
+        }
+    }
+
     private fun setupViews() {
         // Attach WebRTC SurfaceViewRenderers
         binding.localVideoView.setZOrderMediaOverlay(true)
@@ -199,12 +208,14 @@ class VideoCallActivity : AppCompatActivity(), SensorEventListener {
         }
 
         binding.btnEndCall.setOnClickListener {
+            releaseRenderers()
             repository.endCall("Call ended by user")
             finish()
         }
 
         // Outgoing cancel button
         binding.btnCancelOutgoing.setOnClickListener {
+            releaseRenderers()
             repository.endCall("Cancelled by caller")
             finish()
         }
@@ -391,6 +402,7 @@ class VideoCallActivity : AppCompatActivity(), SensorEventListener {
                 binding.textReconnectingBanner.visibility = View.VISIBLE
             }
             is VideoCallStatus.Ended -> {
+                releaseRenderers()
                 AppServiceManager.stopCallRinging(this)
                 Toast.makeText(this, state.status.reason, Toast.LENGTH_SHORT).show()
                 finish()
@@ -482,19 +494,15 @@ class VideoCallActivity : AppCompatActivity(), SensorEventListener {
         } catch (_: Exception) {}
     }
 
+    override fun onStop() {
+        releaseRenderers()
+        super.onStop()
+    }
+
     override fun onDestroy() {
-        super.onDestroy()
         AppServiceManager.stopCallRinging(this)
         releaseProximityLock()
-        try {
-            repository.detachRenderers()
-        } catch (_: Exception) {}
-        if (renderersAttached) {
-            renderersAttached = false
-            try { binding.localVideoView.clearImage() } catch (_: Exception) {}
-            try { binding.localVideoView.release() } catch (_: Exception) {}
-            try { binding.remoteVideoView.clearImage() } catch (_: Exception) {}
-            try { binding.remoteVideoView.release() } catch (_: Exception) {}
-        }
+        releaseRenderers()
+        super.onDestroy()
     }
 }

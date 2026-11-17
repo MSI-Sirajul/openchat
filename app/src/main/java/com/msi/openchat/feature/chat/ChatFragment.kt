@@ -837,8 +837,20 @@ class ChatFragment : Fragment() {
         _binding?.dotTyping3?.translationY = 0f
     }
 
+    override fun onPause() {
+        super.onPause()
+        try {
+            if (_binding?.videoPreviewPlayer?.isPlaying == true) {
+                _binding?.videoPreviewPlayer?.pause()
+            }
+        } catch (_: Exception) {}
+    }
+
     override fun onDestroyView() {
         stopTypingAnimation()
+        try {
+            _binding?.videoPreviewPlayer?.stopPlayback()
+        } catch (_: Exception) {}
         super.onDestroyView()
         _binding = null
     }

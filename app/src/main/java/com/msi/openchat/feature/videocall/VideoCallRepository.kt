@@ -20,6 +20,10 @@ class VideoCallRepository {
         VideoCallManager.attachRemoteRenderer(renderer)
     }
 
+    fun detachLocalRenderer() {
+        VideoCallManager.detachLocalRenderer()
+    }
+
     fun detachRenderers() {
         VideoCallManager.detachRenderers()
     }

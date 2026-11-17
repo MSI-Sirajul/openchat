@@ -59,7 +59,8 @@ class ActiveVideoCallActivity : AppCompatActivity(), SensorEventListener {
     private var peerName: String = "OpenChat Contact"
     private var isIncoming: Boolean = false
     private var sessionStarted = false
-    private var renderersAttached = false
+    private var localRendererAttached = false
+    private var remoteRendererAttached = false
 
     private val videoPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -113,9 +114,11 @@ class ActiveVideoCallActivity : AppCompatActivity(), SensorEventListener {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        callId = intent.getStringExtra(EXTRA_CALL_ID).orEmpty()
-        peerId = intent.getStringExtra(EXTRA_PEER_ID).orEmpty()
-        peerName = intent.getStringExtra(EXTRA_PEER_NAME) ?: "OpenChat Contact"
+        val currentState = repository.callState.value
+        callId = intent.getStringExtra(EXTRA_CALL_ID).orEmpty().ifBlank { currentState.callId }
+        peerId = intent.getStringExtra(EXTRA_PEER_ID).orEmpty().ifBlank { currentState.peerId }
+        peerName = intent.getStringExtra(EXTRA_PEER_NAME)?.takeIf { it.isNotBlank() }
+            ?: currentState.peerName.ifBlank { "OpenChat Contact" }
         isIncoming = intent.getBooleanExtra(EXTRA_IS_INCOMING, false)
 
         if (callId.startsWith("aud_") || CallSessionCoordinator.isActive()) {
@@ -185,12 +188,41 @@ class ActiveVideoCallActivity : AppCompatActivity(), SensorEventListener {
         }
     }
 
+    private fun attachRenderers() {
+        if (!localRendererAttached && binding.cardLocalPreview.visibility == View.VISIBLE) {
+            repository.attachLocalRenderer(binding.localVideoView)
+            localRendererAttached = true
+        }
+        if (!remoteRendererAttached) {
+            repository.attachRemoteRenderer(binding.remoteVideoView)
+            remoteRendererAttached = true
+        }
+    }
+
+    private fun releaseLocalRenderer() {
+        try { repository.detachLocalRenderer() } catch (_: Exception) {}
+        if (localRendererAttached) {
+            localRendererAttached = false
+            try { binding.localVideoView.release() } catch (_: Exception) {}
+        }
+    }
+
+    private fun releaseRenderers() {
+        try { repository.detachRenderers() } catch (_: Exception) {}
+        if (localRendererAttached) {
+            localRendererAttached = false
+            try { binding.localVideoView.release() } catch (_: Exception) {}
+        }
+        if (remoteRendererAttached) {
+            remoteRendererAttached = false
+            try { binding.remoteVideoView.release() } catch (_: Exception) {}
+        }
+    }
+
     private fun setupViews() {
         // Attach WebRTC SurfaceViewRenderers
         binding.localVideoView.setZOrderMediaOverlay(true)
-        repository.attachLocalRenderer(binding.localVideoView)
-        repository.attachRemoteRenderer(binding.remoteVideoView)
-        renderersAttached = true
+        attachRenderers()
 
         // Minimize / PiP
         binding.btnMinimize.setOnClickListener {
@@ -215,6 +247,7 @@ class ActiveVideoCallActivity : AppCompatActivity(), SensorEventListener {
         }
 
         binding.btnEndCall.setOnClickListener {
+            releaseRenderers()
             repository.endCall("Call ended by user")
             finish()
         }
@@ -328,6 +361,7 @@ class ActiveVideoCallActivity : AppCompatActivity(), SensorEventListener {
         }
 
         if (state.status is VideoCallStatus.Ended) {
+            releaseRenderers()
             Toast.makeText(this, state.status.reason, Toast.LENGTH_SHORT).show()
             finish()
         }
@@ -357,6 +391,7 @@ class ActiveVideoCallActivity : AppCompatActivity(), SensorEventListener {
     override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: Configuration) {
         super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
         if (isInPictureInPictureMode) {
+            releaseLocalRenderer()
             binding.layoutTopBar.visibility = View.GONE
             binding.layoutBottomControls.visibility = View.GONE
             binding.cardLocalPreview.visibility = View.GONE
@@ -365,6 +400,16 @@ class ActiveVideoCallActivity : AppCompatActivity(), SensorEventListener {
             binding.layoutTopBar.visibility = View.VISIBLE
             binding.layoutBottomControls.visibility = View.VISIBLE
             binding.cardLocalPreview.visibility = View.VISIBLE
+            if (sessionStarted && !isFinishing && VideoCallManager.isCallActive()) {
+                attachRenderers()
+            }
+        }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        if (sessionStarted && !isFinishing && VideoCallManager.isCallActive()) {
+            attachRenderers()
         }
     }
 
@@ -379,6 +424,13 @@ class ActiveVideoCallActivity : AppCompatActivity(), SensorEventListener {
         super.onPause()
         sensorManager?.unregisterListener(this)
         releaseProximityLock()
+    }
+
+    override fun onStop() {
+        // Release renderers before super.onStop() triggers SurfaceView.surfaceDestroyed(),
+        // ensuring EglRenderer cleans up GL resources while EGL context is still current.
+        releaseRenderers()
+        super.onStop()
     }
 
     override fun onSensorChanged(event: SensorEvent?) {
@@ -412,17 +464,8 @@ class ActiveVideoCallActivity : AppCompatActivity(), SensorEventListener {
     }
 
     override fun onDestroy() {
-        super.onDestroy()
         releaseProximityLock()
-        try {
-            repository.detachRenderers()
-        } catch (_: Exception) {}
-        if (renderersAttached) {
-            renderersAttached = false
-            try { binding.localVideoView.clearImage() } catch (_: Exception) {}
-            try { binding.localVideoView.release() } catch (_: Exception) {}
-            try { binding.remoteVideoView.clearImage() } catch (_: Exception) {}
-            try { binding.remoteVideoView.release() } catch (_: Exception) {}
-        }
+        releaseRenderers()
+        super.onDestroy()
     }
 }

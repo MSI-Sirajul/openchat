@@ -367,16 +367,19 @@ class ChatMessageAdapter(
         private fun loadUriMedia(imageView: android.widget.ImageView, context: android.content.Context, uri: android.net.Uri, isVideo: Boolean) {
             imageView.clearColorFilter()
             if (isVideo) {
+                var retriever: android.media.MediaMetadataRetriever? = null
                 try {
-                    val retriever = android.media.MediaMetadataRetriever()
+                    retriever = android.media.MediaMetadataRetriever()
                     retriever.setDataSource(context, uri)
                     val frame = retriever.getFrameAtTime(1000000)
-                    retriever.release()
                     if (frame != null) {
                         imageView.setImageBitmap(frame)
                         return
                     }
-                } catch (_: Throwable) {}
+                } catch (_: Throwable) {
+                } finally {
+                    try { retriever?.release() } catch (_: Throwable) {}
+                }
             }
             imageView.load(uri) {
                 crossfade(true)
@@ -385,16 +388,19 @@ class ChatMessageAdapter(
 
         private fun loadImageFile(imageView: android.widget.ImageView, file: java.io.File, isVideo: Boolean) {
             if (isVideo) {
+                var retriever: android.media.MediaMetadataRetriever? = null
                 try {
-                    val retriever = android.media.MediaMetadataRetriever()
+                    retriever = android.media.MediaMetadataRetriever()
                     retriever.setDataSource(file.absolutePath)
                     val frame = retriever.getFrameAtTime(1000000)
-                    retriever.release()
                     if (frame != null) {
                         imageView.setImageBitmap(frame)
                         return
                     }
-                } catch (_: Throwable) {}
+                } catch (_: Throwable) {
+                } finally {
+                    try { retriever?.release() } catch (_: Throwable) {}
+                }
             }
             try {
                 val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }

@@ -102,6 +102,7 @@ object VideoCallManager {
     private var timeoutJob: Job? = null
     private var signalingJob: Job? = null
     private var sessionWatchJob: Job? = null
+    private var resetStateJob: Job? = null
 
     // Dedicated single-thread worker for all WebRTC JNI operations to guarantee thread safety
     private val rtcExecutor = Executors.newSingleThreadExecutor { runnable ->
@@ -234,14 +235,17 @@ object VideoCallManager {
      * Prepares and attaches local camera preview to the provided SurfaceViewRenderer
      */
     fun attachLocalRenderer(renderer: SurfaceViewRenderer) {
-        if (localRenderer === renderer) return
+        val previous = localRenderer
+        if (previous === renderer) return
+        if (previous != null) {
+            try { localVideoTrack?.removeSink(previous) } catch (_: Exception) {}
+        }
         localRenderer = renderer
         try {
-            renderer.init(rootEglBase.eglBaseContext, null, eglConfigAttributes, org.webrtc.GlRectDrawer())
-            renderer.setEnableHardwareScaler(true)
+            renderer.init(rootEglBase.eglBaseContext, null)
+            renderer.setEnableHardwareScaler(!isEmulator())
             renderer.setScalingType(RendererCommon.ScalingType.SCALE_ASPECT_FILL)
             renderer.setMirror(_uiState.value.isFrontCamera)
-            renderer.setZOrderMediaOverlay(true)
         } catch (e: Exception) {
             Log.w(TAG, "Local renderer already initialized or failed: ${e.message}")
         }
@@ -260,11 +264,15 @@ object VideoCallManager {
      * Attaches remote stream to the provided fullscreen SurfaceViewRenderer
      */
     fun attachRemoteRenderer(renderer: SurfaceViewRenderer) {
-        if (remoteRenderer === renderer) return
+        val previous = remoteRenderer
+        if (previous === renderer) return
+        if (previous != null) {
+            try { remoteVideoTrack?.removeSink(previous) } catch (_: Exception) {}
+        }
         remoteRenderer = renderer
         try {
-            renderer.init(rootEglBase.eglBaseContext, null, eglConfigAttributes, org.webrtc.GlRectDrawer())
-            renderer.setEnableHardwareScaler(true)
+            renderer.init(rootEglBase.eglBaseContext, null)
+            renderer.setEnableHardwareScaler(!isEmulator())
             renderer.setScalingType(RendererCommon.ScalingType.SCALE_ASPECT_FIT)
             renderer.setMirror(false)
         } catch (e: Exception) {
@@ -276,6 +284,17 @@ object VideoCallManager {
                 remoteVideoTrack?.addSink(renderer)
             }
         }
+    }
+
+    /**
+     * Safely detaches local SurfaceViewRenderer from local video track before release (e.g., PiP)
+     */
+    fun detachLocalRenderer() {
+        val local = localRenderer
+        localRenderer = null
+        try {
+            local?.let { localVideoTrack?.removeSink(it) }
+        } catch (_: Exception) {}
     }
 
     /**
@@ -292,12 +311,6 @@ object VideoCallManager {
         } catch (_: Exception) {}
         try {
             remote?.let { remoteVideoTrack?.removeSink(it) }
-        } catch (_: Exception) {}
-        try {
-            local?.clearImage()
-        } catch (_: Exception) {}
-        try {
-            remote?.clearImage()
         } catch (_: Exception) {}
     }
 
@@ -388,6 +401,7 @@ object VideoCallManager {
             Log.w(TAG, "Blocked startOutgoingCall: a video call is already active")
             return
         }
+        resetStateJob?.cancel()
         isDisposing.set(false)
         initialize(context)
         acquireWakeLock(context)
@@ -437,6 +451,7 @@ object VideoCallManager {
             Log.w(TAG, "Blocked acceptIncomingCall: an audio call is active")
             return
         }
+        resetStateJob?.cancel()
         isDisposing.set(false)
         initialize(context)
         acquireWakeLock(context)
@@ -979,9 +994,12 @@ object VideoCallManager {
             hasRemoteVideo = false
         )
 
-        managerScope.launch {
+        resetStateJob?.cancel()
+        resetStateJob = managerScope.launch {
             delay(1500)
-            _uiState.value = VideoCallUiState()
+            if (_uiState.value.status is VideoCallStatus.Ended) {
+                _uiState.value = VideoCallUiState()
+            }
             isDisposing.set(false)
         }
     }
