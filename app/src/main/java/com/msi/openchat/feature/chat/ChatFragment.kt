@@ -32,11 +32,9 @@ import coil.load
 import com.example.MainActivity
 import com.example.R
 import com.example.databinding.FragmentChatBinding
-import com.msi.openchat.core.common.DateTimeUtils
 import com.msi.openchat.core.di.ServiceLocator
 import com.msi.openchat.core.presence.PresenceHelper
 import com.msi.openchat.core.ui.adapter.ChatMessageAdapter
-import com.msi.openchat.data.local.OfflineMediaManager
 import com.msi.openchat.data.model.Message
 import kotlinx.coroutines.launch
 
@@ -104,7 +102,7 @@ class ChatFragment : Fragment() {
         if (isGranted) {
             chatViewModel.startVoiceRecording()
         } else {
-            Toast.makeText(requireContext(), "Microphone permission is required to record voice notes", Toast.LENGTH_SHORT).show()
+            Toast.makeText(requireContext(), getString(R.string.chat_mic_required_record), Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -115,10 +113,10 @@ class ChatFragment : Fragment() {
             com.msi.openchat.feature.calls.OutgoingAudioCallActivity.start(
                 context = requireContext(),
                 contactId = contactId,
-                contactName = contactName.ifBlank { "Contact" }
+                contactName = contactName.ifBlank { getString(R.string.common_contact) }
             )
         } else {
-            Toast.makeText(requireContext(), "Microphone permission is required to start a call", Toast.LENGTH_SHORT).show()
+            Toast.makeText(requireContext(), getString(R.string.chat_mic_required_call), Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -132,7 +130,7 @@ class ChatFragment : Fragment() {
         } else {
             Toast.makeText(
                 requireContext(),
-                "Storage and media permission is needed to select attachments",
+                getString(R.string.chat_media_permission_needed),
                 Toast.LENGTH_SHORT
             ).show()
         }
@@ -156,7 +154,7 @@ class ChatFragment : Fragment() {
         super.onCreate(savedInstanceState)
         arguments?.let {
             conversationId = it.getString(ARG_CONVERSATION_ID, "")
-            contactName = it.getString(ARG_CONTACT_NAME, "Contact")
+            contactName = it.getString(ARG_CONTACT_NAME, getString(R.string.common_contact))
             contactId = it.getString(ARG_CONTACT_ID, "")
             autoSendHi = it.getBoolean(ARG_AUTO_SEND_HI, false)
         }
@@ -183,7 +181,7 @@ class ChatFragment : Fragment() {
 
         if (autoSendHi) {
             autoSendHi = false
-            chatViewModel.sendDirectMessage("Hi")
+            chatViewModel.sendDirectMessage(getString(R.string.common_hi))
         }
     }
 
@@ -199,9 +197,9 @@ class ChatFragment : Fragment() {
         }
 
         // Initialize contact name and avatar immediately so header is never blank
-        val initialName = contactName.ifBlank { "Contact" }
+        val initialName = contactName.ifBlank { getString(R.string.common_contact) }
         binding.textChatContactName.text = initialName
-        binding.textChatContactStatus.text = "Offline"
+        binding.textChatContactStatus.text = getString(R.string.chat_status_offline)
         com.msi.openchat.core.ui.AvatarHelper.loadAvatar(
             imageView = binding.imgChatAvatar,
             letterTextView = binding.textChatAvatar,
@@ -211,35 +209,35 @@ class ChatFragment : Fragment() {
 
         binding.btnChatVideoCall.setOnClickListener {
             if (contactId.isBlank()) {
-                Toast.makeText(requireContext(), "Contact information unavailable", Toast.LENGTH_SHORT).show()
+                Toast.makeText(requireContext(), getString(R.string.chat_contact_info_unavailable), Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
             if (com.msi.openchat.service.call.CallSessionCoordinator.isActive()) {
-                Toast.makeText(requireContext(), "Cannot start video call while voice call is active", Toast.LENGTH_SHORT).show()
+                Toast.makeText(requireContext(), getString(R.string.call_video_blocked_by_voice), Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
             if (com.msi.openchat.feature.videocall.VideoCallManager.isCallActive()) {
-                Toast.makeText(requireContext(), "A video call is already active", Toast.LENGTH_SHORT).show()
+                Toast.makeText(requireContext(), getString(R.string.call_video_already_active_alt), Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
             com.msi.openchat.feature.videocall.OutgoingVideoCallActivity.start(
                 context = requireContext(),
                 peerId = contactId,
-                peerName = contactName.ifBlank { "Contact" }
+                peerName = contactName.ifBlank { getString(R.string.common_contact) }
             )
         }
 
         binding.btnChatCall.setOnClickListener {
             if (contactId.isBlank()) {
-                Toast.makeText(requireContext(), "Contact information unavailable", Toast.LENGTH_SHORT).show()
+                Toast.makeText(requireContext(), getString(R.string.chat_contact_info_unavailable), Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
             if (com.msi.openchat.feature.videocall.VideoCallManager.isCallActive()) {
-                Toast.makeText(requireContext(), "Cannot start voice call while video call is active", Toast.LENGTH_SHORT).show()
+                Toast.makeText(requireContext(), getString(R.string.call_voice_blocked_by_video_alt), Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
             if (com.msi.openchat.service.call.CallSessionCoordinator.isActive()) {
-                Toast.makeText(requireContext(), "A voice call is already active", Toast.LENGTH_SHORT).show()
+                Toast.makeText(requireContext(), getString(R.string.call_voice_already_active_alt), Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
             val hasMicPermission = ContextCompat.checkSelfPermission(
@@ -251,7 +249,7 @@ class ChatFragment : Fragment() {
                 com.msi.openchat.feature.calls.OutgoingAudioCallActivity.start(
                     context = requireContext(),
                     contactId = contactId,
-                    contactName = contactName.ifBlank { "Contact" }
+                    contactName = contactName.ifBlank { getString(R.string.common_contact) }
                 )
             } else {
                 micCallLauncher.launch(Manifest.permission.RECORD_AUDIO)
@@ -260,11 +258,11 @@ class ChatFragment : Fragment() {
 
         binding.btnChatMore.setOnClickListener { v ->
             val popup = PopupMenu(requireContext(), v)
-            popup.menu.add(0, 1, 0, "View Profile")
-            popup.menu.add(0, 2, 1, "Search in Chat")
-            popup.menu.add(0, 3, 2, "Media, Links & Docs")
-            popup.menu.add(0, 4, 3, "Mute Notifications")
-            popup.menu.add(0, 5, 4, "Clear Chat")
+            popup.menu.add(0, 1, 0, getString(R.string.chat_menu_view_profile))
+            popup.menu.add(0, 2, 1, getString(R.string.chat_menu_search))
+            popup.menu.add(0, 3, 2, getString(R.string.chat_menu_media_docs))
+            popup.menu.add(0, 4, 3, getString(R.string.chat_menu_mute_notifications))
+            popup.menu.add(0, 5, 4, getString(R.string.chat_menu_clear_chat))
             popup.setOnMenuItemClickListener { item ->
                 when (item.itemId) {
                     1 -> {
@@ -272,19 +270,19 @@ class ChatFragment : Fragment() {
                         true
                     }
                     2 -> {
-                        Toast.makeText(requireContext(), "Search in conversation", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(requireContext(), getString(R.string.chat_toast_search), Toast.LENGTH_SHORT).show()
                         true
                     }
                     3 -> {
-                        Toast.makeText(requireContext(), "Media & documents stored in chat", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(requireContext(), getString(R.string.chat_toast_media_docs), Toast.LENGTH_SHORT).show()
                         true
                     }
                     4 -> {
-                        Toast.makeText(requireContext(), "Notifications muted", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(requireContext(), getString(R.string.chat_toast_muted), Toast.LENGTH_SHORT).show()
                         true
                     }
                     5 -> {
-                        Toast.makeText(requireContext(), "Chat history cleared", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(requireContext(), getString(R.string.chat_toast_cleared), Toast.LENGTH_SHORT).show()
                         true
                     }
                     else -> false
@@ -328,10 +326,10 @@ class ChatFragment : Fragment() {
                 chatViewModel.onInputTextChanged(text)
                 if (text.isNotBlank()) {
                     binding.btnChatSendOrMic.setImageResource(R.drawable.ic_send_24)
-                    binding.btnChatSendOrMic.contentDescription = "Send Message"
+                    binding.btnChatSendOrMic.contentDescription = getString(R.string.chat_send_message_cd)
                 } else {
                     binding.btnChatSendOrMic.setImageResource(R.drawable.ic_mic_24)
-                    binding.btnChatSendOrMic.contentDescription = "Record Voice"
+                    binding.btnChatSendOrMic.contentDescription = getString(R.string.chat_record_voice_cd)
                 }
                 binding.btnChatSendOrMic.setColorFilter(
                     ContextCompat.getColor(requireContext(), R.color.color_composer_action_icon)
@@ -364,10 +362,10 @@ class ChatFragment : Fragment() {
 
         binding.btnChatAttach.setOnClickListener { v ->
             val popup = PopupMenu(requireContext(), v)
-            popup.menu.add(0, 1, 0, "Photo")
-            popup.menu.add(0, 2, 1, "Video")
-            popup.menu.add(0, 3, 2, "Audio")
-            popup.menu.add(0, 4, 3, "Document")
+            popup.menu.add(0, 1, 0, getString(R.string.chat_attach_photo))
+            popup.menu.add(0, 2, 1, getString(R.string.chat_attach_video))
+            popup.menu.add(0, 3, 2, getString(R.string.chat_attach_audio))
+            popup.menu.add(0, 4, 3, getString(R.string.chat_attach_document))
             popup.setOnMenuItemClickListener { item ->
                 when (item.itemId) {
                     1 -> {
@@ -472,9 +470,9 @@ class ChatFragment : Fragment() {
                 )
                 if (result.isSuccess) {
                     val subfolder = com.msi.openchat.core.media.MediaDownloadManager.getCacheSubfolder(msg.type).replaceFirstChar { it.uppercase() }
-                    Toast.makeText(context, "Saved to OpenChat/$subfolder", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, getString(R.string.chat_saved_to_folder, subfolder), Toast.LENGTH_SHORT).show()
                 } else {
-                    Toast.makeText(context, "Failed to save: ${result.exceptionOrNull()?.message}", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, getString(R.string.chat_save_failed, result.exceptionOrNull()?.message.orEmpty()), Toast.LENGTH_SHORT).show()
                 }
             }
             return
@@ -503,18 +501,18 @@ class ChatFragment : Fragment() {
                     tempFile.delete()
                     if (result.isSuccess) {
                         val subfolder = com.msi.openchat.core.media.MediaDownloadManager.getCacheSubfolder(msg.type).replaceFirstChar { it.uppercase() }
-                        Toast.makeText(context, "Saved to OpenChat/$subfolder", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, getString(R.string.chat_saved_to_folder, subfolder), Toast.LENGTH_SHORT).show()
                     } else {
-                        Toast.makeText(context, "Failed to save: ${result.exceptionOrNull()?.message}", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, getString(R.string.chat_save_failed, result.exceptionOrNull()?.message.orEmpty()), Toast.LENGTH_SHORT).show()
                     }
                 } else {
-                    Toast.makeText(context, "Cannot export file", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, getString(R.string.chat_cannot_export_file), Toast.LENGTH_SHORT).show()
                 }
             }
             return
         }
 
-        Toast.makeText(context, "Media is still loading, please wait...", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, getString(R.string.chat_media_still_loading), Toast.LENGTH_SHORT).show()
     }
 
     private fun showMediaPreview(message: Message, resolvedUrl: String?) {
@@ -526,7 +524,7 @@ class ChatFragment : Fragment() {
         binding.layoutFullscreenPreview.visibility = View.VISIBLE
         val isVideo = message.type == "video"
         val titleText = message.content?.takeIf { it.isNotBlank() && !it.startsWith("📷") && !it.startsWith("📹") }
-            ?: if (isVideo) "Video Preview" else "Photo Preview"
+            ?: if (isVideo) getString(R.string.chat_video_preview) else getString(R.string.chat_photo_preview)
         binding.textPreviewTitle.text = titleText
 
         // Reset views
@@ -567,7 +565,7 @@ class ChatFragment : Fragment() {
         if (effectiveUrl.isNullOrBlank()) {
             binding.progressPreviewLoading.visibility = View.GONE
             binding.textPreviewError.visibility = View.VISIBLE
-            binding.textPreviewError.text = "Media file is unavailable"
+            binding.textPreviewError.text = getString(R.string.chat_media_unavailable)
             return
         }
 
@@ -586,7 +584,10 @@ class ChatFragment : Fragment() {
             } else {
                 binding.progressPreviewLoading.visibility = View.GONE
                 binding.textPreviewError.visibility = View.VISIBLE
-                binding.textPreviewError.text = "Failed to load media: ${result.exceptionOrNull()?.message ?: "Unknown error"}"
+                binding.textPreviewError.text = getString(
+                    R.string.chat_media_load_failed,
+                    result.exceptionOrNull()?.message ?: getString(R.string.common_unknown_error)
+                )
             }
         }
     }
@@ -661,11 +662,11 @@ class ChatFragment : Fragment() {
 
         val remoteUrl = message.mediaUrl
         if (remoteUrl.isNullOrBlank()) {
-            Toast.makeText(context, "Attachment file is unavailable", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, getString(R.string.chat_attachment_unavailable), Toast.LENGTH_SHORT).show()
             return
         }
 
-        Toast.makeText(context, "Downloading attachment...", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, getString(R.string.chat_downloading_attachment), Toast.LENGTH_SHORT).show()
         viewLifecycleOwner.lifecycleScope.launch {
             val result = com.msi.openchat.core.media.MediaDownloadManager.downloadToCache(
                 context = context,
@@ -678,7 +679,11 @@ class ChatFragment : Fragment() {
             if (file != null && file.exists()) {
                 openLocalFile(context, file, message.content.orEmpty())
             } else {
-                Toast.makeText(context, "Failed to download attachment: ${result.exceptionOrNull()?.message}", Toast.LENGTH_SHORT).show()
+                Toast.makeText(
+                    context,
+                    getString(R.string.chat_attachment_download_failed, result.exceptionOrNull()?.message.orEmpty()),
+                    Toast.LENGTH_SHORT
+                ).show()
             }
         }
     }
@@ -724,7 +729,7 @@ class ChatFragment : Fragment() {
         binding.dotChatOnline.visibility = if (isOnline) View.VISIBLE else View.GONE
 
         val statusText = if (state.isContactTyping) {
-            "typing..."
+            getString(R.string.chat_status_typing)
         } else {
             PresenceHelper.formatPresenceStatus(state.contactProfile)
         }
@@ -753,7 +758,7 @@ class ChatFragment : Fragment() {
 
         // Real-time animated typing indicator
         if (state.isContactTyping) {
-            binding.textTypingLabel.text = "${state.contactName} is typing..."
+            binding.textTypingLabel.text = getString(R.string.chat_user_typing, state.contactName)
             if (binding.layoutTypingIndicator.visibility != View.VISIBLE) {
                 binding.layoutTypingIndicator.visibility = View.VISIBLE
                 binding.layoutTypingIndicator.alpha = 0f
@@ -786,7 +791,7 @@ class ChatFragment : Fragment() {
             binding.layoutInputBar.visibility = View.GONE
             val min = state.recordingDurationSeconds / 60
             val sec = state.recordingDurationSeconds % 60
-            binding.textRecordingDuration.text = "Recording %02d:%02d".format(min, sec)
+            binding.textRecordingDuration.text = getString(R.string.chat_recording_timer, min, sec)
         } else {
             binding.layoutRecordingBar.visibility = View.GONE
             binding.layoutInputBar.visibility = View.VISIBLE

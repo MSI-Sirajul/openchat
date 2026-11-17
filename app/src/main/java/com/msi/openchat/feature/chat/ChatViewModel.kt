@@ -3,6 +3,7 @@ package com.msi.openchat.feature.chat
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.R
 import com.msi.openchat.core.common.Resource
 import com.msi.openchat.core.di.ServiceLocator
 import com.msi.openchat.data.model.Message
@@ -20,12 +21,9 @@ import kotlinx.coroutines.launch
 import com.msi.openchat.core.security.SessionManager
 
 import android.net.Uri
-import android.provider.OpenableColumns
 import com.msi.openchat.core.common.NetworkMonitor
 import com.msi.openchat.core.common.NetworkStatus
 import java.io.File
-import java.io.FileOutputStream
-import java.util.UUID
 
 data class ChatUiState(
     val conversationId: String = "",
@@ -115,7 +113,7 @@ class ChatViewModel(
                 if (profile != null) {
                     _uiState.value = _uiState.value.copy(
                         contactProfile = profile,
-                        contactName = profile.displayName.ifBlank { profile.username ?: "User" }
+                        contactName = profile.displayName.ifBlank { profile.username ?: ServiceLocator.getString(R.string.common_user) }
                     )
                 }
             }
@@ -289,28 +287,6 @@ class ChatViewModel(
         audioRecorderHelper.stopRecording(discard = true)
     }
 
-    private fun compressImageFileIfNeeded(file: File) {
-        try {
-            if (!file.exists() || file.length() < 300 * 1024) return
-            val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
-            android.graphics.BitmapFactory.decodeFile(file.absolutePath, bounds)
-            val maxDim = 1600
-            var sampleSize = 1
-            while (bounds.outWidth / sampleSize > maxDim || bounds.outHeight / sampleSize > maxDim) {
-                sampleSize *= 2
-            }
-            val decodeOpts = android.graphics.BitmapFactory.Options().apply {
-                inSampleSize = sampleSize
-                inPreferredConfig = android.graphics.Bitmap.Config.RGB_565
-            }
-            val bitmap = android.graphics.BitmapFactory.decodeFile(file.absolutePath, decodeOpts) ?: return
-            FileOutputStream(file).use { out ->
-                bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 85, out)
-            }
-            bitmap.recycle()
-        } catch (_: Throwable) {}
-    }
-
     fun finishAndSendVoiceRecording() {
         val duration = _uiState.value.recordingDurationSeconds
         val audioFile = audioRecorderHelper.stopRecording(discard = false) ?: return
@@ -364,7 +340,7 @@ class ChatViewModel(
                     audioPlayerHelper.playAudio(message.id, localPath)
                     return
                 } else {
-                    _uiState.value = _uiState.value.copy(errorMessage = "Audio file is no longer accessible")
+                    _uiState.value = _uiState.value.copy(errorMessage = ServiceLocator.getString(R.string.chat_audio_inaccessible))
                     return
                 }
             } else {
@@ -451,7 +427,7 @@ class ChatViewModel(
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isUploadingMedia = false,
-                    errorMessage = e.message ?: "Failed to upload image"
+                    errorMessage = e.message ?: ServiceLocator.getString(R.string.chat_upload_image_failed)
                 )
             }
         }
@@ -463,7 +439,7 @@ class ChatViewModel(
         if (meta.size > maxVideoSize) {
             val sizeMb = meta.size / (1024.0 * 1024.0)
             _uiState.value = _uiState.value.copy(
-                errorMessage = "Video size exceeds 100 MB limit (Selected: %.1f MB). Please choose a video up to 100 MB.".format(sizeMb)
+                errorMessage = ServiceLocator.getString(R.string.chat_video_size_limit, sizeMb)
             )
             return
         }
@@ -500,7 +476,7 @@ class ChatViewModel(
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isUploadingMedia = false,
-                    errorMessage = e.message ?: "Failed to upload video"
+                    errorMessage = e.message ?: ServiceLocator.getString(R.string.chat_upload_video_failed)
                 )
             }
         }
@@ -540,7 +516,7 @@ class ChatViewModel(
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isUploadingMedia = false,
-                    errorMessage = e.message ?: "Failed to upload audio"
+                    errorMessage = e.message ?: ServiceLocator.getString(R.string.chat_upload_audio_failed)
                 )
             }
         }
@@ -579,7 +555,7 @@ class ChatViewModel(
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isUploadingMedia = false,
-                    errorMessage = e.message ?: "Failed to upload file"
+                    errorMessage = e.message ?: ServiceLocator.getString(R.string.chat_upload_file_failed)
                 )
             }
         }

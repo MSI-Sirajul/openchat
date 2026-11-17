@@ -7,6 +7,7 @@ import android.content.Intent
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.RemoteInput
+import com.example.R
 import com.msi.openchat.core.common.Constants
 import com.msi.openchat.core.di.ServiceLocator
 import kotlinx.coroutines.CoroutineScope
@@ -35,7 +36,8 @@ class NotificationReplyReceiver : BroadcastReceiver() {
 
         val conversationId = intent.getStringExtra(EXTRA_CONVERSATION_ID).orEmpty()
         val recipientId = intent.getStringExtra(EXTRA_RECIPIENT_ID).orEmpty()
-        val recipientName = intent.getStringExtra(EXTRA_RECIPIENT_NAME) ?: "Chat"
+        val recipientName = intent.getStringExtra(EXTRA_RECIPIENT_NAME)
+            ?: context.getString(R.string.home_conversation_fallback)
         val notificationId = intent.getIntExtra(EXTRA_NOTIFICATION_ID, 100)
 
         val remoteInputResults = RemoteInput.getResultsFromIntent(intent)
@@ -60,7 +62,7 @@ class NotificationReplyReceiver : BroadcastReceiver() {
                 val repliedNotification = NotificationCompat.Builder(context, Constants.CHANNEL_MESSAGES)
                     .setSmallIcon(android.R.drawable.stat_notify_chat)
                     .setContentTitle(recipientName)
-                    .setContentText("You: $replyText")
+                    .setContentText(context.getString(R.string.notif_reply_you, replyText))
                     .setPriority(NotificationCompat.PRIORITY_LOW)
                     .setTimeoutAfter(3000)
                     .build()

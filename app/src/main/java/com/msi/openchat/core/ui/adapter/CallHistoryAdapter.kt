@@ -4,7 +4,6 @@ import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.view.LayoutInflater
 import android.view.ViewGroup
-import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
@@ -39,8 +38,10 @@ class CallHistoryAdapter(
 
         fun bind(call: CallSession) {
             try {
+                val context = binding.root.context
                 val other = call.callerProfile ?: call.receiverProfile
-                val contactName = other?.getResolvedName()?.ifBlank { "Contact" } ?: "Contact"
+                val defaultContact = context.getString(R.string.common_contact)
+                val contactName = other?.getResolvedName()?.ifBlank { defaultContact } ?: defaultContact
                 val contactId = other?.id?.takeIf { it.isNotBlank() } ?: if (call.callerProfile != null) call.callerId else call.receiverId
                 val status = call.status ?: "ended"
                 val callType = if (call.callType == "video" || call.id.startsWith("vid_")) "video" else "audio"
@@ -59,14 +60,19 @@ class CallHistoryAdapter(
                 binding.textAvatar.text = contactName.take(1).uppercase()
                 binding.textContactName.text = contactName
 
-                val context = binding.root.context
                 val formattedTime = DateTimeUtils.formatConversationTime(context, call.startedAt)
-                val durationText = if (call.durationSeconds > 0) " • ${call.durationSeconds}s" else ""
-                val timeText = if (formattedTime.isNotBlank()) " • $formattedTime" else ""
+                val durationText = if (call.durationSeconds > 0) context.getString(R.string.call_history_duration_suffix, call.durationSeconds) else ""
+                val timeText = if (formattedTime.isNotBlank()) context.getString(R.string.call_history_time_suffix, formattedTime) else ""
                 val statusDisplay = status.replaceFirstChar { it.uppercase() }
-                val typeLabel = if (callType == "video") "Video" else "Audio"
+                val typeLabel = context.getString(if (callType == "video") R.string.call_video_label else R.string.call_audio_label)
 
-                binding.textCallDetails.text = "$typeLabel • $statusDisplay$durationText$timeText"
+                binding.textCallDetails.text = context.getString(
+                    R.string.call_history_details_format,
+                    typeLabel,
+                    statusDisplay,
+                    durationText,
+                    timeText
+                )
 
                 if (isMissed) {
                     binding.imageStatus.setImageResource(R.drawable.ic_call_missed_24)
@@ -79,8 +85,9 @@ class CallHistoryAdapter(
                 binding.btnCallback.setImageResource(
                     if (callType == "video") R.drawable.ic_video_24 else R.drawable.ic_call_24
                 )
-                binding.btnCallback.contentDescription =
-                    if (callType == "video") "Start Video Call" else "Start Voice Call"
+                binding.btnCallback.contentDescription = context.getString(
+                    if (callType == "video") R.string.call_start_video_cd else R.string.call_start_audio_cd
+                )
 
                 binding.btnCallback.setOnClickListener {
                     onCallback(contactId, contactName, callType)

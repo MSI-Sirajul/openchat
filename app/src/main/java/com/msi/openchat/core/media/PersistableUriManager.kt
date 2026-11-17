@@ -10,6 +10,7 @@ import android.util.Log
 import android.webkit.MimeTypeMap
 import android.widget.Toast
 import androidx.core.content.FileProvider
+import com.example.R
 import com.msi.openchat.data.local.dao.MessageDao
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -168,7 +169,7 @@ object PersistableUriManager {
      */
     fun openDocument(context: Context, uri: Uri, mimeType: String? = null, displayName: String = "") {
         if (!isUriAccessible(context, uri)) {
-            Toast.makeText(context, "File is no longer accessible or has been deleted from your device", Toast.LENGTH_LONG).show()
+            Toast.makeText(context, context.getString(R.string.chat_file_deleted_inaccessible), Toast.LENGTH_LONG).show()
             return
         }
 
@@ -181,17 +182,17 @@ object PersistableUriManager {
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
-            val title = displayName.ifBlank { "file" }
-            val chooser = Intent.createChooser(intent, "Open $title").apply {
+            val title = displayName.ifBlank { context.getString(R.string.common_file) }
+            val chooser = Intent.createChooser(intent, context.getString(R.string.chat_open_file_title, title)).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             context.startActivity(chooser)
         } catch (e: ActivityNotFoundException) {
-            val title = displayName.ifBlank { "file" }
-            Toast.makeText(context, "No app available to open this file format ($title)", Toast.LENGTH_LONG).show()
+            val title = displayName.ifBlank { context.getString(R.string.common_file) }
+            Toast.makeText(context, context.getString(R.string.chat_no_app_handle_file, title), Toast.LENGTH_LONG).show()
         } catch (e: Exception) {
             Log.e(TAG, "Error opening URI: ${e.message}", e)
-            Toast.makeText(context, "Cannot open file: ${e.message}", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.chat_cannot_open_file, e.message.orEmpty()), Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -200,7 +201,7 @@ object PersistableUriManager {
      */
     fun shareDocument(context: Context, uri: Uri, mimeType: String? = null, displayName: String = "") {
         if (!isUriAccessible(context, uri)) {
-            Toast.makeText(context, "File is no longer accessible or has been deleted from your device", Toast.LENGTH_LONG).show()
+            Toast.makeText(context, context.getString(R.string.chat_file_deleted_inaccessible), Toast.LENGTH_LONG).show()
             return
         }
 
@@ -214,14 +215,14 @@ object PersistableUriManager {
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
-            val title = displayName.ifBlank { "file" }
-            val chooser = Intent.createChooser(intent, "Share $title").apply {
+            val title = displayName.ifBlank { context.getString(R.string.common_file) }
+            val chooser = Intent.createChooser(intent, context.getString(R.string.chat_share_file_title, title)).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             context.startActivity(chooser)
         } catch (e: Exception) {
             Log.e(TAG, "Error sharing URI: ${e.message}", e)
-            Toast.makeText(context, "Cannot share file: ${e.message}", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.chat_cannot_share_file, e.message.orEmpty()), Toast.LENGTH_SHORT).show()
         }
     }
 

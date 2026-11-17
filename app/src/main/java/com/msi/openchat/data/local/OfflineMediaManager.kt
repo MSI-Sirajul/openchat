@@ -9,6 +9,7 @@ import android.util.Log
 import android.webkit.MimeTypeMap
 import android.widget.Toast
 import androidx.core.content.FileProvider
+import com.example.R
 import com.msi.openchat.core.di.ServiceLocator
 import com.msi.openchat.data.local.dao.MessageDao
 import com.msi.openchat.data.model.Message
@@ -30,7 +31,6 @@ import java.net.URL
 object OfflineMediaManager {
 
     private const val TAG = "OfflineMediaManager"
-    private const val MEDIA_DIR_NAME = "openchat_offline_media"
 
     fun getUserMediaDirectory(context: Context, userId: String? = null): File {
         val uid = userId ?: try {
@@ -349,7 +349,7 @@ object OfflineMediaManager {
                     displayName = fileName
                 )
             } else {
-                Toast.makeText(context, "Attachment is no longer accessible or permission was revoked", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, context.getString(R.string.chat_attachment_revoked), Toast.LENGTH_SHORT).show()
             }
             return
         }
@@ -361,10 +361,10 @@ object OfflineMediaManager {
         }
 
         // If not immediately available, show progress toast and resolve in background
-        Toast.makeText(context, "Preparing attachment...", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, context.getString(R.string.chat_preparing_attachment), Toast.LENGTH_SHORT).show()
         val mediaUrl = message.mediaUrl
         if (mediaUrl.isNullOrBlank()) {
-            Toast.makeText(context, "Attachment file data unavailable", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.chat_attachment_data_unavailable), Toast.LENGTH_SHORT).show()
             return
         }
 
@@ -405,7 +405,7 @@ object OfflineMediaManager {
                     }
                     openFileWithIntent(context, file, fileName)
                 } else {
-                    Toast.makeText(context, "Unable to load attachment file", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, context.getString(R.string.chat_unable_load_attachment), Toast.LENGTH_SHORT).show()
                 }
             }
         }
@@ -428,16 +428,16 @@ object OfflineMediaManager {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
 
-            val chooser = Intent.createChooser(intent, "Open $displayFileName").apply {
+            val chooser = Intent.createChooser(intent, context.getString(R.string.chat_open_file_title, displayFileName)).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             context.startActivity(chooser)
         } catch (e: ActivityNotFoundException) {
             Log.w(TAG, "No activity found to handle file: ${e.message}")
-            Toast.makeText(context, "No app found to open this file format ($displayFileName)", Toast.LENGTH_LONG).show()
+            Toast.makeText(context, context.getString(R.string.chat_no_app_open_file, displayFileName), Toast.LENGTH_LONG).show()
         } catch (e: Exception) {
             Log.e(TAG, "Failed to open attachment: ${e.message}", e)
-            Toast.makeText(context, "Cannot open file: ${e.message}", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.chat_cannot_open_file, e.message.orEmpty()), Toast.LENGTH_SHORT).show()
         }
     }
 }

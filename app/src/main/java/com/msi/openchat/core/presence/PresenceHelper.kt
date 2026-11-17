@@ -1,5 +1,7 @@
 package com.msi.openchat.core.presence
 
+import com.example.R
+import com.msi.openchat.core.di.ServiceLocator
 import com.msi.openchat.data.model.Profile
 import java.time.Duration
 import java.time.Instant
@@ -36,36 +38,36 @@ object PresenceHelper {
      * Generates a user-friendly presence label ("Online", "Last seen 5m ago", "Offline").
      */
     fun formatPresenceStatus(profile: Profile?): String {
-        if (profile == null) return "Offline"
+        if (profile == null) return ServiceLocator.getString(R.string.chat_status_offline)
 
         if (isUserOnline(profile)) {
-            return "Online"
+            return ServiceLocator.getString(R.string.chat_status_online)
         }
 
         if (!profile.showLastSeen) {
-            return "Offline"
+            return ServiceLocator.getString(R.string.chat_status_offline)
         }
 
-        val lastSeenIso = profile.lastSeen ?: return "Offline"
-        val lastSeenInstant = parseIsoTimestamp(lastSeenIso) ?: return "Offline"
+        val lastSeenIso = profile.lastSeen ?: return ServiceLocator.getString(R.string.chat_status_offline)
+        val lastSeenInstant = parseIsoTimestamp(lastSeenIso) ?: return ServiceLocator.getString(R.string.chat_status_offline)
         val now = Instant.now()
         val diffSeconds = Duration.between(lastSeenInstant, now).seconds
 
         return when {
-            diffSeconds < 60 -> "Last seen just now"
+            diffSeconds < 60 -> ServiceLocator.getString(R.string.chat_last_seen_just_now)
             diffSeconds < 3600 -> {
                 val mins = (diffSeconds / 60).coerceAtLeast(1)
-                "Last seen ${mins}m ago"
+                ServiceLocator.getString(R.string.chat_last_seen_mins_ago, mins)
             }
             diffSeconds < 86400 -> {
                 val hours = (diffSeconds / 3600).coerceAtLeast(1)
-                "Last seen ${hours}h ago"
+                ServiceLocator.getString(R.string.chat_last_seen_hours_ago, hours)
             }
-            diffSeconds < 172800 -> "Last seen yesterday"
+            diffSeconds < 172800 -> ServiceLocator.getString(R.string.chat_last_seen_yesterday)
             else -> {
                 val formatter = DateTimeFormatter.ofPattern("MMM d", Locale.getDefault())
                     .withZone(ZoneId.systemDefault())
-                "Last seen ${formatter.format(lastSeenInstant)}"
+                ServiceLocator.getString(R.string.chat_last_seen_date, formatter.format(lastSeenInstant))
             }
         }
     }

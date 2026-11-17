@@ -4,13 +4,13 @@ import android.content.Context
 import android.net.Uri
 import android.util.Log
 import com.google.android.gms.tasks.Task
-import com.google.firebase.database.ChildEventListener
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
-import com.google.firebase.database.ServerValue
 import com.google.firebase.database.ValueEventListener
+import com.example.R
 import com.msi.openchat.core.common.Constants
 import com.msi.openchat.core.common.Resource
+import com.msi.openchat.core.di.ServiceLocator
 import com.msi.openchat.core.security.SessionManager
 import com.msi.openchat.data.local.dao.ConversationDao
 import com.msi.openchat.data.local.dao.MessageDao
@@ -31,7 +31,6 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import java.util.UUID
 import kotlin.coroutines.resume
 
 /**
@@ -95,7 +94,7 @@ class ChatRepository(
 
     suspend fun getConversations(): Resource<List<Conversation>> = withContext(Dispatchers.IO) {
         val currentUserId = sessionManager.getUserId() ?: FirebaseManager.auth.currentUser?.uid
-            ?: return@withContext Resource.Error("Not authenticated")
+            ?: return@withContext Resource.Error(ServiceLocator.getString(R.string.common_not_authenticated))
 
         // 1. Load from local DB first
         val localEntities = conversationDao?.getConversationsForUserList(currentUserId).orEmpty()
@@ -157,14 +156,14 @@ class ChatRepository(
             if (localConversations.isNotEmpty()) {
                 Resource.Success(localConversations)
             } else {
-                Resource.Error(e.message ?: "Failed to get conversations", e)
+                Resource.Error(e.message ?: ServiceLocator.getString(R.string.chat_conversations_load_failed), e)
             }
         }
     }
 
     suspend fun getOrCreateConversation(otherUserId: String): Resource<Conversation> = withContext(Dispatchers.IO) {
         val currentUserId = sessionManager.getUserId() ?: FirebaseManager.auth.currentUser?.uid
-            ?: return@withContext Resource.Error("Not authenticated")
+            ?: return@withContext Resource.Error(ServiceLocator.getString(R.string.common_not_authenticated))
 
         val convId = if (currentUserId < otherUserId) "direct_${currentUserId}_${otherUserId}" else "direct_${otherUserId}_${currentUserId}"
         val now = getCurrentIsoTime()
@@ -234,7 +233,7 @@ class ChatRepository(
             if (localMessages.isNotEmpty()) {
                 Resource.Success(localMessages)
             } else {
-                Resource.Error(e.message ?: "Failed to load messages", e)
+                Resource.Error(e.message ?: ServiceLocator.getString(R.string.chat_messages_load_failed), e)
             }
         }
     }
@@ -258,7 +257,7 @@ class ChatRepository(
             Resource.Success(entity.toDomain())
         } catch (e: Exception) {
             Log.e(tag, "sendTextMessage error: ${e.message}", e)
-            Resource.Error(e.message ?: "Failed to send message", e)
+            Resource.Error(e.message ?: ServiceLocator.getString(R.string.chat_send_message_failed), e)
         }
     }
 
@@ -286,7 +285,7 @@ class ChatRepository(
             Resource.Success(entity.toDomain())
         } catch (e: Exception) {
             Log.e(tag, "sendMediaMessage error: ${e.message}", e)
-            Resource.Error(e.message ?: "Failed to send media message", e)
+            Resource.Error(e.message ?: ServiceLocator.getString(R.string.chat_send_media_message_failed), e)
         }
     }
 
@@ -313,7 +312,7 @@ class ChatRepository(
             Resource.Success(entity.toDomain())
         } catch (e: Exception) {
             Log.e(tag, "sendMediaFromUri error: ${e.message}", e)
-            Resource.Error(e.message ?: "Failed to send media", e)
+            Resource.Error(e.message ?: ServiceLocator.getString(R.string.chat_send_media_failed), e)
         }
     }
 
@@ -356,12 +355,12 @@ class ChatRepository(
                 return@withContext uploadRes
             }
 
-            val errorMsg = (uploadRes as? Resource.Error)?.message ?: "Media upload failed"
+            val errorMsg = (uploadRes as? Resource.Error)?.message ?: ServiceLocator.getString(R.string.chat_media_upload_failed)
             Log.e(tag, "Upload failed for bucket '$bucketId': $errorMsg")
             Resource.Error(errorMsg)
         } catch (e: Exception) {
             Log.e(tag, "Upload error: ${e.message}", e)
-            Resource.Error(e.message ?: "Failed to upload file", e)
+            Resource.Error(e.message ?: ServiceLocator.getString(R.string.chat_upload_file_failed), e)
         }
     }
 
@@ -377,7 +376,7 @@ class ChatRepository(
                 )
             }
             is Resource.Error -> Resource.Error(uploadRes.message)
-            else -> Resource.Error("Upload failed")
+            else -> Resource.Error(ServiceLocator.getString(R.string.chat_upload_generic_failed))
         }
     }
 
@@ -392,7 +391,7 @@ class ChatRepository(
                 )
             }
             is Resource.Error -> Resource.Error(uploadRes.message)
-            else -> Resource.Error("Upload failed")
+            else -> Resource.Error(ServiceLocator.getString(R.string.chat_upload_generic_failed))
         }
     }
 
@@ -407,7 +406,7 @@ class ChatRepository(
                 )
             }
             is Resource.Error -> Resource.Error(uploadRes.message)
-            else -> Resource.Error("Upload failed")
+            else -> Resource.Error(ServiceLocator.getString(R.string.chat_upload_generic_failed))
         }
     }
 
@@ -423,7 +422,7 @@ class ChatRepository(
                 )
             }
             is Resource.Error -> Resource.Error(uploadRes.message)
-            else -> Resource.Error("Upload failed")
+            else -> Resource.Error(ServiceLocator.getString(R.string.chat_upload_generic_failed))
         }
     }
 

@@ -15,7 +15,7 @@ import android.util.Log
 import android.view.View
 import android.view.WindowManager
 import androidx.appcompat.app.AppCompatActivity
-import com.example.MainActivity
+import com.example.R
 import com.example.databinding.FragmentCallBinding
 import com.msi.openchat.core.di.ServiceLocator
 import com.msi.openchat.core.service.AppServiceManager
@@ -37,7 +37,7 @@ class IncomingCallActivity : AppCompatActivity() {
 
     private var callId: String = ""
     private var callerId: String = ""
-    private var callerName: String = "Incoming Call"
+    private var callerName: String = ""
 
     private val activityScope = CoroutineScope(Dispatchers.Main + Job())
     private var timeoutJob: Job? = null
@@ -74,7 +74,7 @@ class IncomingCallActivity : AppCompatActivity() {
 
         callId = intent.getStringExtra(EXTRA_CALL_ID).orEmpty()
         callerId = intent.getStringExtra(EXTRA_CALLER_ID).orEmpty()
-        callerName = intent.getStringExtra(EXTRA_CALLER_NAME) ?: "OpenChat Caller"
+        callerName = intent.getStringExtra(EXTRA_CALLER_NAME) ?: getString(R.string.home_openchat_caller)
 
         setupWindowAndLockScreen()
         acquireWakeLock()
@@ -97,7 +97,7 @@ class IncomingCallActivity : AppCompatActivity() {
 
         binding.textCallerName.text = callerName
         binding.textCallerAvatarInitial.text = callerName.take(1).uppercase()
-        binding.textCallStatus.text = "Incoming Voice Call..."
+        binding.textCallStatus.text = getString(R.string.call_incoming_voice_ellipsis)
 
         binding.layoutIncomingCallControls.visibility = View.VISIBLE
         binding.layoutActiveCallControls.visibility = View.GONE
@@ -202,7 +202,7 @@ class IncomingCallActivity : AppCompatActivity() {
 
             CoroutineScope(Dispatchers.IO).launch {
                 try {
-                    ServiceLocator.callRepository.updateCallStatus(callId, "missed", endReason = "No answer")
+                    ServiceLocator.callRepository.updateCallStatus(callId, "missed", endReason = getString(R.string.call_no_answer_sentence))
                     ServiceLocator.callRepository.sendSignaling(callId, callerId, "bye", "{\"reason\":\"timeout\"}")
                 } catch (_: Exception) {}
             }
@@ -244,7 +244,7 @@ class IncomingCallActivity : AppCompatActivity() {
 
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                ServiceLocator.callRepository.updateCallStatus(callId, "declined", endReason = "Declined by user")
+                ServiceLocator.callRepository.updateCallStatus(callId, "declined", endReason = getString(R.string.call_declined_by_user))
                 ServiceLocator.callRepository.sendSignaling(callId, callerId, "bye", "{\"reason\":\"declined\"}")
             } catch (_: Exception) {}
         }

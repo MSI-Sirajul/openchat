@@ -8,6 +8,7 @@ import android.view.ViewGroup
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
+import com.example.R
 import com.example.databinding.ItemConversationBinding
 import com.msi.openchat.core.common.DateTimeUtils
 import com.msi.openchat.data.model.Conversation
@@ -37,9 +38,9 @@ class ConversationAdapter(
     ) : RecyclerView.ViewHolder(binding.root) {
 
         fun bind(conversation: Conversation) {
+            val context = binding.root.context
             val other = conversation.otherUser
-            val displayName = other?.getResolvedName() ?: "User"
-            val initial = displayName.take(1).uppercase()
+            val displayName = other?.getResolvedName() ?: context.getString(R.string.common_user)
 
             val nameColor = if (isDark) Color.parseColor("#E8EEF5") else Color.parseColor("#17212B")
             val subColor = if (isDark) Color.parseColor("#A3B1BF") else Color.parseColor("#64748B")
@@ -61,9 +62,9 @@ class ConversationAdapter(
                 displayName = displayName
             )
             binding.textName.text = displayName
-            binding.textLastMessage.text = conversation.lastMessageText ?: "Started conversation"
+            binding.textLastMessage.text = conversation.lastMessageText ?: context.getString(R.string.home_started_conversation)
             binding.textTime.text = DateTimeUtils.formatConversationTime(
-                binding.root.context,
+                context,
                 conversation.lastMessageAt
             )
 

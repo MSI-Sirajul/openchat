@@ -2,6 +2,7 @@ package com.msi.openchat.feature.friends
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.R
 import com.msi.openchat.core.common.Resource
 import com.msi.openchat.core.di.ServiceLocator
 import com.msi.openchat.data.model.FriendRequest
@@ -54,10 +55,13 @@ class FriendRequestsViewModel(
             when (val res = friendsRepository.acceptFriendRequest(request.id)) {
                 is Resource.Success -> {
                     _uiState.value = _uiState.value.copy(
-                        message = "Accepted friend request from ${request.sender?.displayName}"
+                        message = ServiceLocator.getString(
+                            R.string.friends_request_accepted_from,
+                            request.sender?.displayName.orEmpty()
+                        )
                     )
                     loadRequests()
-                    val friendName = request.sender?.displayName ?: "Friend"
+                    val friendName = request.sender?.displayName ?: ServiceLocator.getString(R.string.common_friend)
                     onAccepted(res.data, friendName)
                 }
                 is Resource.Error -> {
@@ -72,7 +76,9 @@ class FriendRequestsViewModel(
         viewModelScope.launch {
             when (val res = friendsRepository.declineFriendRequest(requestId)) {
                 is Resource.Success -> {
-                    _uiState.value = _uiState.value.copy(message = "Request declined")
+                    _uiState.value = _uiState.value.copy(
+                        message = ServiceLocator.getString(R.string.friends_request_declined)
+                    )
                     loadRequests()
                 }
                 is Resource.Error -> {
@@ -87,7 +93,9 @@ class FriendRequestsViewModel(
         viewModelScope.launch {
             when (val res = friendsRepository.cancelFriendRequest(requestId)) {
                 is Resource.Success -> {
-                    _uiState.value = _uiState.value.copy(message = "Request cancelled")
+                    _uiState.value = _uiState.value.copy(
+                        message = ServiceLocator.getString(R.string.friends_request_cancelled)
+                    )
                     loadRequests()
                 }
                 is Resource.Error -> {

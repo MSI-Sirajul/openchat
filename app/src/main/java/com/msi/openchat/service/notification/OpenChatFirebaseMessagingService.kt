@@ -1,17 +1,9 @@
 package com.msi.openchat.service.notification
 
-import android.app.NotificationChannel
-import android.app.NotificationManager
-import android.app.PendingIntent
-import android.content.Context
-import android.content.Intent
-import android.os.Build
 import android.util.Log
-import androidx.core.app.NotificationCompat
-import com.example.MainActivity
+import com.example.R
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
-import com.msi.openchat.core.common.Constants
 import com.msi.openchat.core.di.ServiceLocator
 import com.msi.openchat.core.security.SessionManager
 import kotlinx.coroutines.CoroutineScope
@@ -41,8 +33,12 @@ class OpenChatFirebaseMessagingService : FirebaseMessagingService() {
         Log.d(tag, "Received push message: ${remoteMessage.data}")
 
         val type = remoteMessage.data["type"] ?: "new_message"
-        val title = remoteMessage.notification?.title ?: remoteMessage.data["title"] ?: "OpenChat"
-        val body = remoteMessage.notification?.body ?: remoteMessage.data["body"] ?: "You have a new update"
+        val title = remoteMessage.notification?.title
+            ?: remoteMessage.data["title"]
+            ?: getString(R.string.app_name)
+        val body = remoteMessage.notification?.body
+            ?: remoteMessage.data["body"]
+            ?: getString(R.string.notif_new_update)
         val senderId = remoteMessage.data["sender_id"]
         val conversationId = remoteMessage.data["conversation_id"]
         val callId = remoteMessage.data["call_id"]

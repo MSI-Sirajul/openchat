@@ -5,7 +5,9 @@ import com.google.firebase.database.ChildEventListener
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.ValueEventListener
+import com.example.R
 import com.msi.openchat.core.common.Resource
+import com.msi.openchat.core.di.ServiceLocator
 import com.msi.openchat.core.security.SessionManager
 import com.msi.openchat.data.model.CallSession
 import com.msi.openchat.data.model.CallSignalingMessage
@@ -49,7 +51,7 @@ class CallRepository(
             }
 
             val callerId = FirebaseManager.auth.currentUser?.uid ?: sessionManager.getUserId()
-                ?: return@withContext Resource.Error("Not authenticated")
+                ?: return@withContext Resource.Error(ServiceLocator.getString(R.string.common_not_authenticated))
 
             try {
                 val callId = com.msi.openchat.service.call.CallSessionGuard.generateAudioCallId()
@@ -68,7 +70,7 @@ class CallRepository(
                     is Resource.Success -> p.data
                     else -> null
                 }
-                val callerName = callerProfile?.displayName?.ifBlank { callerProfile.username } ?: "OpenChat"
+                val callerName = callerProfile?.displayName?.ifBlank { callerProfile.username } ?: ServiceLocator.getString(R.string.app_name)
 
                 val incomingAudioData = HashMap<String, Any?>()
                 incomingAudioData["call_id"] = callId
@@ -106,13 +108,13 @@ class CallRepository(
                                 )
                             )
                         } else {
-                            continuation.resume(Resource.Error(task.exception?.message ?: "Failed to initiate audio call"))
+                            continuation.resume(Resource.Error(task.exception?.message ?: ServiceLocator.getString(R.string.call_voice_initiate_failed)))
                         }
                     }
                 }
             } catch (e: Exception) {
                 Log.e(tag, "initiateAudioCall error: ${e.message}", e)
-                Resource.Error(e.message ?: "Failed to initiate audio call", e)
+                Resource.Error(e.message ?: ServiceLocator.getString(R.string.call_voice_initiate_failed), e)
             }
         }
 
@@ -185,7 +187,7 @@ class CallRepository(
         }
 
         val senderId = FirebaseManager.auth.currentUser?.uid ?: sessionManager.getUserId()
-            ?: return@withContext Resource.Error("Not authenticated")
+            ?: return@withContext Resource.Error(ServiceLocator.getString(R.string.common_not_authenticated))
 
         val messageId = audioCallSignalingRef.child(callId).push().key ?: UUID.randomUUID().toString()
         val now = System.currentTimeMillis().toString()
@@ -202,7 +204,7 @@ class CallRepository(
         suspendCancellableCoroutine<Resource<Unit>> { continuation ->
             audioCallSignalingRef.child(callId).child(messageId).setValue(data).addOnCompleteListener { task ->
                 if (task.isSuccessful) continuation.resume(Resource.Success(Unit))
-                else continuation.resume(Resource.Error(task.exception?.message ?: "Signaling send failed"))
+                else continuation.resume(Resource.Error(task.exception?.message ?: ServiceLocator.getString(R.string.call_signaling_send_failed)))
             }
         }
     }
@@ -341,7 +343,7 @@ class CallRepository(
 
     suspend fun getCallHistory(): Resource<List<CallSession>> = withContext(Dispatchers.IO) {
         val currentUserId = sessionManager.getUserId() ?: FirebaseManager.auth.currentUser?.uid
-            ?: return@withContext Resource.Error("Not authenticated")
+            ?: return@withContext Resource.Error(ServiceLocator.getString(R.string.common_not_authenticated))
 
         val audioSnap = fetchCallsSnapshot(audioCallsRef, 40)
         val videoSnap = fetchCallsSnapshot(FirebaseManager.videoCallsRef, 40)

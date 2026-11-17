@@ -26,7 +26,7 @@
         <ImageView
             android:layout_width="16dp"
             android:layout_height="16dp"
-            android:contentDescription="Encrypted"
+            android:contentDescription="@string/call_encrypted_cd"
             android:src="@drawable/ic_lock_24"
             app:tint="#5DD69A" />
 
@@ -34,7 +34,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="8dp"
-            android:text="End-to-End Encrypted"
+            android:text="@string/call_encrypted_banner"
             android:textColor="#5DD69A"
             android:textSize="13sp"
             android:textStyle="bold" />
@@ -63,7 +63,7 @@
             android:layout_width="120dp"
             android:layout_height="120dp"
             android:layout_gravity="center"
-            android:contentDescription="Contact Avatar"
+            android:contentDescription="@string/common_avatar_cd"
             android:scaleType="centerCrop" />
 
         <TextView
@@ -146,7 +146,7 @@
             android:layout_height="60dp"
             android:layout_marginEnd="28dp"
             android:background="@drawable/bg_video_call_control_circle"
-            android:contentDescription="Mute Audio"
+            android:contentDescription="@string/call_mute_audio_cd"
             android:elevation="6dp"
             android:padding="16dp"
             android:scaleType="centerInside"
@@ -160,7 +160,7 @@
             android:layout_height="60dp"
             android:layout_marginEnd="28dp"
             android:background="@drawable/bg_video_call_control_circle"
-            android:contentDescription="Toggle Speaker"
+            android:contentDescription="@string/call_toggle_speaker_cd"
             android:elevation="6dp"
             android:padding="16dp"
             android:scaleType="centerInside"
@@ -173,7 +173,7 @@
             android:layout_width="68dp"
             android:layout_height="68dp"
             android:background="@drawable/bg_video_call_end_circle"
-            android:contentDescription="End Voice Call"
+            android:contentDescription="@string/call_end_voice_cd"
             android:elevation="8dp"
             android:padding="18dp"
             android:scaleType="centerInside"

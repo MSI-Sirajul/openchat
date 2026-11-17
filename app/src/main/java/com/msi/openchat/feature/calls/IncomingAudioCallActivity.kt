@@ -20,6 +20,7 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePadding
 import androidx.lifecycle.lifecycleScope
+import com.example.R
 import com.example.databinding.ActivityIncomingAudioCallBinding
 import com.msi.openchat.core.di.ServiceLocator
 import com.msi.openchat.core.service.AppServiceManager
@@ -42,7 +43,7 @@ class IncomingAudioCallActivity : AppCompatActivity() {
     private lateinit var binding: ActivityIncomingAudioCallBinding
     private var callId: String = ""
     private var callerId: String = ""
-    private var callerName: String = "Incoming Voice Call"
+    private var callerName: String = ""
 
     private var pulseAnimator: ObjectAnimator? = null
     private var dismissReceiver: BroadcastReceiver? = null
@@ -81,7 +82,7 @@ class IncomingAudioCallActivity : AppCompatActivity() {
 
         callId = intent.getStringExtra(EXTRA_CALL_ID).orEmpty()
         callerId = intent.getStringExtra(EXTRA_CALLER_ID).orEmpty()
-        callerName = intent.getStringExtra(EXTRA_CALLER_NAME) ?: "OpenChat Caller"
+        callerName = intent.getStringExtra(EXTRA_CALLER_NAME) ?: getString(R.string.home_openchat_caller)
 
         if (callId.isBlank() ||
             CallSessionGuard.isVideoCall(callId, null) ||
@@ -246,7 +247,11 @@ class IncomingAudioCallActivity : AppCompatActivity() {
 
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                ServiceLocator.callRepository.updateCallStatus(callId = callId, status = "declined", endReason = "Declined by user")
+                ServiceLocator.callRepository.updateCallStatus(
+                    callId = callId,
+                    status = "declined",
+                    endReason = getString(R.string.call_declined_by_user)
+                )
                 ServiceLocator.callRepository.sendSignaling(callId, callerId, "bye", "{\"reason\":\"declined\"}")
             } catch (e: Exception) {
                 Log.e(tag, "Error declining audio call: ${e.message}")

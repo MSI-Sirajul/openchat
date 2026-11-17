@@ -27,6 +27,7 @@
         <ImageView
             android:layout_width="16dp"
             android:layout_height="16dp"
+            android:contentDescription="@string/call_encrypted_cd"
             android:src="@drawable/ic_lock_24"
             app:tint="#5DD69A" />
 
@@ -34,7 +35,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="6dp"
-            android:text="End-to-End Encrypted"
+            android:text="@string/call_encrypted_banner"
             android:textColor="#5DD69A"
             android:textSize="12sp"
             android:fontFamily="sans-serif-medium" />
@@ -66,7 +67,7 @@
             android:background="@drawable/bg_avatar_circle"
             android:backgroundTint="#087EBA"
             android:gravity="center"
-            android:text="U"
+            android:text="@string/common_avatar_placeholder_letter"
             android:textColor="#FFFFFF"
             android:textSize="44sp"
             android:fontFamily="sans-serif-bold" />
@@ -78,7 +79,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="20dp"
-        android:text="Contact Name"
+        android:text="@string/call_contact_name_placeholder"
         android:textColor="#FFFFFF"
         android:textSize="24sp"
         android:fontFamily="sans-serif-bold"
@@ -121,7 +122,7 @@
             android:layout_height="wrap_content"
             android:layout_marginEnd="24dp"
             android:src="@drawable/ic_mic_24"
-            android:contentDescription="Mute Audio"
+            android:contentDescription="@string/call_mute_audio_cd"
             app:tint="#FFFFFF"
             app:backgroundTint="#344452"
             app:elevation="4dp" />
@@ -132,7 +133,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:src="@drawable/ic_call_end_24"
-            android:contentDescription="End Call"
+            android:contentDescription="@string/call_end"
             app:tint="#FFFFFF"
             app:backgroundTint="#D32F2F"
             app:fabCustomSize="64dp"
@@ -145,7 +146,7 @@
             android:layout_height="wrap_content"
             android:layout_marginStart="24dp"
             android:src="@drawable/ic_volume_up_24"
-            android:contentDescription="Toggle Speaker"
+            android:contentDescription="@string/call_toggle_speaker_cd"
             app:tint="#FFFFFF"
             app:backgroundTint="#344452"
             app:elevation="4dp" />
@@ -171,7 +172,7 @@
             android:layout_height="wrap_content"
             android:layout_marginEnd="48dp"
             android:src="@drawable/ic_call_end_24"
-            android:contentDescription="Decline Call"
+            android:contentDescription="@string/call_decline_cd"
             app:tint="#FFFFFF"
             app:backgroundTint="#D32F2F"
             app:fabCustomSize="64dp"
@@ -184,7 +185,7 @@
             android:layout_height="wrap_content"
             android:layout_marginStart="48dp"
             android:src="@drawable/ic_call_24"
-            android:contentDescription="Accept Call"
+            android:contentDescription="@string/call_accept_cd"
             app:tint="#FFFFFF"
             app:backgroundTint="#16834A"
             app:fabCustomSize="64dp"

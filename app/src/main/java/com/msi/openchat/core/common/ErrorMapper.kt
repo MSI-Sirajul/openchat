@@ -1,7 +1,7 @@
 package com.msi.openchat.core.common
 
+import com.example.R
 import com.msi.openchat.core.di.ServiceLocator
-import java.io.IOException
 import java.net.ConnectException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
@@ -13,13 +13,16 @@ import java.net.UnknownHostException
  */
 object ErrorMapper {
 
-    fun toUserFacingMessage(throwable: Throwable?, fallback: String = "Something went wrong"): String {
+    fun toUserFacingMessage(
+        throwable: Throwable?,
+        fallback: String = ServiceLocator.getString(R.string.common_something_went_wrong)
+    ): String {
         if (throwable == null) return fallback
 
         // 1. Direct device network check if available
         try {
             if (!ServiceLocator.networkMonitor.status.value.isConnected) {
-                return "No internet connection"
+                return ServiceLocator.getString(R.string.common_no_internet)
             }
         } catch (_: Exception) {}
 
@@ -28,7 +31,7 @@ object ErrorMapper {
             throwable is ConnectException ||
             throwable is SocketTimeoutException
         ) {
-            return "No internet connection"
+            return ServiceLocator.getString(R.string.common_no_internet)
         }
 
         val rawMsg = throwable.message?.trim().orEmpty()
@@ -49,7 +52,7 @@ object ErrorMapper {
             lower.contains("broken pipe") ||
             lower.contains("software caused connection abort")
         ) {
-            return "No internet connection"
+            return ServiceLocator.getString(R.string.common_no_internet)
         }
 
         // 4. Rate limiting (HTTP 429)
@@ -58,17 +61,17 @@ object ErrorMapper {
             lower.contains("too-many-requests") ||
             lower.contains("rate limit")
         ) {
-            return "Too many sign-in attempts. Please wait 1 minute before trying again to allow the rate limit to reset."
+            return ServiceLocator.getString(R.string.common_rate_limit_error)
         }
 
         // 5. GraphQL schema / query_root errors
         if (lower.contains("not found in type: 'query_root'") || lower.contains("not found query_root")) {
-            return "Database table permissions initializing. Please retry in a few moments."
+            return ServiceLocator.getString(R.string.common_db_initializing_error)
         }
 
         // 6. Email verification notice
         if (lower.contains("unverified") || lower.contains("not confirmed") || lower.contains("not-verified")) {
-            return "Please check your email (including Spam/Junk folder) to confirm your account."
+            return ServiceLocator.getString(R.string.common_email_confirm_notice)
         }
 
         return rawMsg.ifBlank { fallback }

@@ -6,6 +6,7 @@ import android.view.ViewGroup
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
+import com.example.R
 import com.example.databinding.ItemFriendRequestBinding
 import com.msi.openchat.core.common.DateTimeUtils
 import com.msi.openchat.data.model.FriendRequest
@@ -35,8 +36,10 @@ class FriendRequestAdapter(
     ) : RecyclerView.ViewHolder(binding.root) {
 
         fun bind(request: FriendRequest) {
+            val context = binding.root.context
             val user = if (isReceivedTab) request.sender else request.receiver
-            val displayName = user?.displayName?.ifBlank { user.username ?: "User" } ?: "User"
+            val defaultUser = context.getString(R.string.common_user)
+            val displayName = user?.displayName?.ifBlank { user.username ?: defaultUser } ?: defaultUser
             binding.textRequestName.text = displayName
             com.msi.openchat.core.ui.AvatarHelper.loadAvatar(
                 imageView = binding.imgRequestAvatar,

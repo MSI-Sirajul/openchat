@@ -70,9 +70,9 @@ class AppLockFragment : Fragment() {
         isBiometricPromptShowing = true
         BiometricAuthHelper.promptBiometricAuthentication(
             activity = requireActivity(),
-            title = "OpenChat Privacy Lock",
-            subtitle = "Scan your fingerprint to unlock",
-            negativeButtonText = if (viewModel.hasPinSet()) "Use PIN" else "Use Password",
+            title = getString(R.string.applock_privacy_lock_title),
+            subtitle = getString(R.string.biometric_subtitle),
+            negativeButtonText = if (viewModel.hasPinSet()) getString(R.string.applock_use_pin) else getString(R.string.applock_use_password),
             onSuccess = {
                 isBiometricPromptShowing = false
                 viewModel.onBiometricSuccess()
@@ -81,7 +81,7 @@ class AppLockFragment : Fragment() {
                 isBiometricPromptShowing = false
                 if (errorCode == androidx.biometric.BiometricPrompt.ERROR_LOCKOUT ||
                     errorCode == androidx.biometric.BiometricPrompt.ERROR_LOCKOUT_PERMANENT) {
-                    Toast.makeText(context, "Biometric locked out: $errString", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, getString(R.string.applock_biometric_locked_out, errString), Toast.LENGTH_SHORT).show()
                 }
             },
             onFailed = {
@@ -148,7 +148,7 @@ class AppLockFragment : Fragment() {
 
                     // Lockout / Error state
                     if (state.isLockedOut) {
-                        binding.textLockError.text = state.errorMessage ?: "Too many incorrect attempts. Please reset your PIN."
+                        binding.textLockError.text = state.errorMessage ?: getString(R.string.applock_too_many_attempts_short)
                         binding.textLockError.visibility = View.VISIBLE
                         setKeypadEnabled(false)
                     } else if (!state.errorMessage.isNullOrBlank()) {
@@ -178,23 +178,23 @@ class AppLockFragment : Fragment() {
 
     private fun showResetPasswordDialog() {
         val input = EditText(requireContext()).apply {
-            hint = "Enter your account password"
+            hint = getString(R.string.applock_enter_account_password)
             inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
             setPadding(48, 32, 48, 32)
         }
 
         AlertDialog.Builder(requireContext())
-            .setTitle("Reset Passcode")
-            .setMessage("Confirm your OpenChat account password to remove the current passcode lock.")
+            .setTitle(getString(R.string.applock_reset_passcode_title))
+            .setMessage(getString(R.string.applock_reset_passcode_message))
             .setView(input)
-            .setPositiveButton("Verify & Unlock") { _, _ ->
+            .setPositiveButton(getString(R.string.applock_verify_unlock)) { _, _ ->
                 val password = input.text.toString()
                 if (password.isNotBlank()) {
                     viewModel.onResetPasswordChanged(password)
                     viewModel.verifyCredentialsForReset()
                 }
             }
-            .setNegativeButton("Cancel", null)
+            .setNegativeButton(getString(R.string.common_cancel), null)
             .show()
     }
 

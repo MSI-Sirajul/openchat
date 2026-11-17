@@ -76,7 +76,7 @@ class ActiveVideoCallActivity : AppCompatActivity(), SensorEventListener {
 
     private var callId: String = ""
     private var peerId: String = ""
-    private var peerName: String = "OpenChat Contact"
+    private var peerName: String = ""
     private var isIncoming: Boolean = false
     private var sessionStarted = false
     private var localRendererAttached = false
@@ -93,11 +93,11 @@ class ActiveVideoCallActivity : AppCompatActivity(), SensorEventListener {
         if (camGranted && micGranted) {
             startVideoCallSession()
         } else {
-            Toast.makeText(this, "Camera and microphone permissions are required for video calls", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, getString(R.string.call_video_permissions_required), Toast.LENGTH_SHORT).show()
             if (isIncoming && callId.isNotBlank()) {
                 VideoCallManager.declineIncomingCall(applicationContext, callId, peerId)
             } else {
-                VideoCallManager.endCall("Permissions denied")
+                VideoCallManager.endCall(getString(R.string.call_permissions_denied))
             }
             finish()
         }
@@ -147,7 +147,7 @@ class ActiveVideoCallActivity : AppCompatActivity(), SensorEventListener {
             ?: intent.getStringExtra("peerUserId")?.ifBlank { null }
             ?: currentState.peerId
         peerName = intent.getStringExtra(EXTRA_PEER_NAME)?.takeIf { it.isNotBlank() }
-            ?: currentState.peerName.ifBlank { "OpenChat Contact" }
+            ?: currentState.peerName.ifBlank { getString(R.string.home_openchat_contact) }
         isIncoming = intent.getBooleanExtra(EXTRA_IS_INCOMING, false) ||
             intent.getBooleanExtra("autoAccept", false)
 
@@ -211,7 +211,8 @@ class ActiveVideoCallActivity : AppCompatActivity(), SensorEventListener {
                     return
                 }
                 releaseRenderers()
-                videoService?.endCall("Call ended") ?: VideoCallManager.endCall("Call ended")
+                val endedReason = getString(R.string.call_ended_sentence)
+                videoService?.endCall(endedReason) ?: VideoCallManager.endCall(endedReason)
                 finish()
             }
         })
@@ -349,7 +350,8 @@ class ActiveVideoCallActivity : AppCompatActivity(), SensorEventListener {
 
         binding.btnEndCall.setOnClickListener {
             releaseRenderers()
-            videoService?.endCall("Call ended by user") ?: VideoCallManager.endCall("Call ended by user")
+            val endedReason = getString(R.string.call_ended_by_user)
+            videoService?.endCall(endedReason) ?: VideoCallManager.endCall(endedReason)
             finish()
         }
 
@@ -458,7 +460,7 @@ class ActiveVideoCallActivity : AppCompatActivity(), SensorEventListener {
             binding.layoutRemotePlaceholder.visibility = View.GONE
         } else {
             binding.layoutRemotePlaceholder.visibility = View.VISIBLE
-            binding.textPlaceholderStatus.text = "Waiting for remote video..."
+            binding.textPlaceholderStatus.text = getString(R.string.call_video_waiting_remote)
             binding.textRemoteAvatarInitial.text = state.peerName.ifBlank { peerName }.take(1).uppercase()
         }
 

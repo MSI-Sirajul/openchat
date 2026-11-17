@@ -40,7 +40,7 @@
                 android:id="@+id/img_remote_avatar"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:contentDescription="Contact Avatar"
+                android:contentDescription="@string/common_avatar_cd"
                 android:scaleType="centerCrop" />
 
             <TextView
@@ -101,7 +101,7 @@
                 <ImageView
                     android:layout_width="28dp"
                     android:layout_height="28dp"
-                    android:contentDescription="Camera Off"
+                    android:contentDescription="@string/call_video_camera_off"
                     android:src="@drawable/ic_videocam_off_24"
                     app:tint="#FFFFFF" />
 
@@ -109,7 +109,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="4dp"
-                    android:text="Camera Off"
+                    android:text="@string/call_video_camera_off"
                     android:textColor="#CCCCCC"
                     android:textSize="10sp" />
             </LinearLayout>
@@ -136,7 +136,7 @@
             android:layout_width="44dp"
             android:layout_height="44dp"
             android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="Minimize to PiP"
+            android:contentDescription="@string/call_video_minimize_pip_cd"
             android:padding="10dp"
             android:scaleType="centerInside"
             android:src="@drawable/ic_pip_24"
@@ -209,7 +209,7 @@
         android:background="#D32F2F"
         android:gravity="center"
         android:padding="8dp"
-        android:text="Reconnecting video call..."
+        android:text="@string/call_video_reconnecting"
         android:textColor="#FFFFFF"
         android:textSize="13sp"
         android:textStyle="bold"
@@ -241,7 +241,7 @@
             android:layout_height="52dp"
             android:layout_marginEnd="14dp"
             android:background="@drawable/bg_video_call_control_circle"
-            android:contentDescription="Mute Audio"
+            android:contentDescription="@string/call_mute_audio_cd"
             android:padding="12dp"
             android:scaleType="centerInside"
             android:src="@drawable/ic_mic_24"
@@ -254,7 +254,7 @@
             android:layout_height="52dp"
             android:layout_marginEnd="14dp"
             android:background="@drawable/bg_video_call_control_circle"
-            android:contentDescription="Toggle Camera"
+            android:contentDescription="@string/call_video_toggle_camera_cd"
             android:padding="12dp"
             android:scaleType="centerInside"
             android:src="@drawable/ic_camera_24"
@@ -267,7 +267,7 @@
             android:layout_height="52dp"
             android:layout_marginEnd="14dp"
             android:background="@drawable/bg_video_call_control_circle"
-            android:contentDescription="Switch Camera"
+            android:contentDescription="@string/call_video_switch_camera_cd"
             android:padding="12dp"
             android:scaleType="centerInside"
             android:src="@drawable/ic_cameraswitch_24"
@@ -280,7 +280,7 @@
             android:layout_height="52dp"
             android:layout_marginEnd="18dp"
             android:background="@drawable/bg_video_call_control_circle"
-            android:contentDescription="Speakerphone"
+            android:contentDescription="@string/call_speakerphone_cd"
             android:padding="12dp"
             android:scaleType="centerInside"
             android:src="@drawable/ic_volume_up_24"
@@ -292,7 +292,7 @@
             android:layout_width="58dp"
             android:layout_height="58dp"
             android:background="@drawable/bg_video_call_end_circle"
-            android:contentDescription="End Video Call"
+            android:contentDescription="@string/call_video_end_cd"
             android:elevation="6dp"
             android:padding="14dp"
             android:scaleType="centerInside"

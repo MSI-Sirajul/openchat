@@ -2,6 +2,7 @@ package com.msi.openchat.feature.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.R
 import com.msi.openchat.core.common.NetworkMonitor
 import com.msi.openchat.core.common.NetworkStatus
 import com.msi.openchat.core.common.Resource
@@ -268,7 +269,7 @@ class HomeViewModel(
                 is Resource.Success -> {
                     _uiState.value = _uiState.value.copy(isNewChatDialogOpen = false)
                     val conv = res.data
-                    val contactName = conv.otherUser?.displayName ?: "Friend"
+                    val contactName = conv.otherUser?.displayName ?: ServiceLocator.getString(R.string.common_friend)
                     onConversationReady(conv.id, contactName)
                 }
                 is Resource.Error -> {

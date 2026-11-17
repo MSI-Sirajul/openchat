@@ -9,7 +9,9 @@ import com.google.firebase.auth.PhoneAuthCredential
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.ValueEventListener
+import com.example.R
 import com.msi.openchat.core.common.Resource
+import com.msi.openchat.core.di.ServiceLocator
 import com.msi.openchat.core.security.FirebaseAuthManager
 import com.msi.openchat.core.security.SessionManager
 import com.msi.openchat.data.model.AuthSession
@@ -60,7 +62,7 @@ class AuthRepository(
                     }
             }
 
-            val user = authResult ?: return@withContext Resource.Error("Sign up failed. Please try a different email or password.")
+            val user = authResult ?: return@withContext Resource.Error(ServiceLocator.getString(R.string.auth_signup_failed_detail))
             val userId = user.uid
 
             val cleanUsername = username.trim()
@@ -106,7 +108,7 @@ class AuthRepository(
             throw ce
         } catch (e: Exception) {
             Log.e(tag, "Sign up error: ${e.message}", e)
-            Resource.Error(e.message ?: "Sign up failed", e)
+            Resource.Error(e.message ?: ServiceLocator.getString(R.string.auth_signup_failed), e)
         }
     }
 
@@ -146,7 +148,7 @@ class AuthRepository(
                             )
                         )
                     }
-                    return@withContext Resource.Error("No account found with username or phone '$trimmed'. Please enter your registered email address or sign up.")
+                    return@withContext Resource.Error(ServiceLocator.getString(R.string.auth_no_account_identifier, trimmed))
                 }
                 resolved
             }
@@ -187,24 +189,24 @@ class AuthRepository(
 
                 val friendlyMessage = when (taskException) {
                     is com.google.firebase.auth.FirebaseAuthInvalidUserException ->
-                        "No account found with this email. Please check your spelling or sign up."
+                        ServiceLocator.getString(R.string.auth_no_account_email)
                     is com.google.firebase.auth.FirebaseAuthInvalidCredentialsException ->
-                        "Incorrect password or email. Please check your credentials and try again."
+                        ServiceLocator.getString(R.string.auth_incorrect_credentials)
                     is com.google.firebase.FirebaseTooManyRequestsException ->
-                        "Too many unsuccessful login attempts. Please wait a few minutes before trying again."
+                        ServiceLocator.getString(R.string.auth_too_many_attempts)
                     is com.google.firebase.FirebaseNetworkException ->
-                        "Network connection error. Please check your internet connection."
+                        ServiceLocator.getString(R.string.auth_network_error)
                     else -> {
                         val msg = taskException?.localizedMessage.orEmpty()
                         if (msg.contains("credential is incorrect", ignoreCase = true) ||
                             msg.contains("malformed", ignoreCase = true) ||
                             msg.contains("expired", ignoreCase = true)
                         ) {
-                            "Incorrect password or email. Please check your credentials and try again."
+                            ServiceLocator.getString(R.string.auth_incorrect_credentials)
                         } else if (msg.isNotBlank()) {
                             msg
                         } else {
-                            "Invalid login credentials. Please check your username, email, and password."
+                            ServiceLocator.getString(R.string.auth_invalid_login_credentials)
                         }
                     }
                 }
@@ -244,7 +246,7 @@ class AuthRepository(
             )
         } catch (e: Exception) {
             Log.e(tag, "Sign in error: ${e.message}", e)
-            Resource.Error(e.message ?: "Sign in failed", e)
+            Resource.Error(e.message ?: ServiceLocator.getString(R.string.auth_signin_failed), e)
         }
     }
 
@@ -254,7 +256,7 @@ class AuthRepository(
             signInWithCredentialInternal(credential)
         } catch (e: Exception) {
             Log.e(tag, "Google sign in error: ${e.message}", e)
-            Resource.Error(e.message ?: "Google Sign In failed", e)
+            Resource.Error(e.message ?: ServiceLocator.getString(R.string.auth_google_signin_failed), e)
         }
     }
 
@@ -263,7 +265,7 @@ class AuthRepository(
             signInWithCredentialInternal(credential)
         } catch (e: Exception) {
             Log.e(tag, "Phone sign in error: ${e.message}", e)
-            Resource.Error(e.message ?: "Phone verification failed", e)
+            Resource.Error(e.message ?: ServiceLocator.getString(R.string.auth_phone_verification_failed), e)
         }
     }
 
@@ -274,11 +276,11 @@ class AuthRepository(
                     if (task.isSuccessful) continuation.resume(task.result?.user)
                     else continuation.resume(null)
                 }
-        } ?: return Resource.Error("Authentication failed")
+        } ?: return Resource.Error(ServiceLocator.getString(R.string.auth_failed))
 
         val userId = user.uid
         val userEmail = user.email
-        val userName = user.displayName ?: userEmail?.substringBefore("@") ?: "User"
+        val userName = user.displayName ?: userEmail?.substringBefore("@") ?: ServiceLocator.getString(R.string.common_user)
 
         sessionManager.saveSession(
             accessToken = userId,
@@ -408,7 +410,7 @@ class AuthRepository(
                 if (task.isSuccessful) {
                     continuation.resume(Resource.Success(Unit))
                 } else {
-                    continuation.resume(Resource.Error(task.exception?.message ?: "Failed to send reset email"))
+                    continuation.resume(Resource.Error(task.exception?.message ?: ServiceLocator.getString(R.string.auth_reset_email_failed)))
                 }
             }
         }
@@ -433,7 +435,7 @@ class AuthRepository(
             suspendCancellableCoroutine<Resource<Unit>> { continuation ->
                 user.sendEmailVerification().addOnCompleteListener { task ->
                     if (task.isSuccessful) continuation.resume(Resource.Success(Unit))
-                    else continuation.resume(Resource.Error(task.exception?.message ?: "Failed to resend"))
+                    else continuation.resume(Resource.Error(task.exception?.message ?: ServiceLocator.getString(R.string.auth_resend_failed)))
                 }
             }
         } else {
@@ -445,7 +447,7 @@ class AuthRepository(
         when (val res = signIn(identifier, password, rememberMe = false)) {
             is Resource.Success -> Resource.Success(true)
             is Resource.Error -> Resource.Error(res.message, res.cause)
-            else -> Resource.Error("Verification failed")
+            else -> Resource.Error(ServiceLocator.getString(R.string.auth_verification_failed))
         }
     }
 

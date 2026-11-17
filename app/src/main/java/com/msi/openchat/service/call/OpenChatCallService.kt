@@ -23,7 +23,6 @@ import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.example.R
 import com.msi.openchat.core.common.Constants
-import com.msi.openchat.core.common.Resource
 import com.msi.openchat.core.di.ServiceLocator
 import com.msi.openchat.core.service.AppServiceManager
 import com.msi.openchat.data.remote.firebase.FirebaseManager
@@ -81,7 +80,7 @@ class OpenChatCallService : Service(), SensorEventListener {
 
     private var currentCallId: String = ""
     private var currentContactId: String = ""
-    private var currentContactName: String = "OpenChat Call"
+    private var currentContactName: String = ""
     private var currentIsIncoming: Boolean = false
     private var currentIsWaitingAnswer: Boolean = false
 
@@ -197,6 +196,7 @@ class OpenChatCallService : Service(), SensorEventListener {
     override fun onCreate() {
         super.onCreate()
         ServiceLocator.initialize(applicationContext)
+        currentContactName = getString(R.string.call_service_notification_title)
         createNotificationChannel()
         setupSensorsAndWakeLocks()
     }
@@ -287,10 +287,10 @@ class OpenChatCallService : Service(), SensorEventListener {
             val activeName = CallSessionCoordinator.contactName.value
             if (activeId.isNotBlank() && CallSessionCoordinator.isActive()) {
                 currentCallId = activeId
-                currentContactName = activeName.ifBlank { "OpenChat Call" }
+                currentContactName = activeName.ifBlank { getString(R.string.call_service_notification_title) }
                 val recoveryNotification = buildOngoingCallNotification(
                     contactName = currentContactName,
-                    statusLabel = "Connecting...",
+                    statusLabel = getString(R.string.common_connecting),
                     durationSeconds = CallSessionCoordinator.durationSeconds.value,
                     isConnected = CallSessionCoordinator.callState.value == WebRtcCallState.CONNECTED,
                     isMuted = CallSessionCoordinator.isMuted.value,
@@ -318,7 +318,7 @@ class OpenChatCallService : Service(), SensorEventListener {
                     ?: intent.getStringExtra("peerUserId").orEmpty()
                 val contactName = intent.getStringExtra(EXTRA_CONTACT_NAME)
                     ?.ifBlank { null }
-                    ?: "OpenChat Caller"
+                    ?: getString(R.string.home_openchat_caller)
 
                 if (callId.isBlank() ||
                     CallSessionGuard.isVideoCall(callId, null) ||
@@ -340,7 +340,7 @@ class OpenChatCallService : Service(), SensorEventListener {
 
                 val initialNotification = buildOngoingCallNotification(
                     contactName = contactName,
-                    statusLabel = "Connecting...",
+                    statusLabel = getString(R.string.common_connecting),
                     durationSeconds = 0,
                     isConnected = false,
                     isMuted = false,
@@ -365,7 +365,7 @@ class OpenChatCallService : Service(), SensorEventListener {
             ACTION_START_OUTGOING -> {
                 val callId = intent.getStringExtra(EXTRA_CALL_ID).orEmpty()
                 val contactId = intent.getStringExtra(EXTRA_CONTACT_ID).orEmpty()
-                val contactName = intent.getStringExtra(EXTRA_CONTACT_NAME) ?: "OpenChat Call"
+                val contactName = intent.getStringExtra(EXTRA_CONTACT_NAME) ?: getString(R.string.call_service_notification_title)
 
                 if (callId.isBlank() || CallSessionGuard.isVideoCall(callId, null)) {
                     stopSelf()
@@ -374,7 +374,7 @@ class OpenChatCallService : Service(), SensorEventListener {
 
                 val initialNotification = buildOngoingCallNotification(
                     contactName = contactName,
-                    statusLabel = "Calling...",
+                    statusLabel = getString(R.string.call_calling_ellipsis),
                     durationSeconds = 0,
                     isConnected = false,
                     isMuted = false,
@@ -399,7 +399,7 @@ class OpenChatCallService : Service(), SensorEventListener {
             ACTION_START_CALL -> {
                 val callId = intent.getStringExtra(EXTRA_CALL_ID).orEmpty()
                 val contactId = intent.getStringExtra(EXTRA_CONTACT_ID).orEmpty()
-                val contactName = intent.getStringExtra(EXTRA_CONTACT_NAME) ?: "OpenChat Call"
+                val contactName = intent.getStringExtra(EXTRA_CONTACT_NAME) ?: getString(R.string.call_service_notification_title)
                 val isIncoming = intent.getBooleanExtra(EXTRA_IS_INCOMING, false)
                 val isAlreadyAnswered = intent.getBooleanExtra(EXTRA_IS_ALREADY_ANSWERED, true)
 
@@ -410,7 +410,13 @@ class OpenChatCallService : Service(), SensorEventListener {
 
                 val initialNotification = buildOngoingCallNotification(
                     contactName = contactName,
-                    statusLabel = if (_callUiState.value.connectionState == WebRtcCallState.CONNECTED) "Connected" else "Connecting...",
+                    statusLabel = getString(
+                        if (_callUiState.value.connectionState == WebRtcCallState.CONNECTED) {
+                            R.string.call_active_title
+                        } else {
+                            R.string.common_connecting
+                        }
+                    ),
                     durationSeconds = _callUiState.value.durationSeconds,
                     isConnected = _callUiState.value.connectionState == WebRtcCallState.CONNECTED,
                     isMuted = _callUiState.value.isMuted,
@@ -446,7 +452,7 @@ class OpenChatCallService : Service(), SensorEventListener {
             }
 
             ACTION_STOP_CALL -> {
-                endCallInternal("Call ended", updateRemote = false)
+                endCallInternal(getString(R.string.call_ended_sentence), updateRemote = false)
                 return START_NOT_STICKY
             }
         }
@@ -490,14 +496,14 @@ class OpenChatCallService : Service(), SensorEventListener {
 
         currentCallId = callId
         currentContactId = contactId
-        currentContactName = contactName.ifBlank { "OpenChat Call" }
+        currentContactName = contactName.ifBlank { getString(R.string.call_service_notification_title) }
         currentIsIncoming = isIncoming
         currentIsWaitingAnswer = isIncoming && !isAlreadyAnswered
 
         val initialStatus = when {
-            isIncoming && !isAlreadyAnswered -> "Incoming call..."
-            isIncoming -> "Connecting..."
-            else -> "Calling..."
+            isIncoming && !isAlreadyAnswered -> getString(R.string.call_incoming_generic)
+            isIncoming -> getString(R.string.common_connecting)
+            else -> getString(R.string.call_calling_ellipsis)
         }
 
         publishState(
@@ -582,7 +588,7 @@ class OpenChatCallService : Service(), SensorEventListener {
     fun acceptWaitingIncomingCall() {
         if (currentCallId.isBlank() || !currentIsWaitingAnswer) return
         currentIsWaitingAnswer = false
-        publishState(_callUiState.value.copy(isIncomingWaiting = false, callStatus = "Connecting..."))
+        publishState(_callUiState.value.copy(isIncomingWaiting = false, callStatus = getString(R.string.common_connecting)))
         clearIncomingNode()
         serviceScope.launch {
             try {
@@ -601,13 +607,17 @@ class OpenChatCallService : Service(), SensorEventListener {
         serviceScope.launch {
             if (cid.isNotBlank()) {
                 try {
-                    ServiceLocator.callRepository.updateCallStatus(cid, "declined", endReason = "Declined by user")
+                    ServiceLocator.callRepository.updateCallStatus(
+                        cid,
+                        "declined",
+                        endReason = getString(R.string.call_declined_by_user)
+                    )
                     if (peer.isNotBlank()) {
                         ServiceLocator.callRepository.sendSignaling(cid, peer, "bye", "{\"reason\":\"declined\"}")
                     }
                 } catch (_: Exception) {}
             }
-            endCallInternal("Call Declined", updateRemote = false)
+            endCallInternal(getString(R.string.call_declined_title), updateRemote = false)
         }
     }
 
@@ -642,11 +652,11 @@ class OpenChatCallService : Service(), SensorEventListener {
                         callId = cid,
                         status = "ended",
                         durationSeconds = duration,
-                        endReason = "Normal hangup"
+                        endReason = getString(R.string.call_normal_hangup)
                     )
                 } catch (_: Exception) {}
             }
-            endCallInternal("Call ended", updateRemote = false)
+            endCallInternal(getString(R.string.call_ended_sentence), updateRemote = false)
         }
     }
 
@@ -706,13 +716,17 @@ class OpenChatCallService : Service(), SensorEventListener {
                 val cid = currentCallId
                 if (cid.isNotBlank()) {
                     try {
-                        ServiceLocator.callRepository.updateCallStatus(cid, "missed", endReason = "No answer")
+                        ServiceLocator.callRepository.updateCallStatus(
+                            cid,
+                            "missed",
+                            endReason = getString(R.string.call_no_answer_sentence)
+                        )
                         if (currentContactId.isNotBlank()) {
                             ServiceLocator.callRepository.sendSignaling(cid, currentContactId, "bye", "{\"reason\":\"timeout\"}")
                         }
                     } catch (_: Exception) {}
                 }
-                endCallInternal("No Answer", updateRemote = false)
+                endCallInternal(getString(R.string.call_no_answer_title), updateRemote = false)
             }
         }
     }
@@ -781,32 +795,36 @@ class OpenChatCallService : Service(), SensorEventListener {
         callSessionJob = serviceScope.launch {
             ServiceLocator.callRepository.observeCallSession(targetCallId).collect { session ->
                 if (hasEnded || !_callUiState.value.isCallActive) return@collect
+                val callingLabel = getString(R.string.call_calling_ellipsis)
+                val ringingLabel = getString(R.string.call_ringing_ellipsis)
+                val connectingLabel = getString(R.string.common_connecting)
+                val connectedLabel = getString(R.string.call_active_title)
                 when (session.status) {
                     "ringing" -> {
-                        if (_callUiState.value.isCaller && _callUiState.value.callStatus == "Calling...") {
-                            publishState(_callUiState.value.copy(callStatus = "Ringing..."))
+                        if (_callUiState.value.isCaller && _callUiState.value.callStatus == callingLabel) {
+                            publishState(_callUiState.value.copy(callStatus = ringingLabel))
                         }
                     }
                     "accepted", "connecting" -> {
                         callTimeoutJob?.cancel()
-                        if (_callUiState.value.callStatus in listOf("Calling...", "Ringing...")) {
-                            publishState(_callUiState.value.copy(callStatus = "Connecting..."))
+                        if (_callUiState.value.callStatus in listOf(callingLabel, ringingLabel)) {
+                            publishState(_callUiState.value.copy(callStatus = connectingLabel))
                         }
                     }
                     "connected" -> {
                         callTimeoutJob?.cancel()
                         if (webRtcManager?.callState?.value == WebRtcCallState.CONNECTED &&
-                            _callUiState.value.callStatus != "Connected"
+                            _callUiState.value.callStatus != connectedLabel
                         ) {
-                            publishState(_callUiState.value.copy(callStatus = "Connected"))
+                            publishState(_callUiState.value.copy(callStatus = connectedLabel))
                             startDurationTimer()
                         }
                     }
-                    "declined" -> endCallInternal("Call Declined", updateRemote = false)
-                    "busy" -> endCallInternal("User Busy", updateRemote = false)
-                    "missed" -> endCallInternal("No Answer", updateRemote = false)
-                    "ended" -> endCallInternal("Call Ended", updateRemote = false)
-                    "failed" -> endCallInternal("Call Failed", updateRemote = false)
+                    "declined" -> endCallInternal(getString(R.string.call_declined_title), updateRemote = false)
+                    "busy" -> endCallInternal(getString(R.string.call_user_busy), updateRemote = false)
+                    "missed" -> endCallInternal(getString(R.string.call_no_answer_title), updateRemote = false)
+                    "ended" -> endCallInternal(getString(R.string.call_ended_title), updateRemote = false)
+                    "failed" -> endCallInternal(getString(R.string.call_failed_title), updateRemote = false)
                 }
             }
         }
@@ -817,8 +835,10 @@ class OpenChatCallService : Service(), SensorEventListener {
             val payload = JSONObject(payloadStr)
             when (type) {
                 "ringing" -> {
-                    if (_callUiState.value.isCaller && _callUiState.value.callStatus == "Calling...") {
-                        publishState(_callUiState.value.copy(callStatus = "Ringing..."))
+                    if (_callUiState.value.isCaller &&
+                        _callUiState.value.callStatus == getString(R.string.call_calling_ellipsis)
+                    ) {
+                        publishState(_callUiState.value.copy(callStatus = getString(R.string.call_ringing_ellipsis)))
                     }
                 }
                 "offer" -> {
@@ -853,12 +873,12 @@ class OpenChatCallService : Service(), SensorEventListener {
                     }
                 }
                 "bye" -> {
-                    val reason = payload.optString("reason", "Call ended")
+                    val reason = payload.optString("reason", getString(R.string.call_ended_sentence))
                     val displayStatus = when (reason) {
-                        "declined" -> "Call Declined"
-                        "busy" -> "User Busy"
-                        "timeout" -> "No Answer"
-                        else -> "Call Ended"
+                        "declined" -> getString(R.string.call_declined_title)
+                        "busy" -> getString(R.string.call_user_busy)
+                        "timeout" -> getString(R.string.call_no_answer_title)
+                        else -> getString(R.string.call_ended_title)
                     }
                     endCallInternal(displayStatus, updateRemote = false)
                 }
@@ -872,17 +892,21 @@ class OpenChatCallService : Service(), SensorEventListener {
         if (hasEnded) return
         val nextStatus = when (state) {
             WebRtcCallState.CONNECTING -> {
-                if (_callUiState.value.callStatus in listOf("Calling...", "Ringing...")) {
+                if (_callUiState.value.callStatus in listOf(
+                        getString(R.string.call_calling_ellipsis),
+                        getString(R.string.call_ringing_ellipsis)
+                    )
+                ) {
                     _callUiState.value.callStatus
                 } else {
-                    "Connecting..."
+                    getString(R.string.common_connecting)
                 }
             }
-            WebRtcCallState.CONNECTED -> "Connected"
+            WebRtcCallState.CONNECTED -> getString(R.string.call_active_title)
             WebRtcCallState.RECONNECTING,
-            WebRtcCallState.DISCONNECTED -> "Reconnecting..."
-            WebRtcCallState.FAILED -> "Connection Failed"
-            WebRtcCallState.ENDED -> "Call Ended"
+            WebRtcCallState.DISCONNECTED -> getString(R.string.common_reconnecting_ellipsis)
+            WebRtcCallState.FAILED -> getString(R.string.call_connection_failed_title)
+            WebRtcCallState.ENDED -> getString(R.string.call_ended_title)
             WebRtcCallState.IDLE -> _callUiState.value.callStatus
         }
 
@@ -906,8 +930,8 @@ class OpenChatCallService : Service(), SensorEventListener {
                     }
                 }
             }
-            WebRtcCallState.FAILED -> endCallInternal("Call Failed", updateRemote = false)
-            WebRtcCallState.ENDED -> endCallInternal("Call Ended", updateRemote = false)
+            WebRtcCallState.FAILED -> endCallInternal(getString(R.string.call_failed_title), updateRemote = false)
+            WebRtcCallState.ENDED -> endCallInternal(getString(R.string.call_ended_title), updateRemote = false)
             else -> Unit
         }
     }
@@ -998,12 +1022,12 @@ class OpenChatCallService : Service(), SensorEventListener {
     ): Notification {
         val minutes = durationSeconds / 60
         val seconds = durationSeconds % 60
-        val durationFormatted = String.format("%02d:%02d", minutes, seconds)
+        val durationFormatted = getString(R.string.common_duration_mm_ss, minutes, seconds)
 
         val contentText = if (isConnected || durationSeconds > 0) {
-            "Connected • $durationFormatted"
+            getString(R.string.call_connected_duration, durationFormatted)
         } else {
-            statusLabel.ifBlank { "Connecting..." }
+            statusLabel.ifBlank { getString(R.string.common_connecting) }
         }
 
         // Open/resume ActiveAudioCallActivity bound to this live service (no reconnect)
@@ -1054,13 +1078,13 @@ class OpenChatCallService : Service(), SensorEventListener {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val muteTitle = if (isMuted) "Unmute" else "Mute"
+        val muteTitle = getString(if (isMuted) R.string.call_unmute else R.string.call_mute)
         val muteIcon = if (isMuted) R.drawable.ic_mic_off_24 else R.drawable.ic_mic_24
-        val speakerTitle = if (isSpeakerOn) "Earpiece" else "Speaker"
+        val speakerTitle = getString(if (isSpeakerOn) R.string.call_earpiece else R.string.call_speaker)
         val speakerIcon = if (isSpeakerOn) R.drawable.ic_volume_up_24 else R.drawable.ic_volume_off_24
 
         return NotificationCompat.Builder(this, Constants.CHANNEL_ACTIVE_CALLS)
-            .setContentTitle("Voice Call • $contactName")
+            .setContentTitle(getString(R.string.call_notif_voice_title, contactName))
             .setContentText(contentText)
             .setSmallIcon(android.R.drawable.stat_sys_phone_call)
             .setOngoing(true)
@@ -1068,7 +1092,7 @@ class OpenChatCallService : Service(), SensorEventListener {
             .setContentIntent(contentPendingIntent)
             .addAction(muteIcon, muteTitle, mutePendingIntent)
             .addAction(speakerIcon, speakerTitle, speakerPendingIntent)
-            .addAction(R.drawable.ic_call_end_24, "End", endPendingIntent)
+            .addAction(R.drawable.ic_call_end_24, getString(R.string.call_end_short), endPendingIntent)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setCategory(NotificationCompat.CATEGORY_CALL)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
@@ -1196,10 +1220,10 @@ class OpenChatCallService : Service(), SensorEventListener {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 Constants.CHANNEL_ACTIVE_CALLS,
-                "Active Call Status",
+                getString(R.string.notif_channel_active_call),
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
-                description = "Ongoing active voice call duration and audio controls"
+                description = getString(R.string.notif_channel_active_voice_desc)
                 setShowBadge(false)
             }
             val manager = getSystemService(NotificationManager::class.java)
@@ -1210,7 +1234,7 @@ class OpenChatCallService : Service(), SensorEventListener {
     override fun onDestroy() {
         super.onDestroy()
         if (!hasEnded && currentCallId.isNotBlank()) {
-            endCallInternal("Call ended", updateRemote = false)
+            endCallInternal(getString(R.string.call_ended_sentence), updateRemote = false)
         } else {
             observerJob?.cancel()
             cleanupResourcesOnly()

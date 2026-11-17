@@ -6,14 +6,15 @@ import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.ValueEventListener
 import com.google.firebase.database.ServerValue
+import com.example.R
 import com.msi.openchat.core.backend.BackendManager
 import com.msi.openchat.core.common.Resource
+import com.msi.openchat.core.di.ServiceLocator
 import com.msi.openchat.core.security.SessionManager
 import com.msi.openchat.core.ui.adapter.RelationshipStatus
 import com.msi.openchat.core.ui.adapter.UserSearchItem
 import com.msi.openchat.data.model.FriendRequest
 import com.msi.openchat.data.model.Friendship
-import com.msi.openchat.data.model.Profile
 import com.msi.openchat.data.remote.firebase.FirebaseManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -116,7 +117,7 @@ open class FriendRepository(
      */
     suspend fun searchNonFriendUsers(query: String): Resource<List<UserSearchItem>> = withContext(Dispatchers.IO) {
         val currentUserId = sessionManager.getUserId() ?: FirebaseManager.auth.currentUser?.uid
-            ?: return@withContext Resource.Error("Not authenticated")
+            ?: return@withContext Resource.Error(ServiceLocator.getString(R.string.common_not_authenticated))
 
         try {
             val friendIds = getFriendIds(currentUserId)
@@ -144,23 +145,23 @@ open class FriendRepository(
             Resource.Success(items)
         } catch (e: Exception) {
             Log.e(tag, "searchNonFriendUsers error: ${e.message}", e)
-            Resource.Error(e.message ?: "Failed to search users", e)
+            Resource.Error(e.message ?: ServiceLocator.getString(R.string.friends_search_failed), e)
         }
     }
 
     suspend fun sendFriendRequest(receiverId: String): Resource<FriendRequest> = withContext(Dispatchers.IO) {
         val senderId = sessionManager.getUserId() ?: FirebaseManager.auth.currentUser?.uid
-            ?: return@withContext Resource.Error("Not authenticated")
+            ?: return@withContext Resource.Error(ServiceLocator.getString(R.string.common_not_authenticated))
 
         if (senderId == receiverId) {
-            return@withContext Resource.Error("Cannot send friend request to yourself")
+            return@withContext Resource.Error(ServiceLocator.getString(R.string.friends_cannot_add_self))
         }
 
         try {
             // 1. Backend check: reject if already friends
             val friendSnapshot = getSingleSnapshot(friendsRef.child(senderId).child(receiverId))
             if (friendSnapshot != null && friendSnapshot.exists() && friendSnapshot.getValue(Boolean::class.java) == true) {
-                return@withContext Resource.Error("Already friends")
+                return@withContext Resource.Error(ServiceLocator.getString(R.string.friends_already_friends))
             }
 
             // 2. Backend check: reject duplicate requests server-side (idempotent, return existing status)
@@ -185,11 +186,11 @@ open class FriendRepository(
                     }
 
                     if (sId == receiverId && rId == senderId && reqStatus == "pending") {
-                        return@withContext Resource.Error("This user has already sent you a friend request")
+                        return@withContext Resource.Error(ServiceLocator.getString(R.string.friends_already_sent_you))
                     }
 
                     if ((sId == senderId && rId == receiverId || sId == receiverId && rId == senderId) && reqStatus == "accepted") {
-                        return@withContext Resource.Error("Already friends")
+                        return@withContext Resource.Error(ServiceLocator.getString(R.string.friends_already_friends))
                     }
                 }
             }
@@ -211,7 +212,8 @@ open class FriendRepository(
                 is Resource.Success -> p.data
                 else -> null
             }
-            val senderName = senderProfile?.displayName?.ifBlank { senderProfile.username ?: "Someone" } ?: "Someone"
+            val senderName = senderProfile?.displayName?.ifBlank { senderProfile.username ?: ServiceLocator.getString(R.string.common_someone) }
+                ?: ServiceLocator.getString(R.string.common_someone)
 
             val updates = HashMap<String, Any?>()
             updates["/friend_requests/$receiverId/$requestId"] = reqData
@@ -231,8 +233,8 @@ open class FriendRepository(
                 // Dispatch FCM Push Notification (arrives even when app is closed)
                 BackendManager.sendPushNotification(
                     recipientId = receiverId,
-                    title = "Friend Request",
-                    body = "$senderName sent you a friend request",
+                    title = ServiceLocator.getString(R.string.notif_friend_request_title),
+                    body = ServiceLocator.getString(R.string.notif_friend_request_body, senderName),
                     data = mapOf(
                         "type" to "friend_request",
                         "request_id" to requestId,
@@ -251,24 +253,24 @@ open class FriendRepository(
                     )
                 )
             } else {
-                Resource.Error("Failed to send friend request")
+                Resource.Error(ServiceLocator.getString(R.string.friends_send_request_failed))
             }
         } catch (e: Exception) {
             Log.e(tag, "sendFriendRequest error: ${e.message}", e)
-            Resource.Error(e.message ?: "Failed to send friend request", e)
+            Resource.Error(e.message ?: ServiceLocator.getString(R.string.friends_send_request_failed), e)
         }
     }
 
     suspend fun acceptFriendRequest(requestId: String): Resource<String> = withContext(Dispatchers.IO) {
         val currentUserId = sessionManager.getUserId() ?: FirebaseManager.auth.currentUser?.uid
-            ?: return@withContext Resource.Error("Not authenticated")
+            ?: return@withContext Resource.Error(ServiceLocator.getString(R.string.common_not_authenticated))
 
         try {
             val reqSnapshot = getSingleSnapshot(friendRequestsRef.child(currentUserId).child(requestId))
-                ?: return@withContext Resource.Error("Friend request not found")
+                ?: return@withContext Resource.Error(ServiceLocator.getString(R.string.friends_request_not_found))
 
             val senderId = reqSnapshot.child("sender_id").getValue(String::class.java).orEmpty()
-            if (senderId.isBlank()) return@withContext Resource.Error("Invalid request data")
+            if (senderId.isBlank()) return@withContext Resource.Error(ServiceLocator.getString(R.string.friends_invalid_request_data))
 
             val now = getCurrentIsoTime()
             val conversationId = if (currentUserId < senderId) {
@@ -277,14 +279,14 @@ open class FriendRepository(
                 "direct_${senderId}_${currentUserId}"
             }
 
-            // Create initial conversation nodes
+            val connectedText = ServiceLocator.getString(R.string.friends_now_connected_message)
             val convData1 = HashMap<String, Any?>()
             convData1["id"] = conversationId
             convData1["type"] = "direct"
             convData1["participant1_id"] = currentUserId
             convData1["participant2_id"] = senderId
             convData1["other_user_id"] = senderId
-            convData1["last_message_text"] = "You are now connected!"
+            convData1["last_message_text"] = connectedText
             convData1["last_message_at"] = now
             convData1["unread_count"] = 0
 
@@ -294,7 +296,7 @@ open class FriendRepository(
             convData2["participant1_id"] = senderId
             convData2["participant2_id"] = currentUserId
             convData2["other_user_id"] = currentUserId
-            convData2["last_message_text"] = "You are now connected!"
+            convData2["last_message_text"] = connectedText
             convData2["last_message_at"] = now
             convData2["unread_count"] = 0
 
@@ -302,7 +304,8 @@ open class FriendRepository(
                 is Resource.Success -> p.data
                 else -> null
             }
-            val currentUserName = currentUserProfile?.displayName?.ifBlank { currentUserProfile.username ?: "Friend" } ?: "Friend"
+            val currentUserName = currentUserProfile?.displayName?.ifBlank { currentUserProfile.username ?: ServiceLocator.getString(R.string.common_friend) }
+                ?: ServiceLocator.getString(R.string.common_friend)
 
             val updates = HashMap<String, Any?>()
             // Mark friendship bidirectionally
@@ -329,8 +332,8 @@ open class FriendRepository(
                 // Dispatch FCM Push Notification (Channel B: Friend Accepted, arrives even when app is closed)
                 BackendManager.sendPushNotification(
                     recipientId = senderId,
-                    title = "Friend Request Accepted",
-                    body = "$currentUserName accepted your friend request",
+                    title = ServiceLocator.getString(R.string.notif_friend_accepted_title),
+                    body = ServiceLocator.getString(R.string.notif_friend_accepted_body, currentUserName),
                     data = mapOf(
                         "type" to "friend_accepted",
                         "conversation_id" to conversationId,
@@ -341,44 +344,44 @@ open class FriendRepository(
 
                 Resource.Success(conversationId)
             } else {
-                Resource.Error("Failed to accept friend request")
+                Resource.Error(ServiceLocator.getString(R.string.friends_accept_failed))
             }
         } catch (e: Exception) {
             Log.e(tag, "acceptFriendRequest error: ${e.message}", e)
-            Resource.Error(e.message ?: "Failed to accept friend request", e)
+            Resource.Error(e.message ?: ServiceLocator.getString(R.string.friends_accept_failed), e)
         }
     }
 
     suspend fun declineFriendRequest(requestId: String): Resource<Unit> = withContext(Dispatchers.IO) {
         val currentUserId = sessionManager.getUserId() ?: FirebaseManager.auth.currentUser?.uid
-            ?: return@withContext Resource.Error("Not authenticated")
+            ?: return@withContext Resource.Error(ServiceLocator.getString(R.string.common_not_authenticated))
 
         try {
             val success = friendRequestsRef.child(currentUserId).child(requestId).child("status")
                 .setValue("declined").awaitTask()
             if (success) Resource.Success(Unit)
-            else Resource.Error("Failed to decline friend request")
+            else Resource.Error(ServiceLocator.getString(R.string.friends_decline_failed))
         } catch (e: Exception) {
-            Resource.Error(e.message ?: "Failed to decline friend request", e)
+            Resource.Error(e.message ?: ServiceLocator.getString(R.string.friends_decline_failed), e)
         }
     }
 
     suspend fun cancelFriendRequest(requestId: String): Resource<Unit> = withContext(Dispatchers.IO) {
         val currentUserId = sessionManager.getUserId() ?: FirebaseManager.auth.currentUser?.uid
-            ?: return@withContext Resource.Error("Not authenticated")
+            ?: return@withContext Resource.Error(ServiceLocator.getString(R.string.common_not_authenticated))
 
         try {
             val success = friendRequestsRef.child(currentUserId).child(requestId).removeValue().awaitTask()
             if (success) Resource.Success(Unit)
-            else Resource.Error("Failed to cancel friend request")
+            else Resource.Error(ServiceLocator.getString(R.string.friends_cancel_failed))
         } catch (e: Exception) {
-            Resource.Error(e.message ?: "Failed to cancel friend request", e)
+            Resource.Error(e.message ?: ServiceLocator.getString(R.string.friends_cancel_failed), e)
         }
     }
 
     suspend fun getFriends(): Resource<List<Friendship>> = withContext(Dispatchers.IO) {
         val currentUserId = sessionManager.getUserId() ?: FirebaseManager.auth.currentUser?.uid
-            ?: return@withContext Resource.Error("Not authenticated")
+            ?: return@withContext Resource.Error(ServiceLocator.getString(R.string.common_not_authenticated))
 
         try {
             val snapshot = getSingleSnapshot(friendsRef.child(currentUserId))
@@ -408,13 +411,13 @@ open class FriendRepository(
             Resource.Success(list)
         } catch (e: Exception) {
             Log.e(tag, "getFriends error: ${e.message}", e)
-            Resource.Error(e.message ?: "Failed to load friends", e)
+            Resource.Error(e.message ?: ServiceLocator.getString(R.string.friends_load_failed), e)
         }
     }
 
     suspend fun getReceivedRequests(): Resource<List<FriendRequest>> = withContext(Dispatchers.IO) {
         val currentUserId = sessionManager.getUserId() ?: FirebaseManager.auth.currentUser?.uid
-            ?: return@withContext Resource.Error("Not authenticated")
+            ?: return@withContext Resource.Error(ServiceLocator.getString(R.string.common_not_authenticated))
 
         try {
             val snapshot = getSingleSnapshot(friendRequestsRef.child(currentUserId))
@@ -455,13 +458,13 @@ open class FriendRepository(
             Resource.Success(populated)
         } catch (e: Exception) {
             Log.e(tag, "getReceivedRequests error: ${e.message}", e)
-            Resource.Error(e.message ?: "Failed to load received requests", e)
+            Resource.Error(e.message ?: ServiceLocator.getString(R.string.friends_load_received_failed), e)
         }
     }
 
     suspend fun getSentRequests(): Resource<List<FriendRequest>> = withContext(Dispatchers.IO) {
         val currentUserId = sessionManager.getUserId() ?: FirebaseManager.auth.currentUser?.uid
-            ?: return@withContext Resource.Error("Not authenticated")
+            ?: return@withContext Resource.Error(ServiceLocator.getString(R.string.common_not_authenticated))
 
         try {
             val snapshot = getSingleSnapshot(friendRequestsRef.child(currentUserId))
@@ -502,7 +505,7 @@ open class FriendRepository(
             Resource.Success(populated)
         } catch (e: Exception) {
             Log.e(tag, "getSentRequests error: ${e.message}", e)
-            Resource.Error(e.message ?: "Failed to load sent requests", e)
+            Resource.Error(e.message ?: ServiceLocator.getString(R.string.friends_load_sent_failed), e)
         }
     }
 }

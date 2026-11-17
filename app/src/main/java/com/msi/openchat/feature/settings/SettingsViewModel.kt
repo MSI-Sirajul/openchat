@@ -2,9 +2,9 @@ package com.msi.openchat.feature.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.R
 import com.msi.openchat.core.common.Resource
 import com.msi.openchat.core.di.ServiceLocator
-import com.msi.openchat.data.model.Profile
 import com.msi.openchat.data.repository.AuthRepository
 import com.msi.openchat.data.repository.UserRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -144,7 +144,7 @@ class SettingsViewModel(
                 _uiState.value = _uiState.value.copy(
                     isAppLockEnabled = false,
                     isBiometricEnabled = false,
-                    message = "App lock disabled"
+                    message = ServiceLocator.getString(R.string.settings_app_lock_disabled)
                 )
             }
         }
@@ -179,11 +179,11 @@ class SettingsViewModel(
         val pin = _uiState.value.pinInput
         val confirm = _uiState.value.confirmPinInput
         if (pin.length != 4) {
-            _uiState.value = _uiState.value.copy(pinDialogError = "PIN must be exactly 4 digits")
+            _uiState.value = _uiState.value.copy(pinDialogError = ServiceLocator.getString(R.string.settings_pin_length_exact_error))
             return
         }
         if (pin != confirm) {
-            _uiState.value = _uiState.value.copy(pinDialogError = "PINs do not match")
+            _uiState.value = _uiState.value.copy(pinDialogError = ServiceLocator.getString(R.string.settings_pin_mismatch_error))
             return
         }
 
@@ -195,13 +195,13 @@ class SettingsViewModel(
                         isSavingPin = false,
                         showPinDialog = false,
                         isAppLockEnabled = true,
-                        message = "4-digit PIN set successfully"
+                        message = ServiceLocator.getString(R.string.settings_pin_set_success)
                     )
                 }
                 is Resource.Error -> {
                     _uiState.value = _uiState.value.copy(
                         isSavingPin = false,
-                        pinDialogError = res.message ?: "Failed to save PIN"
+                        pinDialogError = res.message ?: ServiceLocator.getString(R.string.settings_pin_save_failed)
                     )
                 }
                 else -> Unit
@@ -214,7 +214,11 @@ class SettingsViewModel(
             authRepository.updateBiometricEnabled(enabled)
             _uiState.value = _uiState.value.copy(
                 isBiometricEnabled = enabled,
-                message = if (enabled) "Fingerprint unlock on startup enabled" else "Fingerprint unlock disabled"
+                message = if (enabled) {
+                    ServiceLocator.getString(R.string.settings_fingerprint_startup_enabled)
+                } else {
+                    ServiceLocator.getString(R.string.settings_fingerprint_disabled)
+                }
             )
         }
     }
@@ -235,7 +239,7 @@ class SettingsViewModel(
                 is Resource.Success -> {
                     _uiState.value = _uiState.value.copy(
                         isSaving = false,
-                        message = "Profile updated successfully"
+                        message = ServiceLocator.getString(R.string.profile_updated_success)
                     )
                 }
                 is Resource.Error -> {

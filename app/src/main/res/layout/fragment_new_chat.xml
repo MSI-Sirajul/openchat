@@ -14,7 +14,7 @@
         android:layout_height="72dp"
         android:background="@color/color_surface"
         app:navigationIcon="@drawable/ic_arrow_back_24"
-        app:navigationContentDescription="Back"
+        app:navigationContentDescription="@string/common_back"
         app:elevation="2dp"
         app:contentInsetStartWithNavigation="0dp">
 
@@ -35,7 +35,7 @@
                     android:id="@+id/text_new_chat_title"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Select Contact"
+                    android:text="@string/new_chat_select_contact"
                     android:textColor="@color/color_primary_text"
                     android:textSize="19sp"
                     android:fontFamily="sans-serif-bold" />
@@ -44,7 +44,7 @@
                     android:id="@+id/text_contact_count"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Loading contacts..."
+                    android:text="@string/new_chat_loading_contacts"
                     android:textColor="@color/color_secondary_text"
                     android:textSize="13sp" />
             </LinearLayout>
@@ -55,7 +55,7 @@
                 android:layout_height="44dp"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:src="@drawable/ic_search_24"
-                android:contentDescription="Search contacts"
+                android:contentDescription="@string/new_chat_search_contacts_cd"
                 app:tint="@color/color_primary_text" />
         </LinearLayout>
     </com.google.android.material.appbar.MaterialToolbar>
@@ -86,7 +86,7 @@
                 android:id="@+id/et_search_contacts"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:hint="Search contacts by name or username"
+                android:hint="@string/new_chat_search_hint"
                 android:textSize="14sp" />
         </com.google.android.material.textfield.TextInputLayout>
     </FrameLayout>
@@ -125,14 +125,14 @@
                         android:layout_gravity="center"
                         android:src="@drawable/ic_group_24"
                         app:tint="#FFFFFF"
-                        android:contentDescription="New Group" />
+                        android:contentDescription="@string/new_chat_new_group_cd" />
                 </FrameLayout>
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginStart="16dp"
-                    android:text="New group"
+                    android:text="@string/new_chat_new_group"
                     android:textColor="@color/color_primary_text"
                     android:textSize="16sp"
                     android:fontFamily="sans-serif-bold" />
@@ -162,14 +162,14 @@
                         android:layout_gravity="center"
                         android:src="@drawable/ic_person_add_24"
                         app:tint="@color/color_primary"
-                        android:contentDescription="New Contact" />
+                        android:contentDescription="@string/new_chat_new_contact_cd" />
                 </FrameLayout>
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginStart="16dp"
-                    android:text="New contact"
+                    android:text="@string/new_chat_new_contact"
                     android:textColor="@color/color_primary_text"
                     android:textSize="16sp"
                     android:fontFamily="sans-serif-bold" />
@@ -183,7 +183,7 @@
                 android:paddingHorizontal="16dp"
                 android:paddingTop="16dp"
                 android:paddingBottom="8dp"
-                android:text="Contacts on OpenChat"
+                android:text="@string/new_chat_contacts_header"
                 android:textColor="@color/color_secondary_text"
                 android:textSize="13sp"
                 android:fontFamily="sans-serif-medium"
@@ -223,14 +223,14 @@
                     android:layout_gravity="center"
                     android:src="@drawable/ic_group_24"
                     app:tint="@color/color_primary"
-                    android:contentDescription="Empty contacts" />
+                    android:contentDescription="@string/new_chat_empty_cd" />
             </com.google.android.material.card.MaterialCardView>
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"
-                android:text="No friends found"
+                android:text="@string/new_chat_no_friends_found"
                 android:textColor="@color/color_primary_text"
                 android:textSize="17sp"
                 android:fontFamily="sans-serif-bold" />
@@ -239,7 +239,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="6dp"
-                android:text="Add contacts on OpenChat to start chatting"
+                android:text="@string/new_chat_empty_subtitle"
                 android:textColor="@color/color_secondary_text"
                 android:textSize="14sp"
                 android:gravity="center" />
@@ -249,7 +249,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="48dp"
                 android:layout_marginTop="20dp"
-                android:text="Find Friends"
+                android:text="@string/nav_add_friend"
                 app:cornerRadius="24dp" />
         </LinearLayout>
     </FrameLayout>

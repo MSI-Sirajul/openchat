@@ -2,6 +2,7 @@ package com.msi.openchat.feature.auth
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.R
 import com.msi.openchat.core.common.Resource
 import com.msi.openchat.core.di.ServiceLocator
 import com.msi.openchat.data.repository.AuthRepository
@@ -49,7 +50,7 @@ class AuthViewModel(
                 when (state) {
                     is com.msi.openchat.core.security.AuthState.SessionExpired -> {
                         _uiState.value = _uiState.value.copy(
-                            errorMessage = "Your session expired. Please sign in to continue.",
+                            errorMessage = ServiceLocator.getString(R.string.auth_session_expired),
                             isAuthenticated = false,
                             isLogin = true
                         )
@@ -154,7 +155,7 @@ class AuthViewModel(
             ServiceLocator.sessionManager.secureStorage.setAppUnlocked(true)
             _uiState.value = _uiState.value.copy(isAuthenticated = true)
         } else {
-            _uiState.value = _uiState.value.copy(errorMessage = "No offline credentials saved. Please log in online first.")
+            _uiState.value = _uiState.value.copy(errorMessage = ServiceLocator.getString(R.string.auth_no_offline_credentials))
         }
     }
 
@@ -190,17 +191,17 @@ class AuthViewModel(
         val state = _uiState.value
         if (state.isLogin) {
             if (state.email.isBlank()) {
-                _uiState.value = state.copy(errorMessage = "Please enter your email, username, or phone number")
+                _uiState.value = state.copy(errorMessage = ServiceLocator.getString(R.string.auth_error_enter_identifier))
                 return
             }
         } else {
             if (state.email.isBlank() || !state.email.contains("@")) {
-                _uiState.value = state.copy(errorMessage = "Please enter a valid email address")
+                _uiState.value = state.copy(errorMessage = ServiceLocator.getString(R.string.auth_error_invalid_email))
                 return
             }
         }
         if (state.password.length < 6) {
-            _uiState.value = state.copy(errorMessage = "Password must be at least 6 characters")
+            _uiState.value = state.copy(errorMessage = ServiceLocator.getString(R.string.auth_error_short_password))
             return
         }
 
@@ -220,7 +221,10 @@ class AuthViewModel(
                 }
             } else {
                 if (state.username.isBlank()) {
-                    _uiState.value = _uiState.value.copy(isLoading = false, errorMessage = "Username is required")
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        errorMessage = ServiceLocator.getString(R.string.auth_error_username_required)
+                    )
                     return@launch
                 }
                 val dName = if (state.displayName.isNotBlank()) state.displayName.trim() else state.username.trim()
@@ -240,14 +244,14 @@ class AuthViewModel(
                             _uiState.value = _uiState.value.copy(
                                 isLoading = false,
                                 isAuthenticated = true,
-                                successMessage = "Welcome to OpenChat!"
+                                successMessage = ServiceLocator.getString(R.string.auth_welcome_toast)
                             )
                         } else {
                             // Email confirmation is required
                             _uiState.value = _uiState.value.copy(
                                 isLoading = false,
                                 showEmailConfirmDialog = true,
-                                successMessage = "Account created! Please check your Inbox and Spam folder for the verification link."
+                                successMessage = ServiceLocator.getString(R.string.auth_account_created_verify)
                             )
                         }
                     }
@@ -270,7 +274,7 @@ class AuthViewModel(
                 is Resource.Success -> {
                     _uiState.value = _uiState.value.copy(
                         isCheckingConfirmation = false,
-                        successMessage = "Verification email resent! Please check your Inbox and Spam/Junk folder."
+                        successMessage = ServiceLocator.getString(R.string.auth_verification_resent)
                     )
                 }
                 is Resource.Error -> {
@@ -346,7 +350,7 @@ class AuthViewModel(
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
                         isForgotPasswordOpen = false,
-                        successMessage = "Password reset instructions sent to $email"
+                        successMessage = ServiceLocator.getString(R.string.auth_reset_instructions_sent, email)
                     )
                 }
                 is Resource.Error -> {

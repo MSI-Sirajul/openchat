@@ -59,7 +59,7 @@
                 android:layout_width="16dp"
                 android:layout_height="16dp"
                 android:src="@drawable/ic_call_received_24"
-                android:contentDescription="Call status" />
+                android:contentDescription="@string/call_history_status_cd" />
 
             <TextView
                 android:id="@+id/textCallDetails"
@@ -79,5 +79,5 @@
         android:layout_height="48dp"
         android:background="?android:attr/selectableItemBackgroundBorderless"
         android:src="@drawable/ic_call_24"
-        android:contentDescription="Call contact" />
+        android:contentDescription="@string/call_history_callback_cd" />
 </LinearLayout>

@@ -6,6 +6,7 @@ import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
 import android.util.Log
+import com.example.R
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.database.ChildEventListener
@@ -22,6 +23,7 @@ import com.msi.openchat.core.backend.outbox.ConversationOutboxQueue
 import com.msi.openchat.core.common.Constants
 import com.msi.openchat.core.common.DateTimeUtils
 import com.msi.openchat.core.common.Resource
+import com.msi.openchat.core.di.ServiceLocator
 import com.msi.openchat.core.security.SessionManager
 import com.msi.openchat.data.local.OpenChatDatabase
 import com.msi.openchat.data.local.entity.MessageEntity
@@ -294,7 +296,7 @@ object BackendManager {
         val newState = when {
             !isNetworkAvailable -> ConnectionState.Offline
             isFirebaseConnected -> ConnectionState.Connected
-            else -> ConnectionState.Reconnecting("Reconnecting to backend...")
+            else -> ConnectionState.Reconnecting(ServiceLocator.getString(R.string.common_reconnecting_backend))
         }
         _connectionState.value = newState
     }
@@ -421,7 +423,7 @@ object BackendManager {
         bucket: String = Constants.BUCKET_IMAGES,
         onProgress: (Float) -> Unit = {}
     ): Resource<String> = withContext(Dispatchers.IO) {
-        Resource.Error("Media uploads are temporarily unavailable")
+        Resource.Error(ServiceLocator.getString(R.string.common_media_uploads_unavailable))
     }
 
     private suspend fun uploadFileInternal(
@@ -439,7 +441,7 @@ object BackendManager {
         mimeType: String,
         bucket: String = Constants.BUCKET_IMAGES
     ): Resource<String> = withContext(Dispatchers.IO) {
-        Resource.Error("Media uploads are temporarily unavailable")
+        Resource.Error(ServiceLocator.getString(R.string.common_media_uploads_unavailable))
     }
 
     /**
@@ -605,10 +607,10 @@ object BackendManager {
     ): Resource<CallSession> {
         return if (callType == "video") {
             com.msi.openchat.feature.videocall.VideoCallSignaling(
-                com.msi.openchat.core.di.ServiceLocator.sessionManager
-            ).createVideoCall(receiverId, "OpenChat Contact")
+                ServiceLocator.sessionManager
+            ).createVideoCall(receiverId, ServiceLocator.getString(R.string.home_openchat_contact))
         } else {
-            com.msi.openchat.core.di.ServiceLocator.callRepository.initiateAudioCall(receiverId)
+            ServiceLocator.callRepository.initiateAudioCall(receiverId)
         }
     }
 

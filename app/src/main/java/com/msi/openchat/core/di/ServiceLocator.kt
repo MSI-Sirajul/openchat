@@ -1,6 +1,8 @@
 package com.msi.openchat.core.di
 
+import android.annotation.SuppressLint
 import android.content.Context
+import androidx.annotation.StringRes
 import com.msi.openchat.core.security.FirebaseAuthManager
 import com.msi.openchat.core.security.SessionManager
 import com.msi.openchat.data.remote.firebase.FirebaseManager
@@ -23,6 +25,27 @@ object ServiceLocator {
 
     val context: Context
         get() = appContext ?: throw IllegalStateException("ServiceLocator not initialized")
+
+    @SuppressLint("PrivateApi")
+    fun contextOrNull(): Context? {
+        appContext?.let { return it }
+        return try {
+            val cls = Class.forName("android.app.ActivityThread")
+            val app = cls.getMethod("currentApplication").invoke(null) as? Context
+            app?.applicationContext
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    fun getString(@StringRes resId: Int, vararg formatArgs: Any): String {
+        val ctx = contextOrNull() ?: throw IllegalStateException("ServiceLocator not initialized")
+        return if (formatArgs.isEmpty()) {
+            ctx.getString(resId)
+        } else {
+            ctx.getString(resId, *formatArgs)
+        }
+    }
 
     val networkMonitor: com.msi.openchat.core.common.NetworkMonitor by lazy {
         com.msi.openchat.core.common.NetworkMonitor(appContext ?: throw IllegalStateException("ServiceLocator not initialized"))

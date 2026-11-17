@@ -39,7 +39,7 @@
                     android:layout_height="44dp"
                     android:layout_marginEnd="8dp"
                     android:background="?attr/selectableItemBackgroundBorderless"
-                    android:contentDescription="My Profile">
+                    android:contentDescription="@string/home_my_profile_cd">
 
                     <TextView
                         android:id="@+id/text_home_profile_avatar"
@@ -49,7 +49,7 @@
                         android:background="@drawable/bg_avatar_circle"
                         android:backgroundTint="@color/color_avatar_bg"
                         android:gravity="center"
-                        android:text="U"
+                        android:text="@string/common_avatar_placeholder_letter"
                         android:textColor="@color/color_primary"
                         android:textSize="17sp"
                         android:fontFamily="sans-serif-bold"
@@ -216,7 +216,7 @@
                         android:layout_gravity="center"
                         android:src="@drawable/ic_chat_24"
                         app:tint="@color/color_primary"
-                        android:contentDescription="Empty chats" />
+                        android:contentDescription="@string/home_empty_chats_cd" />
                 </com.google.android.material.card.MaterialCardView>
 
                 <TextView
@@ -276,7 +276,7 @@
                         android:layout_gravity="center"
                         android:src="@drawable/ic_call_24"
                         app:tint="@color/color_status_online"
-                        android:contentDescription="Empty calls" />
+                        android:contentDescription="@string/home_empty_calls_cd" />
                 </com.google.android.material.card.MaterialCardView>
 
                 <TextView
@@ -284,7 +284,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="16dp"
-                    android:text="No call history yet. Tap + to call a friend!"
+                    android:text="@string/home_empty_calls"
                     android:textColor="@color/color_secondary_text"
                     android:textSize="15sp"
                     android:fontFamily="sans-serif-medium"
@@ -336,7 +336,7 @@
                         android:layout_gravity="center"
                         android:src="@drawable/ic_group_24"
                         app:tint="@color/color_primary"
-                        android:contentDescription="Empty friends" />
+                        android:contentDescription="@string/home_empty_friends_cd" />
                 </com.google.android.material.card.MaterialCardView>
 
                 <TextView
@@ -344,7 +344,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="16dp"
-                    android:text="No friends added yet. Tap Find Friends to connect!"
+                    android:text="@string/home_empty_friends"
                     android:textColor="@color/color_secondary_text"
                     android:textSize="15sp"
                     android:fontFamily="sans-serif-medium"
@@ -363,7 +363,7 @@
         android:layout_marginEnd="20dp"
         android:layout_marginBottom="96dp"
         android:src="@drawable/ic_chat_24"
-        android:contentDescription="New Action"
+        android:contentDescription="@string/home_new_action_cd"
         app:tint="#FFFFFF"
         app:backgroundTint="@color/color_primary"
         app:elevation="6dp" />

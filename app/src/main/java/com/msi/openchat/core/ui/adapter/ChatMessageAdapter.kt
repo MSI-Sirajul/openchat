@@ -1,6 +1,5 @@
 package com.msi.openchat.core.ui.adapter
 
-import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
 import android.view.LayoutInflater
@@ -150,25 +149,25 @@ class ChatMessageAdapter(
                         binding.textSeenStatus.visibility = View.GONE
                         binding.imageMessageStatus.setImageResource(R.drawable.ic_check_double_16)
                         binding.imageMessageStatus.setColorFilter(readTickColor)
-                        binding.imageMessageStatus.contentDescription = "Read"
+                        binding.imageMessageStatus.contentDescription = context.getString(R.string.chat_status_read)
                     }
                     "delivered" -> {
                         binding.textSeenStatus.visibility = View.GONE
                         binding.imageMessageStatus.setImageResource(R.drawable.ic_check_double_16)
                         binding.imageMessageStatus.setColorFilter(tickColor)
-                        binding.imageMessageStatus.contentDescription = "Delivered"
+                        binding.imageMessageStatus.contentDescription = context.getString(R.string.chat_status_delivered)
                     }
                     "sending" -> {
                         binding.textSeenStatus.visibility = View.GONE
                         binding.imageMessageStatus.setImageResource(R.drawable.ic_clock_16)
                         binding.imageMessageStatus.setColorFilter(tickColor)
-                        binding.imageMessageStatus.contentDescription = "Sending"
+                        binding.imageMessageStatus.contentDescription = context.getString(R.string.chat_status_sending)
                     }
                     else -> { // "sent"
                         binding.textSeenStatus.visibility = View.GONE
                         binding.imageMessageStatus.setImageResource(R.drawable.ic_check_single_16)
                         binding.imageMessageStatus.setColorFilter(tickColor)
-                        binding.imageMessageStatus.contentDescription = "Sent"
+                        binding.imageMessageStatus.contentDescription = context.getString(R.string.chat_status_sent)
                     }
                 }
             } else {
@@ -190,7 +189,11 @@ class ChatMessageAdapter(
                     binding.progressVoice.progress = (progress * 100).toInt()
 
                     val durationSec = message.mediaDurationSeconds
-                    binding.textVoiceDuration.text = if (durationSec > 0) "${durationSec}s" else "Voice"
+                    binding.textVoiceDuration.text = if (durationSec > 0) {
+                        context.getString(R.string.common_seconds_short, durationSec)
+                    } else {
+                        context.getString(R.string.chat_voice_label)
+                    }
 
                     binding.btnPlayVoice.setOnClickListener {
                         onPlayVoice(message)
@@ -341,11 +344,15 @@ class ChatMessageAdapter(
                             !com.msi.openchat.core.media.PersistableUriManager.isUriAccessible(context, android.net.Uri.parse(localPath))
 
                     val displayFileName = if (isRevokedOrDeleted) {
-                        "$rawContent (Unavailable)"
+                        context.getString(
+                            R.string.common_name_unavailable,
+                            rawContent,
+                            context.getString(R.string.common_unavailable)
+                        )
                     } else if (rawContent.isNotBlank() && rawContent != "Attachment" && rawContent != "📎 Document") {
                         rawContent
                     } else {
-                        "Document_${message.id.take(6)}"
+                        context.getString(R.string.chat_document_fallback, message.id.take(6))
                     }
                     binding.textFileName.text = displayFileName
                     binding.textMessageBody.visibility = View.GONE

@@ -17,7 +17,6 @@ import com.example.databinding.DialogEditProfileBinding
 import com.example.databinding.DialogSetPinBinding
 import com.example.databinding.FragmentSettingsBinding
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
-import com.msi.openchat.core.di.ServiceLocator
 import com.msi.openchat.core.theme.AppThemeMode
 import com.msi.openchat.data.local.OfflineMediaManager
 import kotlinx.coroutines.Dispatchers
@@ -65,7 +64,7 @@ class SettingsFragment : Fragment() {
 
             MaterialAlertDialogBuilder(requireContext())
                 .setView(dialogBinding.root)
-                .setPositiveButton("Save") { _, _ ->
+                .setPositiveButton(getString(R.string.common_save)) { _, _ ->
                     val newName = dialogBinding.etEditDisplayName.text?.toString().orEmpty().trim()
                     val newBio = dialogBinding.etEditBio.text?.toString().orEmpty().trim()
                     if (newName.isNotBlank()) {
@@ -74,7 +73,7 @@ class SettingsFragment : Fragment() {
                         settingsViewModel.saveProfile()
                     }
                 }
-                .setNegativeButton("Cancel", null)
+                .setNegativeButton(getString(R.string.common_cancel), null)
                 .show()
         }
     }
@@ -125,14 +124,14 @@ class SettingsFragment : Fragment() {
 
                 if (!settingsViewModel.uiState.value.isAppLockEnabled) {
                     MaterialAlertDialogBuilder(requireContext())
-                        .setTitle("Set Backup PIN")
-                        .setMessage("Please set a 4-digit backup PIN first, so you can always unlock OpenChat if your fingerprint cannot be recognized.")
-                        .setPositiveButton("Set PIN") { _, _ ->
+                        .setTitle(getString(R.string.settings_backup_pin_title))
+                        .setMessage(getString(R.string.settings_backup_pin_message))
+                        .setPositiveButton(getString(R.string.settings_set_pin_button)) { _, _ ->
                             showSetPinDialog(onSuccess = {
                                 verifyAndEnableBiometric()
                             })
                         }
-                        .setNegativeButton("Cancel") { _, _ ->
+                        .setNegativeButton(getString(R.string.common_cancel)) { _, _ ->
                             binding.switchBiometric.isChecked = false
                         }
                         .show()
@@ -148,20 +147,20 @@ class SettingsFragment : Fragment() {
     private fun verifyAndEnableBiometric() {
         com.msi.openchat.core.security.BiometricAuthHelper.promptBiometricAuthentication(
             activity = requireActivity(),
-            title = "Verify Fingerprint",
-            subtitle = "Scan your fingerprint to enable biometric startup unlock",
-            negativeButtonText = "Cancel",
+            title = getString(R.string.settings_verify_fingerprint_title),
+            subtitle = getString(R.string.settings_verify_fingerprint_subtitle),
+            negativeButtonText = getString(R.string.common_cancel),
             onSuccess = {
                 settingsViewModel.onToggleBiometric(true)
-                Toast.makeText(requireContext(), "Fingerprint startup unlock enabled!", Toast.LENGTH_SHORT).show()
+                Toast.makeText(requireContext(), getString(R.string.settings_fingerprint_enabled_toast), Toast.LENGTH_SHORT).show()
             },
             onError = { _, errString ->
                 binding.switchBiometric.isChecked = false
-                Toast.makeText(requireContext(), "Biometric verification: $errString", Toast.LENGTH_SHORT).show()
+                Toast.makeText(requireContext(), getString(R.string.settings_biometric_verification_error, errString), Toast.LENGTH_SHORT).show()
             },
             onFailed = {
                 binding.switchBiometric.isChecked = false
-                Toast.makeText(requireContext(), "Fingerprint not recognized", Toast.LENGTH_SHORT).show()
+                Toast.makeText(requireContext(), getString(R.string.settings_fingerprint_not_recognized), Toast.LENGTH_SHORT).show()
             }
         )
     }
@@ -170,8 +169,8 @@ class SettingsFragment : Fragment() {
         val dialogBinding = DialogSetPinBinding.inflate(layoutInflater)
         val dialog = MaterialAlertDialogBuilder(requireContext())
             .setView(dialogBinding.root)
-            .setPositiveButton("Set PIN", null)
-            .setNegativeButton("Cancel") { _, _ ->
+            .setPositiveButton(getString(R.string.settings_set_pin_button), null)
+            .setNegativeButton(getString(R.string.common_cancel)) { _, _ ->
                 binding.switchAppLock.isChecked = settingsViewModel.uiState.value.isAppLockEnabled
             }
             .create()
@@ -183,11 +182,11 @@ class SettingsFragment : Fragment() {
                 val confirmPin = dialogBinding.etConfirmPin.text?.toString().orEmpty()
 
                 if (pin.length != 4) {
-                    dialogBinding.tilNewPin.error = "PIN must be 4 digits"
+                    dialogBinding.tilNewPin.error = getString(R.string.settings_pin_length_short_error)
                     return@setOnClickListener
                 }
                 if (pin != confirmPin) {
-                    dialogBinding.tilConfirmPin.error = "PINs do not match"
+                    dialogBinding.tilConfirmPin.error = getString(R.string.settings_pin_mismatch_error)
                     return@setOnClickListener
                 }
 
@@ -212,7 +211,7 @@ class SettingsFragment : Fragment() {
                     mediaDir.listFiles()?.forEach { file -> file.delete() }
                 } catch (_: Exception) {}
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(requireContext(), "Cache cleared successfully", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(requireContext(), getString(R.string.settings_cache_cleared), Toast.LENGTH_SHORT).show()
                     updateCacheSizeDisplay()
                 }
             }
@@ -237,7 +236,7 @@ class SettingsFragment : Fragment() {
 
             val mb = totalBytes / (1024.0 * 1024.0)
             withContext(Dispatchers.Main) {
-                _binding?.textCacheSize?.text = "%.1f MB used".format(mb)
+                _binding?.textCacheSize?.text = getString(R.string.common_storage_used_mb, mb)
             }
         }
     }
@@ -245,12 +244,12 @@ class SettingsFragment : Fragment() {
     private fun setupLogoutSection() {
         binding.btnSettingsLogout.setOnClickListener {
             MaterialAlertDialogBuilder(requireContext())
-                .setTitle("Log Out")
-                .setMessage("Are you sure you want to log out of OpenChat?")
-                .setPositiveButton("Log Out") { _, _ ->
+                .setTitle(getString(R.string.settings_logout))
+                .setMessage(getString(R.string.settings_logout_confirm))
+                .setPositiveButton(getString(R.string.settings_logout)) { _, _ ->
                     settingsViewModel.logout()
                 }
-                .setNegativeButton("Cancel", null)
+                .setNegativeButton(getString(R.string.common_cancel), null)
                 .show()
         }
     }
@@ -268,7 +267,7 @@ class SettingsFragment : Fragment() {
     }
 
     private fun renderState(state: SettingsUiState) {
-        val displayName = state.displayName.ifBlank { state.username.ifBlank { "User" } }
+        val displayName = state.displayName.ifBlank { state.username.ifBlank { getString(R.string.common_user) } }
         binding.textSettingsName.text = displayName
         com.msi.openchat.core.ui.AvatarHelper.loadAvatar(
             imageView = binding.imgSettingsAvatar,
@@ -276,7 +275,7 @@ class SettingsFragment : Fragment() {
             avatarUrl = state.avatarUrl,
             displayName = displayName
         )
-        binding.textSettingsUsername.text = if (state.username.isNotBlank()) "@${state.username}" else ""
+        binding.textSettingsUsername.text = if (state.username.isNotBlank()) getString(R.string.common_handle_format, state.username) else ""
 
         // Theme selection radio
         isUpdatingThemeRadio = true

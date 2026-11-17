@@ -72,7 +72,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:scaleType="centerCrop"
-                android:contentDescription="Attached photo" />
+                android:contentDescription="@string/chat_attached_photo_cd" />
 
             <!-- Video Overlay with Play Button & Scrim -->
             <FrameLayout
@@ -93,7 +93,7 @@
                     android:padding="12dp"
                     android:src="@drawable/ic_play_24"
                     app:tint="@color/white"
-                    android:contentDescription="Play video" />
+                    android:contentDescription="@string/chat_play_video_cd" />
 
                 <TextView
                     android:id="@+id/textVideoBadge"
@@ -107,7 +107,7 @@
                     android:paddingEnd="6dp"
                     android:paddingTop="2dp"
                     android:paddingBottom="2dp"
-                    android:text="VIDEO"
+                    android:text="@string/chat_video_badge"
                     android:textColor="@color/white"
                     android:textSize="10sp"
                     android:textStyle="bold" />
@@ -131,7 +131,7 @@
                 android:layout_height="40dp"
                 android:background="?android:attr/selectableItemBackgroundBorderless"
                 android:src="@drawable/ic_play_24"
-                android:contentDescription="Play voice note" />
+                android:contentDescription="@string/chat_play_voice_cd" />
 
             <ProgressBar
                 android:id="@+id/progressVoice"
@@ -171,7 +171,7 @@
                 android:layout_height="24dp"
                 android:src="@drawable/ic_file_24"
                 app:tint="@color/color_primary"
-                android:contentDescription="File icon" />
+                android:contentDescription="@string/chat_file_icon_cd" />
 
             <TextView
                 android:id="@+id/textFileName"
@@ -224,7 +224,7 @@
                 android:textSize="10sp"
                 android:fontFamily="sans-serif-bold"
                 android:textColor="@color/color_status_online"
-                android:text="Seen"
+                android:text="@string/chat_status_seen"
                 android:visibility="gone"
                 tools:visibility="visible" />
 
@@ -233,7 +233,7 @@
                 android:layout_width="16dp"
                 android:layout_height="16dp"
                 android:layout_marginStart="4dp"
-                android:contentDescription="Message status"
+                android:contentDescription="@string/chat_message_status_cd"
                 android:visibility="gone"
                 tools:visibility="visible"
                 tools:src="@drawable/ic_check_double_16" />

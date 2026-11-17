@@ -2,6 +2,8 @@ package com.msi.openchat.core.common
 
 import android.content.Context
 import android.text.format.DateFormat
+import com.example.R
+import com.msi.openchat.core.di.ServiceLocator
 import java.time.Instant
 import java.time.LocalDate
 import java.time.OffsetDateTime
@@ -87,15 +89,15 @@ object DateTimeUtils {
      * - "MMMM d, yyyy" (e.g. "October 14, 2025") if older year
      */
     fun formatDateSeparator(isoString: String?): String {
-        if (isoString.isNullOrBlank()) return "Today"
+        if (isoString.isNullOrBlank()) return ServiceLocator.getString(R.string.common_today)
         val instant = parseTimestamp(isoString)
         val zone = ZoneId.systemDefault()
         val messageDate = instant.atZone(zone).toLocalDate()
         val today = LocalDate.now(zone)
 
         return when {
-            messageDate.isEqual(today) -> "Today"
-            messageDate.isEqual(today.minusDays(1)) -> "Yesterday"
+            messageDate.isEqual(today) -> ServiceLocator.getString(R.string.common_today)
+            messageDate.isEqual(today.minusDays(1)) -> ServiceLocator.getString(R.string.common_yesterday)
             messageDate.year == today.year -> {
                 val formatter = DateTimeFormatter.ofPattern("MMMM d", Locale.getDefault())
                 messageDate.format(formatter)
@@ -140,7 +142,7 @@ object DateTimeUtils {
                 val formatter = DateTimeFormatter.ofPattern(pattern, Locale.getDefault())
                 messageDateTime.format(formatter)
             }
-            messageDate.isEqual(today.minusDays(1)) -> "Yesterday"
+            messageDate.isEqual(today.minusDays(1)) -> context.getString(R.string.common_yesterday)
             messageDate.year == today.year -> {
                 val formatter = DateTimeFormatter.ofPattern("MMM d", Locale.getDefault())
                 messageDate.format(formatter)
@@ -156,20 +158,20 @@ object DateTimeUtils {
      * Formats relative timestamp for friend requests or user activities.
      */
     fun formatRelativeTime(isoString: String?): String {
-        if (isoString.isNullOrBlank()) return "Recently"
+        if (isoString.isNullOrBlank()) return ServiceLocator.getString(R.string.common_recently)
         return try {
             val instant = parseTimestamp(isoString)
             val now = Instant.now()
             val diffSec = java.time.Duration.between(instant, now).seconds
             when {
-                diffSec < 60 -> "Just now"
-                diffSec < 3600 -> "${diffSec / 60}m ago"
-                diffSec < 86400 -> "${diffSec / 3600}h ago"
-                diffSec < 172800 -> "Yesterday"
-                else -> "${diffSec / 86400}d ago"
+                diffSec < 60 -> ServiceLocator.getString(R.string.common_just_now)
+                diffSec < 3600 -> ServiceLocator.getString(R.string.common_minutes_ago, diffSec / 60)
+                diffSec < 86400 -> ServiceLocator.getString(R.string.common_hours_ago, diffSec / 3600)
+                diffSec < 172800 -> ServiceLocator.getString(R.string.common_yesterday)
+                else -> ServiceLocator.getString(R.string.common_days_ago, diffSec / 86400)
             }
         } catch (_: Exception) {
-            "Recently"
+            ServiceLocator.getString(R.string.common_recently)
         }
     }
 }

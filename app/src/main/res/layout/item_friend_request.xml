@@ -30,7 +30,7 @@
                 android:background="@drawable/bg_avatar_circle"
                 android:backgroundTint="@color/color_avatar_bg"
                 android:gravity="center"
-                android:text="U"
+                android:text="@string/common_avatar_placeholder_letter"
                 android:textColor="@color/color_avatar_text"
                 android:textSize="18sp"
                 android:textStyle="bold"
@@ -57,7 +57,7 @@
                 android:id="@+id/text_request_name"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="User Name"
+                android:text="@string/profile_default_name"
                 android:textColor="@color/color_primary_text"
                 android:textSize="15sp"
                 android:fontFamily="sans-serif-bold" />
@@ -67,7 +67,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
-                android:text="Just now"
+                android:text="@string/common_just_now"
                 android:textColor="@color/color_secondary_text"
                 android:textSize="12sp" />
         </LinearLayout>
@@ -106,7 +106,7 @@
             android:id="@+id/btn_cancel_request"
             android:layout_width="wrap_content"
             android:layout_height="38dp"
-            android:text="Cancel"
+            android:text="@string/common_cancel"
             android:textSize="12sp"
             android:textColor="@color/color_error"
             style="@style/Widget.Material3.Button.OutlinedButton"

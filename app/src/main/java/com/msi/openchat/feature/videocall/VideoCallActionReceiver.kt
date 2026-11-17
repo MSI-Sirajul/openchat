@@ -4,6 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.util.Log
+import com.example.R
 import com.msi.openchat.core.service.AppServiceManager
 import com.msi.openchat.service.notification.OpenChatNotificationManager
 import kotlinx.coroutines.CoroutineScope
@@ -38,7 +39,7 @@ class VideoCallActionReceiver : BroadcastReceiver() {
         val callerId = intent.getStringExtra(EXTRA_CALLER_ID)
             ?.ifBlank { null }
             ?: intent.getStringExtra("peerUserId").orEmpty()
-        val callerName = intent.getStringExtra(EXTRA_CALLER_NAME) ?: "Caller"
+        val callerName = intent.getStringExtra(EXTRA_CALLER_NAME) ?: context.getString(R.string.call_caller_fallback)
 
         Log.i(tag, "Received video action: $action for callId=$callId")
 
@@ -99,7 +100,7 @@ class VideoCallActionReceiver : BroadcastReceiver() {
 
             ACTION_END_VIDEO_CALL -> {
                 Log.i(tag, "Ending active video call via VideoCallManager")
-                VideoCallManager.endCall("Ended from notification")
+                VideoCallManager.endCall(context.getString(R.string.call_ended_from_notif))
                 VideoCallService.stopService(context)
             }
         }

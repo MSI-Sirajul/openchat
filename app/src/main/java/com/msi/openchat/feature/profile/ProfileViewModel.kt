@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.R
 import com.msi.openchat.core.common.Resource
 import com.msi.openchat.core.di.ServiceLocator
 import com.msi.openchat.data.model.Profile
@@ -51,7 +52,7 @@ class ProfileViewModel(
     fun loadProfile(forceRefresh: Boolean = true) {
         val targetId = if (userId.isNotBlank()) userId else currentUserId
         if (targetId.isBlank()) {
-            _uiState.value = _uiState.value.copy(errorMessage = "User not identified")
+            _uiState.value = _uiState.value.copy(errorMessage = ServiceLocator.getString(R.string.profile_user_not_identified))
             return
         }
 
@@ -142,7 +143,7 @@ class ProfileViewModel(
         val current = _uiState.value.profile ?: return
         val newName = displayName.trim()
         if (newName.isBlank()) {
-            _uiState.value = _uiState.value.copy(errorMessage = "Name cannot be empty")
+            _uiState.value = _uiState.value.copy(errorMessage = ServiceLocator.getString(R.string.profile_name_empty_error))
             return
         }
 
@@ -175,7 +176,7 @@ class ProfileViewModel(
                         _uiState.value = _uiState.value.copy(
                             isSaving = false,
                             isUploadingAvatar = false,
-                            errorMessage = uploadResult.message ?: "Failed to upload avatar"
+                            errorMessage = uploadResult.message ?: ServiceLocator.getString(R.string.profile_avatar_upload_failed)
                         )
                         return@launch
                     }
@@ -204,14 +205,14 @@ class ProfileViewModel(
                         isSaving = false,
                         isUploadingAvatar = false,
                         isEditMode = false,
-                        successMessage = "Profile updated successfully"
+                        successMessage = ServiceLocator.getString(R.string.profile_updated_success)
                     )
                 }
                 is Resource.Error -> {
                     _uiState.value = _uiState.value.copy(
                         isSaving = false,
                         isUploadingAvatar = false,
-                        errorMessage = result.message ?: "Failed to save profile"
+                        errorMessage = result.message ?: ServiceLocator.getString(R.string.profile_save_failed)
                     )
                 }
                 else -> {

@@ -8,6 +8,7 @@ import android.view.ViewGroup
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
+import com.example.R
 import com.example.databinding.ItemFriendBinding
 import com.msi.openchat.data.model.Friendship
 
@@ -39,9 +40,12 @@ class FriendAdapter(
 
         fun bind(friendship: Friendship) {
             try {
+                val context = binding.root.context
                 val friend = friendship.friendProfile
-                val displayName = friend?.getResolvedName()?.ifBlank { "Friend" } ?: "Friend"
-                val username = friend?.username?.ifBlank { "user" } ?: "user"
+                val defaultFriend = context.getString(R.string.common_friend)
+                val displayName = friend?.getResolvedName()?.ifBlank { defaultFriend } ?: defaultFriend
+                val defaultHandle = context.getString(R.string.common_user).lowercase()
+                val username = friend?.username?.ifBlank { defaultHandle } ?: defaultHandle
 
                 val nameColor = if (isDark) Color.parseColor("#E8EEF5") else Color.parseColor("#17212B")
                 val subColor = if (isDark) Color.parseColor("#A3B1BF") else Color.parseColor("#64748B")
@@ -64,7 +68,7 @@ class FriendAdapter(
                 )
 
                 binding.textDisplayName.text = displayName
-                binding.textUsername.text = "@$username"
+                binding.textUsername.text = context.getString(R.string.common_handle_format, username)
 
                 // Online status indicator
                 val isOnline = friend?.onlineStatus == "online"

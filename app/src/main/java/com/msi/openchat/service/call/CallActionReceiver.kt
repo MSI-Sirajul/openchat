@@ -1,12 +1,10 @@
 package com.msi.openchat.service.call
 
-import android.Manifest
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.util.Log
-import androidx.core.content.ContextCompat
+import com.example.R
 import com.msi.openchat.core.di.ServiceLocator
 import com.msi.openchat.core.service.AppServiceManager
 import com.msi.openchat.data.remote.firebase.FirebaseManager
@@ -42,7 +40,8 @@ class CallActionReceiver : BroadcastReceiver() {
         val action = intent.action ?: return
         val callId = intent.getStringExtra(EXTRA_CALL_ID).orEmpty()
         val callerId = intent.getStringExtra(EXTRA_CALLER_ID).orEmpty()
-        val callerName = intent.getStringExtra(EXTRA_CALLER_NAME) ?: "Caller"
+        val callerName = intent.getStringExtra(EXTRA_CALLER_NAME)
+            ?: context.getString(R.string.call_caller_fallback)
 
         Log.i(tag, "Received call action: $action for callId=$callId")
 
@@ -70,7 +69,7 @@ class CallActionReceiver : BroadcastReceiver() {
                             ServiceLocator.callRepository.updateAudioCallStatus(
                                 callId = callId,
                                 status = "declined",
-                                endReason = "Declined from notification"
+                                endReason = context.getString(R.string.call_declined_from_notif)
                             )
                             if (callerId.isNotBlank()) {
                                 ServiceLocator.callRepository.sendSignaling(

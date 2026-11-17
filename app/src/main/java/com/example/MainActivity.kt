@@ -1,27 +1,21 @@
 package com.example
 
-import android.Manifest
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.view.View
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
-import androidx.fragment.app.Fragment
 import androidx.fragment.app.commit
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import com.example.databinding.ActivityMainBinding
 import com.google.android.material.color.DynamicColors
-import com.msi.openchat.core.common.NetworkStatus
 import com.msi.openchat.core.di.ServiceLocator
 import com.msi.openchat.core.permission.PermissionManager
 import com.msi.openchat.feature.auth.AuthFragment
-import com.msi.openchat.feature.calls.CallFragment
 import com.msi.openchat.feature.chat.ChatFragment
 import com.msi.openchat.feature.friends.AddFriendFragment
 import com.msi.openchat.feature.friends.FriendRequestsFragment
@@ -38,10 +32,6 @@ import kotlinx.coroutines.launch
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
-
-    private val permissionsLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions()
-    ) { /* Permissions evaluated */ }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // Ensure saved theme mode is applied before inflating views
@@ -149,7 +139,7 @@ class MainActivity : AppCompatActivity() {
                         binding.textNetworkBanner.text = getString(R.string.home_offline_banner)
                     } else if (status.isUnstable) {
                         binding.layoutNetworkBanner.visibility = View.VISIBLE
-                        binding.textNetworkBanner.text = "Connection unstable..."
+                        binding.textNetworkBanner.text = getString(R.string.common_connection_unstable)
                     } else {
                         binding.layoutNetworkBanner.visibility = View.GONE
                     }
@@ -430,7 +420,7 @@ class MainActivity : AppCompatActivity() {
             ?: intent.getStringExtra("incoming_caller_id")
         val incomingCallerName = intent.getStringExtra(OpenChatNotificationManager.EXTRA_CALLER_NAME)
             ?: intent.getStringExtra("incoming_caller_name")
-            ?: "Incoming Call"
+            ?: getString(R.string.call_incoming_caller_fallback)
 
         // Handle decline call action directly from notification
         if (action == OpenChatNotificationManager.ACTION_DECLINE_CALL && !incomingCallId.isNullOrBlank()) {
@@ -444,7 +434,7 @@ class MainActivity : AppCompatActivity() {
                 ServiceLocator.callRepository.updateCallStatus(
                     callId = incomingCallId,
                     status = "declined",
-                    endReason = "Declined from notification"
+                    endReason = getString(R.string.call_declined_from_notif)
                 )
             }
             return
@@ -496,7 +486,7 @@ class MainActivity : AppCompatActivity() {
             ?: intent.getStringExtra("navigate_conversation_id")
         val contactName = intent.getStringExtra(OpenChatNotificationManager.EXTRA_CONTACT_NAME)
             ?: intent.getStringExtra("contact_name")
-            ?: "Chat"
+            ?: getString(R.string.home_conversation_fallback)
         val contactId = intent.getStringExtra(OpenChatNotificationManager.EXTRA_CONTACT_ID)
             ?: intent.getStringExtra("contact_id")
             ?: ""
@@ -543,7 +533,7 @@ class MainActivity : AppCompatActivity() {
         if (isCall) {
             val callId = uri.getQueryParameter("callId") ?: uri.getQueryParameter("id").orEmpty()
             val contactId = uri.getQueryParameter("contactId") ?: uri.getQueryParameter("callerId").orEmpty()
-            val contactName = uri.getQueryParameter("contactName") ?: uri.getQueryParameter("name") ?: "OpenChat Call"
+            val contactName = uri.getQueryParameter("contactName") ?: uri.getQueryParameter("name") ?: getString(R.string.call_service_notification_title)
             val callType = uri.getQueryParameter("type") ?: uri.getQueryParameter("callType") ?: "audio"
 
             if (contactId.isNotBlank()) {
@@ -560,7 +550,7 @@ class MainActivity : AppCompatActivity() {
             }
         } else if (isChat) {
             val convId = uri.getQueryParameter("conversationId") ?: uri.getQueryParameter("id").orEmpty()
-            val contactName = uri.getQueryParameter("contactName") ?: uri.getQueryParameter("name") ?: "Chat"
+            val contactName = uri.getQueryParameter("contactName") ?: uri.getQueryParameter("name") ?: getString(R.string.home_conversation_fallback)
             val contactId = uri.getQueryParameter("contactId").orEmpty()
 
             if (convId.isNotBlank()) {

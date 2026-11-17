@@ -6,24 +6,18 @@ import android.text.TextWatcher
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.recyclerview.widget.RecyclerView
 import com.example.MainActivity
 import com.example.R
-import com.example.databinding.DialogSelectFriendBinding
 import com.example.databinding.FragmentHomeBinding
-import com.google.android.material.tabs.TabLayout
 import com.msi.openchat.core.ui.adapter.CallHistoryAdapter
 import com.msi.openchat.core.ui.adapter.ConversationAdapter
 import com.msi.openchat.core.ui.adapter.FriendAdapter
-import com.msi.openchat.data.model.Conversation
-import com.msi.openchat.data.model.Friendship
 import kotlinx.coroutines.launch
 
 class HomeFragment : Fragment() {
@@ -159,15 +153,15 @@ class HomeFragment : Fragment() {
                 when (tabIndex) {
                     0 -> {
                         binding.fabHomeAction.setImageResource(R.drawable.ic_chat_24)
-                        binding.fabHomeAction.contentDescription = "New Chat"
+                        binding.fabHomeAction.contentDescription = getString(R.string.home_fab_new_chat)
                     }
                     1 -> {
                         binding.fabHomeAction.setImageResource(R.drawable.ic_call_24)
-                        binding.fabHomeAction.contentDescription = "New Call"
+                        binding.fabHomeAction.contentDescription = getString(R.string.home_fab_new_call)
                     }
                     2 -> {
                         binding.fabHomeAction.setImageResource(R.drawable.ic_person_add_24)
-                        binding.fabHomeAction.contentDescription = "Add Friend"
+                        binding.fabHomeAction.contentDescription = getString(R.string.friends_add_button)
                     }
                 }
                 binding.fabHomeAction.animate()
@@ -189,17 +183,17 @@ class HomeFragment : Fragment() {
         when (tabIndex) {
             0 -> {
                 binding.fabHomeAction.setImageResource(R.drawable.ic_chat_24)
-                binding.fabHomeAction.contentDescription = "New Chat"
+                binding.fabHomeAction.contentDescription = getString(R.string.home_fab_new_chat)
                 binding.fabHomeAction.visibility = View.VISIBLE
             }
             1 -> {
                 binding.fabHomeAction.setImageResource(R.drawable.ic_call_24)
-                binding.fabHomeAction.contentDescription = "New Call"
+                binding.fabHomeAction.contentDescription = getString(R.string.home_fab_new_call)
                 binding.fabHomeAction.visibility = View.VISIBLE
             }
             2 -> {
                 binding.fabHomeAction.setImageResource(R.drawable.ic_person_add_24)
-                binding.fabHomeAction.contentDescription = "Add Friend"
+                binding.fabHomeAction.contentDescription = getString(R.string.friends_add_button)
                 binding.fabHomeAction.visibility = View.VISIBLE
             }
         }
@@ -211,7 +205,7 @@ class HomeFragment : Fragment() {
         // 1. Conversations
         conversationAdapter = ConversationAdapter(isDark = isDark) { conv ->
             val other = conv.otherUser
-            val name = other?.displayName?.ifBlank { other.username ?: "User" } ?: "Chat"
+            val name = other?.displayName?.ifBlank { other.username ?: getString(R.string.common_user) } ?: getString(R.string.home_conversation_fallback)
             val otherId = other?.id ?: if (conv.participant1Id == viewModel.uiState.value.conversations.firstOrNull()?.participant1Id) conv.participant2Id else conv.participant1Id
             (activity as? MainActivity)?.navigateToChat(conv.id, name, otherId)
         }
@@ -254,7 +248,7 @@ class HomeFragment : Fragment() {
                 if (friend != null) {
                     val currentUid = com.msi.openchat.core.di.ServiceLocator.sessionManager.getUserId().orEmpty()
                     val convId = if (currentUid < friend.id) "direct_${currentUid}_${friend.id}" else "direct_${friend.id}_${currentUid}"
-                    val name = friend.displayName.ifBlank { friend.username ?: "Friend" }
+                    val name = friend.displayName.ifBlank { friend.username ?: getString(R.string.common_friend) }
                     (activity as? MainActivity)?.navigateToChat(convId, name, friend.id)
                 }
             }
@@ -391,7 +385,7 @@ class HomeFragment : Fragment() {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 com.msi.openchat.core.di.ServiceLocator.userRepository.observeUserProfile(currentUid).collect { profile ->
                     if (profile != null) {
-                        val name = profile.displayName.ifBlank { profile.username ?: "U" }
+                        val name = profile.displayName.ifBlank { profile.username ?: getString(R.string.common_avatar_placeholder_letter) }
                         com.msi.openchat.core.ui.AvatarHelper.loadAvatar(
                             imageView = binding.imgHomeProfileAvatar,
                             letterTextView = binding.textHomeProfileAvatar,
@@ -409,7 +403,7 @@ class HomeFragment : Fragment() {
         if (!currentUid.isNullOrBlank()) {
             val cached = com.msi.openchat.core.di.ServiceLocator.userRepository.getCachedProfile(currentUid)
             if (cached != null) {
-                val name = cached.displayName.ifBlank { cached.username ?: "U" }
+                val name = cached.displayName.ifBlank { cached.username ?: getString(R.string.common_avatar_placeholder_letter) }
                 com.msi.openchat.core.ui.AvatarHelper.loadAvatar(
                     imageView = binding.imgHomeProfileAvatar,
                     letterTextView = binding.textHomeProfileAvatar,

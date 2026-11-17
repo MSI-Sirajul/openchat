@@ -131,7 +131,7 @@ class VideoCallService : Service() {
                 return START_NOT_STICKY
             }
             ACTION_END_CALL -> {
-                VideoCallManager.endCall("Ended from notification")
+                VideoCallManager.endCall(getString(R.string.call_ended_from_notif))
                 stopForeground(true)
                 stopSelf()
                 return START_NOT_STICKY
@@ -145,15 +145,15 @@ class VideoCallService : Service() {
             ACTION_ACCEPT -> {
                 val callId = intent.getStringExtra(EXTRA_CALL_ID).orEmpty()
                 val peerId = intent.getStringExtra(EXTRA_PEER_ID).orEmpty()
-                val peerName = intent.getStringExtra(EXTRA_PEER_NAME) ?: "OpenChat Contact"
-                startForegroundWithNotification(peerName, "Connecting...", isConnected = false, isMuted = false)
+                val peerName = intent.getStringExtra(EXTRA_PEER_NAME) ?: getString(R.string.home_openchat_contact)
+                startForegroundWithNotification(peerName, getString(R.string.common_connecting), isConnected = false, isMuted = false)
                 observeCallState()
                 if (callId.isNotBlank()) {
                     VideoCallManager.acceptIncomingCall(applicationContext, callId, peerId, peerName)
                 }
             }
             else -> {
-                val peerName = intent?.getStringExtra(EXTRA_PEER_NAME) ?: "OpenChat Contact"
+                val peerName = intent?.getStringExtra(EXTRA_PEER_NAME) ?: getString(R.string.home_openchat_contact)
                 val cur = VideoCallManager.uiState.value
                 startForegroundWithNotification(
                     peerName = cur.peerName.ifBlank { peerName },
@@ -213,8 +213,8 @@ class VideoCallService : Service() {
         VideoCallManager.toggleSpeaker()
     }
 
-    fun endCall(reason: String = "Call ended") {
-        VideoCallManager.endCall(reason)
+    fun endCall(reason: String = "") {
+        VideoCallManager.endCall(reason.ifBlank { getString(R.string.call_ended_sentence) })
     }
 
     private fun createNotificationChannel() {
@@ -222,10 +222,10 @@ class VideoCallService : Service() {
             val manager = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
             val channel = NotificationChannel(
                 CHANNEL_ACTIVE_VIDEO,
-                "Ongoing Video Calls",
+                getString(R.string.notif_channel_ongoing_video),
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
-                description = "Ongoing active video call status and controls"
+                description = getString(R.string.notif_channel_ongoing_video_desc)
                 setShowBadge(false)
             }
             manager.createNotificationChannel(channel)
@@ -347,20 +347,24 @@ class VideoCallService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val muteActionTitle = if (isMuted) "Unmute" else "Mute"
-        val statusText = if (isConnected) "Connected • $duration" else "Connecting..."
+        val muteActionTitle = getString(if (isMuted) R.string.call_unmute else R.string.call_mute)
+        val statusText = if (isConnected) {
+            getString(R.string.call_connected_duration, duration)
+        } else {
+            getString(R.string.common_connecting)
+        }
 
         return NotificationCompat.Builder(this, CHANNEL_ACTIVE_VIDEO)
             .setSmallIcon(R.drawable.ic_video_24)
-            .setContentTitle("Video Call: $peerName")
+            .setContentTitle(getString(R.string.call_video_notif_title, peerName))
             .setContentText(statusText)
             .setOngoing(true)
             .setCategory(NotificationCompat.CATEGORY_CALL)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setContentIntent(contentPendingIntent)
             .addAction(if (isMuted) R.drawable.ic_mic_off_24 else R.drawable.ic_mic_24, muteActionTitle, mutePendingIntent)
-            .addAction(R.drawable.ic_cameraswitch_24, "Flip Cam", switchCamPendingIntent)
-            .addAction(R.drawable.ic_call_end_24, "End Call", endPendingIntent)
+            .addAction(R.drawable.ic_cameraswitch_24, getString(R.string.call_video_notif_flip_short), switchCamPendingIntent)
+            .addAction(R.drawable.ic_call_end_24, getString(R.string.call_end), endPendingIntent)
             .build()
     }
 
@@ -376,7 +380,7 @@ class VideoCallService : Service() {
                     }
                     else -> {
                         updateNotification(
-                            peerName = state.peerName.ifBlank { "Contact" },
+                            peerName = state.peerName.ifBlank { getString(R.string.common_contact) },
                             duration = state.formattedDuration,
                             isConnected = state.status is VideoCallStatus.Connected,
                             isMuted = state.isMicMuted

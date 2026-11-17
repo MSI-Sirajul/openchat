@@ -190,20 +190,20 @@ class AuthFragment : Fragment() {
 
     private fun showForgotPasswordDialog() {
         val input = EditText(requireContext()).apply {
-            hint = "Enter your registered email"
+            hint = getString(R.string.auth_reset_password_dialog_title)
             setPadding(48, 32, 48, 32)
         }
         AlertDialog.Builder(requireContext())
             .setTitle(R.string.auth_forgot_password)
-            .setMessage("We will send a password reset link to your email address.")
+            .setMessage(R.string.auth_reset_password_dialog_message)
             .setView(input)
-            .setPositiveButton("Send Reset Link") { _, _ ->
+            .setPositiveButton(R.string.auth_reset_password_send_button) { _, _ ->
                 val email = input.text.toString().trim()
                 if (email.isNotBlank()) {
                     viewModel.sendPasswordReset(email)
                 }
             }
-            .setNegativeButton("Cancel", null)
+            .setNegativeButton(R.string.common_cancel, null)
             .show()
     }
 

@@ -5,6 +5,8 @@ import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
+import com.example.R
+import com.msi.openchat.core.di.ServiceLocator
 
 /**
  * BiometricAuthHelper
@@ -52,12 +54,12 @@ object BiometricAuthHelper {
      */
     fun getBiometricStatusMessage(status: BiometricStatus): String {
         return when (status) {
-            BiometricStatus.AVAILABLE -> "Biometric sensor is ready"
-            BiometricStatus.NONE_ENROLLED -> "No fingerprint or biometric enrolled on this device. Please add one in Android Settings."
-            BiometricStatus.NO_HARDWARE -> "This device does not have biometric hardware."
-            BiometricStatus.HARDWARE_UNAVAILABLE -> "Biometric hardware is currently busy or unavailable. Please try again."
-            BiometricStatus.SECURITY_UPDATE_REQUIRED -> "Security update required for biometric authentication."
-            BiometricStatus.UNSUPPORTED -> "Biometric authentication is not supported on this device."
+            BiometricStatus.AVAILABLE -> ServiceLocator.getString(R.string.biometric_ready)
+            BiometricStatus.NONE_ENROLLED -> ServiceLocator.getString(R.string.biometric_none_enrolled)
+            BiometricStatus.NO_HARDWARE -> ServiceLocator.getString(R.string.biometric_no_hardware)
+            BiometricStatus.HARDWARE_UNAVAILABLE -> ServiceLocator.getString(R.string.biometric_hardware_unavailable)
+            BiometricStatus.SECURITY_UPDATE_REQUIRED -> ServiceLocator.getString(R.string.biometric_security_update)
+            BiometricStatus.UNSUPPORTED -> ServiceLocator.getString(R.string.biometric_unsupported)
         }
     }
 
@@ -66,16 +68,16 @@ object BiometricAuthHelper {
      */
     fun promptBiometricAuthentication(
         activity: androidx.activity.ComponentActivity,
-        title: String = "OpenChat Authentication",
-        subtitle: String = "Scan your fingerprint to unlock",
+        title: String = activity.getString(R.string.biometric_title),
+        subtitle: String = activity.getString(R.string.biometric_subtitle),
         description: String? = null,
-        negativeButtonText: String = "Use PIN",
+        negativeButtonText: String = activity.getString(R.string.applock_use_pin),
         onSuccess: (BiometricPrompt.AuthenticationResult) -> Unit,
         onError: (errorCode: Int, errString: CharSequence) -> Unit,
         onFailed: () -> Unit
     ): BiometricPrompt? {
         if (activity !is FragmentActivity) {
-            onError(-1, "Activity must be a FragmentActivity")
+            onError(-1, activity.getString(R.string.biometric_fragment_activity_error))
             return null
         }
 
@@ -111,7 +113,7 @@ object BiometricAuthHelper {
             biometricPrompt.authenticate(promptInfo)
             biometricPrompt
         } catch (e: Exception) {
-            onError(-2, e.message ?: "Failed to initialize biometric prompt")
+            onError(-2, e.message ?: activity.getString(R.string.biometric_init_failed))
             null
         }
     }

@@ -86,7 +86,7 @@ class OpenChatKeepAliveService : Service() {
         super.onCreate()
         Log.i(tag, "OpenChatKeepAliveService created")
         createNotificationChannel()
-        promoteToForeground("Connecting to OpenChat...")
+        promoteToForeground(getString(R.string.notif_keepalive_connecting))
         BackendManager.initialize(applicationContext)
         observeConnectionState()
     }
@@ -99,7 +99,7 @@ class OpenChatKeepAliveService : Service() {
                 return START_NOT_STICKY
             }
             else -> {
-                promoteToForeground("OpenChat active & syncing")
+                promoteToForeground(getString(R.string.notif_keepalive_active))
                 observeSignalingAndIncoming()
             }
         }
@@ -111,10 +111,10 @@ class OpenChatKeepAliveService : Service() {
             val manager = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
             val channel = NotificationChannel(
                 CHANNEL_SYNC,
-                "Background Connection & Sync",
+                getString(R.string.notif_channel_sync_name),
                 NotificationManager.IMPORTANCE_MIN
             ).apply {
-                description = "Keeps OpenChat connected for instant message and call delivery"
+                description = getString(R.string.notif_channel_sync_desc)
                 setShowBadge(false)
                 enableLights(false)
                 enableVibration(false)
@@ -139,7 +139,7 @@ class OpenChatKeepAliveService : Service() {
 
         return NotificationCompat.Builder(this, channelId)
             .setSmallIcon(R.drawable.ic_chat_24)
-            .setContentTitle("OpenChat")
+            .setContentTitle(getString(R.string.app_name))
             .setContentText(statusText)
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_MIN)
@@ -165,25 +165,27 @@ class OpenChatKeepAliveService : Service() {
         }
     }
 
-    private fun updateForegroundNotification(statusText: String) {
-        val notification = buildPersistentNotification(statusText)
-        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
-        manager?.notify(NOTIFICATION_ID_KEEP_ALIVE, notification)
-    }
-
     private fun observeConnectionState() {
         serviceScope.launch {
             BackendManager.connectionState.collectLatest { state ->
                 when (state) {
                     is ConnectionState.Connected -> {
                         // Connected: clear transient network notification
-                        OpenChatNotificationManager.updateConnectionNotification(applicationContext, "Connected", isConnected = true)
+                        OpenChatNotificationManager.updateConnectionNotification(
+                            applicationContext,
+                            getString(R.string.call_active_title),
+                            isConnected = true
+                        )
                     }
                     is ConnectionState.Reconnecting -> {
                         OpenChatNotificationManager.updateConnectionNotification(applicationContext, state.reason, isConnected = false)
                     }
                     is ConnectionState.Offline -> {
-                        OpenChatNotificationManager.updateConnectionNotification(applicationContext, "Reconnecting…", isConnected = false)
+                        OpenChatNotificationManager.updateConnectionNotification(
+                            applicationContext,
+                            getString(R.string.common_reconnecting),
+                            isConnected = false
+                        )
                     }
                 }
             }
@@ -209,7 +211,8 @@ class OpenChatKeepAliveService : Service() {
                 if (snapshot.exists()) {
                     val callId = snapshot.child("call_id").getValue(String::class.java).orEmpty()
                     val callerId = snapshot.child("caller_id").getValue(String::class.java).orEmpty()
-                    val callerName = snapshot.child("caller_name").getValue(String::class.java) ?: "Friend"
+                    val callerName = snapshot.child("caller_name").getValue(String::class.java)
+                        ?: getString(R.string.common_friend)
                     val callType = snapshot.child("call_type").getValue(String::class.java) ?: "audio"
 
                     if (callId.isBlank() || callType != "audio" || CallSessionGuard.isVideoCall(callId, callType)) {
@@ -237,7 +240,7 @@ class OpenChatKeepAliveService : Service() {
                                 ServiceLocator.callRepository.updateAudioCallStatus(
                                     callId = callId,
                                     status = "busy",
-                                    endReason = "Busy on another call"
+                                    endReason = getString(R.string.call_busy_on_another)
                                 )
                                 ServiceLocator.callRepository.sendSignaling(callId, callerId, "bye", "{\"reason\":\"busy\"}")
                                 ServiceLocator.callRepository.clearIncomingAudioCall(uid)
@@ -276,7 +279,8 @@ class OpenChatKeepAliveService : Service() {
                 if (snapshot.exists()) {
                     val callId = snapshot.child("call_id").getValue(String::class.java).orEmpty()
                     val callerId = snapshot.child("caller_id").getValue(String::class.java).orEmpty()
-                    val callerName = snapshot.child("caller_name").getValue(String::class.java) ?: "Friend"
+                    val callerName = snapshot.child("caller_name").getValue(String::class.java)
+                        ?: getString(R.string.common_friend)
                     val callType = snapshot.child("call_type").getValue(String::class.java) ?: "video"
 
                     if (callId.isBlank() || callType != "video" || !CallSessionGuard.isVideoCall(callId, callType)) {
@@ -338,7 +342,8 @@ class OpenChatKeepAliveService : Service() {
                 val lastSenderId = snapshot.child("last_message_sender_id").getValue(String::class.java)
                 val unreadCount = snapshot.child("unread_count").getValue(Int::class.java) ?: 0
                 val convId = snapshot.child("id").getValue(String::class.java).orEmpty()
-                val lastText = snapshot.child("last_message_text").getValue(String::class.java) ?: "New message"
+                val lastText = snapshot.child("last_message_text").getValue(String::class.java)
+                    ?: getString(R.string.notif_new_message)
 
                 if (!lastSenderId.isNullOrBlank() && lastSenderId != uid && unreadCount > 0) {
                     serviceScope.launch {
@@ -347,7 +352,7 @@ class OpenChatKeepAliveService : Service() {
                             is com.msi.openchat.core.common.Resource.Success -> p.data
                             else -> null
                         }
-                        val senderName = senderProfile?.displayName ?: "Friend"
+                        val senderName = senderProfile?.displayName ?: getString(R.string.common_friend)
 
                         OpenChatNotificationManager.showMessageNotification(
                             context = applicationContext,
@@ -378,7 +383,8 @@ class OpenChatKeepAliveService : Service() {
                     "friend_request" -> {
                         val requestId = snapshot.child("request_id").getValue(String::class.java).orEmpty()
                         val senderId = snapshot.child("sender_id").getValue(String::class.java).orEmpty()
-                        val senderName = snapshot.child("sender_name").getValue(String::class.java) ?: "Someone"
+                        val senderName = snapshot.child("sender_name").getValue(String::class.java)
+                            ?: getString(R.string.common_someone)
                         OpenChatNotificationManager.showFriendRequestNotification(
                             context = applicationContext,
                             requestId = requestId,
@@ -389,7 +395,8 @@ class OpenChatKeepAliveService : Service() {
                     "friend_accepted" -> {
                         val conversationId = snapshot.child("conversation_id").getValue(String::class.java).orEmpty()
                         val accepterId = snapshot.child("accepter_id").getValue(String::class.java).orEmpty()
-                        val accepterName = snapshot.child("accepter_name").getValue(String::class.java) ?: "Friend"
+                        val accepterName = snapshot.child("accepter_name").getValue(String::class.java)
+                            ?: getString(R.string.common_friend)
                         OpenChatNotificationManager.showFriendAcceptedNotification(
                             context = applicationContext,
                             conversationId = conversationId,

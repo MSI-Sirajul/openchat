@@ -58,8 +58,8 @@ object VideoCallPipHelper {
         )
         val muteAction = RemoteAction(
             Icon.createWithResource(context, if (isMuted) R.drawable.ic_mic_off_24 else R.drawable.ic_mic_24),
-            if (isMuted) "Unmute" else "Mute",
-            if (isMuted) "Unmute microphone" else "Mute microphone",
+            context.getString(if (isMuted) R.string.call_unmute else R.string.call_mute),
+            context.getString(if (isMuted) R.string.call_unmute_mic_cd else R.string.call_mute_mic_cd),
             mutePendingIntent
         )
 
@@ -74,8 +74,8 @@ object VideoCallPipHelper {
         )
         val switchCamAction = RemoteAction(
             Icon.createWithResource(context, R.drawable.ic_cameraswitch_24),
-            "Flip Camera",
-            "Switch front or back camera",
+            context.getString(R.string.call_video_pip_flip_camera),
+            context.getString(R.string.call_video_pip_flip_camera_desc),
             switchCamPendingIntent
         )
 
@@ -90,8 +90,8 @@ object VideoCallPipHelper {
         )
         val endAction = RemoteAction(
             Icon.createWithResource(context, R.drawable.ic_call_end_24),
-            "End Call",
-            "End video call",
+            context.getString(R.string.call_end),
+            context.getString(R.string.call_video_pip_end_desc),
             endPendingIntent
         )
 

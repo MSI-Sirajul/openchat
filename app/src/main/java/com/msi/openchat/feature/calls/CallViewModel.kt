@@ -3,6 +3,7 @@ package com.msi.openchat.feature.calls
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.R
 import com.msi.openchat.core.common.Resource
 import com.msi.openchat.core.di.ServiceLocator
 import com.msi.openchat.data.repository.CallRepository
@@ -25,7 +26,7 @@ data class CallUiState(
     val isCaller: Boolean = true,
     val isIncomingWaiting: Boolean = false,
     val connectionState: WebRtcCallState = WebRtcCallState.IDLE,
-    val callStatus: String = "Connecting...",
+    val callStatus: String = "",
     val durationSeconds: Int = 0,
     val isMuted: Boolean = false,
     val isSpeakerOn: Boolean = false,
@@ -61,7 +62,11 @@ class CallViewModel(
             contactId = contactId,
             isCaller = !isIncoming,
             isIncomingWaiting = isIncoming && !isAlreadyAnswered,
-            callStatus = if (isIncoming && !isAlreadyAnswered) "Incoming call..." else if (isIncoming) "Connecting..." else "Calling..."
+            callStatus = when {
+                isIncoming && !isAlreadyAnswered -> ServiceLocator.getString(R.string.call_incoming_generic)
+                isIncoming -> ServiceLocator.getString(R.string.common_connecting)
+                else -> ServiceLocator.getString(R.string.call_calling_ellipsis)
+            }
         )
     )
     val uiState: StateFlow<CallUiState> = _uiState.asStateFlow()
@@ -73,8 +78,8 @@ class CallViewModel(
             CallSessionGuard.isVideoCallActive()
         ) {
             _uiState.value = _uiState.value.copy(
-                callStatus = "Call Blocked",
-                errorMessage = "Another call type is active",
+                callStatus = ServiceLocator.getString(R.string.call_blocked),
+                errorMessage = ServiceLocator.getString(R.string.call_another_type_active),
                 isCallActive = false
             )
         } else {
@@ -127,8 +132,8 @@ class CallViewModel(
     private fun initiateOutgoingCall() {
         if (VideoCallManager.isCallActive() || CallSessionGuard.isVideoCallActive()) {
             _uiState.value = _uiState.value.copy(
-                callStatus = "Busy",
-                errorMessage = "Video call is active",
+                callStatus = ServiceLocator.getString(R.string.call_busy_status),
+                errorMessage = ServiceLocator.getString(R.string.call_video_is_active),
                 isCallActive = false
             )
             return
@@ -137,7 +142,10 @@ class CallViewModel(
             when (val res = callRepository.initiateAudioCall(contactId)) {
                 is Resource.Success -> {
                     val call = res.data
-                    _uiState.value = _uiState.value.copy(callId = call.id, callStatus = "Calling...")
+                    _uiState.value = _uiState.value.copy(
+                        callId = call.id,
+                        callStatus = ServiceLocator.getString(R.string.call_calling_ellipsis)
+                    )
                     OpenChatCallService.startOutgoingCallService(
                         context = context,
                         callId = call.id,
@@ -147,7 +155,7 @@ class CallViewModel(
                 }
                 is Resource.Error -> {
                     _uiState.value = _uiState.value.copy(
-                        callStatus = "Call Failed",
+                        callStatus = ServiceLocator.getString(R.string.call_failed_title),
                         errorMessage = res.message,
                         isCallActive = false
                     )
@@ -178,7 +186,11 @@ class CallViewModel(
             viewModelScope.launch {
                 if (cid.isNotBlank()) {
                     try {
-                        callRepository.updateCallStatus(cid, "declined", endReason = "Declined by user")
+                        callRepository.updateCallStatus(
+                            cid,
+                            "declined",
+                            endReason = ServiceLocator.getString(R.string.call_declined_by_user)
+                        )
                         callRepository.sendSignaling(cid, contactId, "bye", "{\"reason\":\"declined\"}")
                     } catch (_: Exception) {}
                 }
@@ -187,7 +199,7 @@ class CallViewModel(
         }
     }
 
-    fun declineWithMessage(messageText: String = "Can't talk right now. What's up?") {
+    fun declineWithMessage(messageText: String = ServiceLocator.getString(R.string.call_quick_reply_default)) {
         viewModelScope.launch {
             try {
                 val chatRepo = ServiceLocator.chatRepository

@@ -20,6 +20,7 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePadding
 import androidx.lifecycle.lifecycleScope
+import com.example.R
 import com.example.databinding.ActivityIncomingVideoCallBinding
 import com.msi.openchat.core.service.AppServiceManager
 import com.msi.openchat.service.notification.OpenChatNotificationManager
@@ -36,7 +37,7 @@ class IncomingVideoCallActivity : AppCompatActivity() {
     private lateinit var binding: ActivityIncomingVideoCallBinding
     private var callId: String = ""
     private var callerId: String = ""
-    private var callerName: String = "Incoming Video Call"
+    private var callerName: String = ""
 
     private var pulseAnimator: ObjectAnimator? = null
     private var dismissReceiver: BroadcastReceiver? = null
@@ -73,7 +74,7 @@ class IncomingVideoCallActivity : AppCompatActivity() {
 
         callId = intent.getStringExtra(EXTRA_CALL_ID).orEmpty()
         callerId = intent.getStringExtra(EXTRA_CALLER_ID).orEmpty()
-        callerName = intent.getStringExtra(EXTRA_CALLER_NAME) ?: "OpenChat Caller"
+        callerName = intent.getStringExtra(EXTRA_CALLER_NAME) ?: getString(R.string.home_openchat_caller)
 
         if (callId.isBlank() || callId.startsWith("aud_") ||
             com.msi.openchat.service.call.CallSessionCoordinator.isActive()

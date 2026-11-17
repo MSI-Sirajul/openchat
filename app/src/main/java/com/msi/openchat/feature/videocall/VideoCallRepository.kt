@@ -1,6 +1,8 @@
 package com.msi.openchat.feature.videocall
 
 import android.content.Context
+import com.example.R
+import com.msi.openchat.core.di.ServiceLocator
 import kotlinx.coroutines.flow.StateFlow
 import org.webrtc.SurfaceViewRenderer
 
@@ -56,7 +58,7 @@ class VideoCallRepository {
         VideoCallManager.toggleSpeaker()
     }
 
-    fun endCall(reason: String = "Call ended") {
-        VideoCallManager.endCall(reason)
+    fun endCall(reason: String = "") {
+        VideoCallManager.endCall(reason.ifBlank { ServiceLocator.getString(R.string.call_ended_sentence) })
     }
 }

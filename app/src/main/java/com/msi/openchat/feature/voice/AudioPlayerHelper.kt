@@ -3,6 +3,7 @@ package com.msi.openchat.feature.voice
 import android.media.AudioAttributes
 import android.media.MediaPlayer
 import android.util.Log
+import com.example.R
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -40,7 +41,11 @@ class AudioPlayerHelper(
                     val uri = android.net.Uri.parse(audioUrl)
                     val ctx = com.msi.openchat.core.di.ServiceLocator.context
                     if (!com.msi.openchat.core.media.PersistableUriManager.isUriAccessible(ctx, uri)) {
-                        android.widget.Toast.makeText(ctx, "Audio file is no longer accessible on this device", android.widget.Toast.LENGTH_SHORT).show()
+                        android.widget.Toast.makeText(
+                            ctx,
+                            ctx.getString(R.string.chat_audio_device_inaccessible),
+                            android.widget.Toast.LENGTH_SHORT
+                        ).show()
                         stopAudio()
                         return
                     }

@@ -41,8 +41,11 @@ class UserSearchAdapter(
     ) : RecyclerView.ViewHolder(binding.root) {
 
         fun bind(item: UserSearchItem) {
+            val context = binding.root.context
             val profile = item.profile
-            binding.textUserName.text = profile.displayName.ifBlank { profile.username ?: "User" }
+            binding.textUserName.text = profile.displayName.ifBlank {
+                profile.username ?: context.getString(R.string.common_user)
+            }
             com.msi.openchat.core.ui.AvatarHelper.loadAvatar(
                 imageView = binding.imgUserAvatar,
                 letterTextView = binding.textUserAvatar,
@@ -53,20 +56,20 @@ class UserSearchAdapter(
             when (item.status) {
                 RelationshipStatus.FRIENDS -> {
                     binding.btnActionFriend.isEnabled = false
-                    binding.btnActionFriend.text = "Friends"
-                    binding.btnActionFriend.setBackgroundColor(binding.root.context.getColor(R.color.color_surface_variant))
-                    binding.btnActionFriend.setTextColor(binding.root.context.getColor(R.color.color_secondary_text))
+                    binding.btnActionFriend.text = context.getString(R.string.nav_friends)
+                    binding.btnActionFriend.setBackgroundColor(context.getColor(R.color.color_surface_variant))
+                    binding.btnActionFriend.setTextColor(context.getColor(R.color.color_secondary_text))
                 }
                 RelationshipStatus.REQUESTED -> {
                     binding.btnActionFriend.isEnabled = false
-                    binding.btnActionFriend.text = "Requested"
-                    binding.btnActionFriend.setBackgroundColor(binding.root.context.getColor(R.color.color_surface_variant))
-                    binding.btnActionFriend.setTextColor(binding.root.context.getColor(R.color.color_secondary_text))
+                    binding.btnActionFriend.text = context.getString(R.string.friends_status_requested)
+                    binding.btnActionFriend.setBackgroundColor(context.getColor(R.color.color_surface_variant))
+                    binding.btnActionFriend.setTextColor(context.getColor(R.color.color_secondary_text))
                 }
                 RelationshipStatus.NONE -> {
                     binding.btnActionFriend.isEnabled = true
-                    binding.btnActionFriend.text = "Add"
-                    binding.btnActionFriend.setBackgroundColor(binding.root.context.getColor(R.color.color_primary))
+                    binding.btnActionFriend.text = context.getString(R.string.friends_status_add)
+                    binding.btnActionFriend.setBackgroundColor(context.getColor(R.color.color_primary))
                     binding.btnActionFriend.setTextColor(0xFFFFFFFF.toInt())
                     binding.btnActionFriend.setOnClickListener {
                         onAddFriend(profile)

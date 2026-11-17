@@ -2,6 +2,7 @@ package com.msi.openchat.feature.security
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.R
 import com.msi.openchat.core.common.Resource
 import com.msi.openchat.core.di.ServiceLocator
 import com.msi.openchat.data.repository.AuthRepository
@@ -101,9 +102,9 @@ class AppLockViewModel(
                 failedAttempts = attempts,
                 isLockedOut = lockedOut,
                 errorMessage = if (lockedOut) {
-                    "Too many incorrect attempts (5/5). Please reset your PIN."
+                    ServiceLocator.getString(R.string.applock_too_many_attempts_count)
                 } else {
-                    "Incorrect PIN. Attempt $attempts of 5"
+                    ServiceLocator.getString(R.string.applock_incorrect_pin_attempt, attempts)
                 }
             )
         }
@@ -126,9 +127,9 @@ class AppLockViewModel(
             failedAttempts = attempts,
             isLockedOut = lockedOut,
             errorMessage = if (lockedOut) {
-                "Biometric authentication failed 5 times. Please reset your PIN."
+                ServiceLocator.getString(R.string.applock_biometric_failed_limit)
             } else {
-                "Fingerprint not recognized. Attempt $attempts of 5"
+                ServiceLocator.getString(R.string.applock_fingerprint_attempt, attempts)
             }
         )
     }
@@ -173,11 +174,11 @@ class AppLockViewModel(
     fun verifyCredentialsForReset() {
         val state = _uiState.value
         if (state.resetEmail.isBlank()) {
-            _uiState.value = state.copy(resetError = "Please enter your email or username")
+            _uiState.value = state.copy(resetError = ServiceLocator.getString(R.string.applock_enter_email_or_username))
             return
         }
         if (state.resetPassword.isBlank()) {
-            _uiState.value = state.copy(resetError = "Please enter your password")
+            _uiState.value = state.copy(resetError = ServiceLocator.getString(R.string.applock_enter_password))
             return
         }
 
@@ -194,7 +195,7 @@ class AppLockViewModel(
                 is Resource.Error -> {
                     _uiState.value = _uiState.value.copy(
                         isResetting = false,
-                        resetError = res.message ?: "Invalid email or password"
+                        resetError = res.message ?: ServiceLocator.getString(R.string.applock_invalid_credentials)
                     )
                 }
                 else -> Unit
@@ -205,11 +206,11 @@ class AppLockViewModel(
     fun saveNewPinAndUnlock() {
         val state = _uiState.value
         if (state.newPin.length != 4) {
-            _uiState.value = state.copy(resetError = "PIN must be exactly 4 digits")
+            _uiState.value = state.copy(resetError = ServiceLocator.getString(R.string.settings_pin_length_exact_error))
             return
         }
         if (state.newPin != state.confirmNewPin) {
-            _uiState.value = state.copy(resetError = "PINs do not match")
+            _uiState.value = state.copy(resetError = ServiceLocator.getString(R.string.settings_pin_mismatch_error))
             return
         }
 
@@ -231,7 +232,7 @@ class AppLockViewModel(
                 is Resource.Error -> {
                     _uiState.value = _uiState.value.copy(
                         isResetting = false,
-                        resetError = res.message ?: "Failed to update PIN"
+                        resetError = res.message ?: ServiceLocator.getString(R.string.applock_pin_update_failed)
                     )
                 }
                 else -> Unit

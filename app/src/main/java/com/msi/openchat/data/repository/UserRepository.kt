@@ -5,8 +5,10 @@ import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.ServerValue
 import com.google.firebase.database.ValueEventListener
+import com.example.R
 import com.msi.openchat.core.common.Constants
 import com.msi.openchat.core.common.Resource
+import com.msi.openchat.core.di.ServiceLocator
 import com.msi.openchat.core.security.SessionManager
 import com.msi.openchat.data.model.Profile
 import com.msi.openchat.data.remote.firebase.FirebaseManager
@@ -50,7 +52,7 @@ class UserRepository(
     suspend fun getCurrentUserProfile(): Resource<Profile> = withContext(Dispatchers.IO) {
         val uid = sessionManager.getUserId() ?: FirebaseManager.auth.currentUser?.uid
         if (uid.isNullOrBlank()) {
-            return@withContext Resource.Error("User not logged in")
+            return@withContext Resource.Error(ServiceLocator.getString(R.string.common_user_not_logged_in))
         }
         getUserProfile(uid)
     }
@@ -75,7 +77,7 @@ class UserRepository(
                 } else {
                     val fallback = Profile(
                         id = userId,
-                        displayName = "User",
+                        displayName = ServiceLocator.getString(R.string.common_user),
                         username = "user_${userId.take(6)}",
                         statusMessage = "Available",
                         onlineStatus = "offline"
@@ -85,7 +87,7 @@ class UserRepository(
             }
         } catch (e: Exception) {
             Log.e(tag, "Error fetching user profile $userId: ${e.message}")
-            Resource.Error(e.message ?: "Failed to fetch profile", e)
+            Resource.Error(e.message ?: ServiceLocator.getString(R.string.profile_fetch_failed), e)
         }
     }
 
@@ -227,7 +229,7 @@ class UserRepository(
         avatarUrl: String? = null
     ): Resource<Profile> = withContext(Dispatchers.IO) {
         val uid = sessionManager.getUserId() ?: FirebaseManager.auth.currentUser?.uid
-        if (uid.isNullOrBlank()) return@withContext Resource.Error("Not authenticated")
+        if (uid.isNullOrBlank()) return@withContext Resource.Error(ServiceLocator.getString(R.string.common_not_authenticated))
 
         val currentProfile = when (val p = getUserProfile(uid, forceRefresh = true)) {
             is Resource.Success -> p.data
@@ -269,7 +271,7 @@ class UserRepository(
 
             Resource.Success(updated)
         } else {
-            Resource.Error("Failed to update profile")
+            Resource.Error(ServiceLocator.getString(R.string.profile_update_failed))
         }
     }
 
@@ -290,7 +292,7 @@ class UserRepository(
                 context = context,
                 uriString = imageUri.toString(),
                 mimeType = "image/jpeg"
-            ) ?: return@withContext Resource.Error("Could not process selected image")
+            ) ?: return@withContext Resource.Error(ServiceLocator.getString(R.string.profile_image_process_failed))
 
             onProgress(0.2f)
             val uploadRes = com.msi.openchat.core.backend.BackendManager.uploadFile(
@@ -311,10 +313,10 @@ class UserRepository(
                 is Resource.Error -> {
                     Resource.Error(uploadRes.message)
                 }
-                else -> Resource.Error("Upload incomplete")
+                else -> Resource.Error(ServiceLocator.getString(R.string.profile_upload_incomplete))
             }
         } catch (e: Exception) {
-            Resource.Error("Failed to upload avatar: ${e.message}", e)
+            Resource.Error(ServiceLocator.getString(R.string.profile_avatar_upload_error, e.message.orEmpty()), e)
         }
     }
 
@@ -407,7 +409,7 @@ class UserRepository(
         val displayName = snapshot.child("display_name").getValue(String::class.java)
             ?: snapshot.child("name").getValue(String::class.java)
             ?: username
-            ?: "User"
+            ?: ServiceLocator.getString(R.string.common_user)
         val name = snapshot.child("name").getValue(String::class.java)
         val email = snapshot.child("email").getValue(String::class.java)
         val phoneNumber = snapshot.child("phone_number").getValue(String::class.java)

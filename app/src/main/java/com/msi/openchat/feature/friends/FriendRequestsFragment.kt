@@ -12,6 +12,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.MainActivity
+import com.example.R
 import com.example.databinding.FragmentFriendRequestsBinding
 import com.google.android.material.tabs.TabLayout
 import com.msi.openchat.core.ui.adapter.FriendRequestAdapter
@@ -43,8 +44,8 @@ class FriendRequestsFragment : Fragment() {
         binding.recyclerFriendRequests.layoutManager = LinearLayoutManager(requireContext())
         binding.recyclerFriendRequests.setHasFixedSize(true)
 
-        binding.tabsFriendRequests.addTab(binding.tabsFriendRequests.newTab().setText("Received"))
-        binding.tabsFriendRequests.addTab(binding.tabsFriendRequests.newTab().setText("Sent"))
+        binding.tabsFriendRequests.addTab(binding.tabsFriendRequests.newTab().setText(getString(R.string.friends_tab_received)))
+        binding.tabsFriendRequests.addTab(binding.tabsFriendRequests.newTab().setText(getString(R.string.friends_tab_sent)))
 
         binding.tabsFriendRequests.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
             override fun onTabSelected(tab: TabLayout.Tab?) {

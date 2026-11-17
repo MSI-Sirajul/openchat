@@ -56,7 +56,6 @@ data class VideoCallUiState(
     val formattedDuration: String = "00:00",
     val hasRemoteVideo: Boolean = false,
     val isLocalPreviewReady: Boolean = false,
-    val networkQualityText: String = "Good",
     val isReconnecting: Boolean = false,
     val errorMessage: String? = null
 )

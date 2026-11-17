@@ -3,18 +3,16 @@ package com.msi.openchat.feature.videocall
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
-import android.media.AudioAttributes
 import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.os.Build
 import android.os.PowerManager
 import android.util.Log
 import androidx.core.content.ContextCompat
+import com.example.R
 import com.msi.openchat.core.common.Resource
 import com.msi.openchat.core.di.ServiceLocator
-import com.msi.openchat.data.model.CallSession
 import com.msi.openchat.data.model.CallSignalingMessage
-import com.msi.openchat.data.model.IceServerConfig
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -434,7 +432,7 @@ object VideoCallManager {
                 // Create WebRTC PeerConnection & Offer (ensuring local media tracks are added first)
                 setupPeerConnection(isCaller = true, callId = callId, peerId = receiverId)
             } else {
-                endCall("Failed to initiate call")
+                endCall(ServiceLocator.getString(R.string.call_video_initiate_failed))
             }
         }
     }
@@ -492,7 +490,7 @@ object VideoCallManager {
         managerScope.launch {
             signaling?.notifyDecline(callId, callerId)
             signaling?.clearIncomingVideoCall(ServiceLocator.sessionManager.getUserId().orEmpty())
-            endCall("Call declined")
+            endCall(ServiceLocator.getString(R.string.call_declined_lowercase))
         }
     }
 
@@ -543,10 +541,10 @@ object VideoCallManager {
                                 )
                             }
                             PeerConnection.IceConnectionState.FAILED -> {
-                                managerScope.launch { endCall("Connection failed") }
+                                managerScope.launch { endCall(ServiceLocator.getString(R.string.call_connection_failed_sentence)) }
                             }
                             PeerConnection.IceConnectionState.CLOSED -> {
-                                managerScope.launch { endCall("Call closed") }
+                                managerScope.launch { endCall(ServiceLocator.getString(R.string.call_closed)) }
                             }
                             else -> {}
                         }
@@ -826,9 +824,10 @@ object VideoCallManager {
                         }
                     }
                     "bye" -> {
+                        val fallbackEndedByPeer = ServiceLocator.getString(R.string.call_ended_by_peer)
                         val reason = try {
-                            JSONObject(msg.payload).optString("reason", "Call ended by peer")
-                        } catch (_: Exception) { "Call ended by peer" }
+                            JSONObject(msg.payload).optString("reason", fallbackEndedByPeer)
+                        } catch (_: Exception) { fallbackEndedByPeer }
                         endCall(reason)
                     }
                 }
@@ -855,9 +854,9 @@ object VideoCallManager {
                 if (session == null) return@collect
 
                 when (session.status) {
-                    "declined" -> endCall("Declined by $peerName")
-                    "busy" -> endCall("$peerName is on another call")
-                    "ended" -> endCall(session.endReason ?: "Call ended")
+                    "declined" -> endCall(ServiceLocator.getString(R.string.call_declined_by_peer, peerName))
+                    "busy" -> endCall(ServiceLocator.getString(R.string.call_peer_busy, peerName))
+                    "ended" -> endCall(session.endReason ?: ServiceLocator.getString(R.string.call_ended_sentence))
                     "connected" -> {
                         if (_uiState.value.status !is VideoCallStatus.Connected) {
                             _uiState.value = _uiState.value.copy(
@@ -876,9 +875,10 @@ object VideoCallManager {
         timeoutJob = managerScope.launch {
             delay(35000)
             if (_uiState.value.status is VideoCallStatus.OutgoingCalling) {
-                signaling?.updateCallStatus(callId, "ended", "No answer")
+                val noAnswer = ServiceLocator.getString(R.string.call_no_answer_sentence)
+                signaling?.updateCallStatus(callId, "ended", noAnswer)
                 signaling?.sendSignaling(callId, receiverId, "bye", "{\"reason\":\"timeout\"}")
-                endCall("No answer")
+                endCall(noAnswer)
             }
         }
     }
@@ -892,7 +892,7 @@ object VideoCallManager {
                 seconds++
                 val mins = seconds / 60
                 val secs = seconds % 60
-                val formatted = String.format("%02d:%02d", mins, secs)
+                val formatted = ServiceLocator.getString(R.string.common_duration_mm_ss, mins, secs)
                 _uiState.value = _uiState.value.copy(
                     durationSeconds = seconds,
                     formattedDuration = formatted
@@ -1009,8 +1009,9 @@ object VideoCallManager {
     /**
      * Terminates the current call session, cleans up WebRTC tracks, releases camera and mic
      */
-    fun endCall(reason: String = "Call ended") {
+    fun endCall(reason: String = "") {
         if (!isDisposing.compareAndSet(false, true)) return
+        val effectiveReason = reason.ifBlank { ServiceLocator.getString(R.string.call_ended_sentence) }
 
         val state = _uiState.value
         val callId = state.callId
@@ -1024,9 +1025,9 @@ object VideoCallManager {
 
         managerScope.launch {
             if (callId.isNotBlank()) {
-                signaling?.updateCallStatus(callId, "ended", reason, duration)
+                signaling?.updateCallStatus(callId, "ended", effectiveReason, duration)
                 if (peerId.isNotBlank()) {
-                    signaling?.sendSignaling(callId, peerId, "bye", "{\"reason\":\"$reason\"}")
+                    signaling?.sendSignaling(callId, peerId, "bye", "{\"reason\":\"$effectiveReason\"}")
                 }
                 signaling?.clearIncomingCall(ServiceLocator.sessionManager.getUserId().orEmpty())
             }
@@ -1098,7 +1099,7 @@ object VideoCallManager {
         releaseWakeLock()
 
         _uiState.value = _uiState.value.copy(
-            status = VideoCallStatus.Ended(reason),
+            status = VideoCallStatus.Ended(effectiveReason),
             hasRemoteVideo = false
         )
 

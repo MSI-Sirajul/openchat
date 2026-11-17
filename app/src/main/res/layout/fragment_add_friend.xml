@@ -94,7 +94,7 @@
                     android:layout_gravity="center"
                     android:src="@drawable/ic_person_add_24"
                     app:tint="@color/color_primary"
-                    android:contentDescription="Search users" />
+                    android:contentDescription="@string/friends_search_users_cd" />
             </com.google.android.material.card.MaterialCardView>
 
             <TextView

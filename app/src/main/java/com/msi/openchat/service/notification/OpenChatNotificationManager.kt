@@ -14,9 +14,9 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.Person
 import com.example.MainActivity
+import com.example.R
 import com.msi.openchat.core.common.Constants
 import com.msi.openchat.core.service.AppServiceManager
-import com.msi.openchat.feature.calls.IncomingCallActivity
 import com.msi.openchat.service.call.CallActionReceiver
 
 object OpenChatNotificationManager {
@@ -40,10 +40,10 @@ object OpenChatNotificationManager {
             // 1. Channel for Incoming Calls (High Importance, Ringtone Sound & Vibration)
             val incomingCallChannel = NotificationChannel(
                 Constants.CHANNEL_INCOMING_CALLS,
-                "Incoming Voice Calls",
+                context.getString(R.string.notif_channel_incoming_voice),
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
-                description = "Full-screen alerts and ringtones for incoming voice calls"
+                description = context.getString(R.string.notif_channel_incoming_voice_desc)
                 enableVibration(true)
                 vibrationPattern = longArrayOf(0, 1000, 1000, 1000, 1000)
                 val ringtoneUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
@@ -59,10 +59,10 @@ object OpenChatNotificationManager {
             // 1b. Channel for Incoming Video Calls
             val incomingVideoCallChannel = NotificationChannel(
                 Constants.CHANNEL_INCOMING_VIDEO_CALLS,
-                "Incoming Video Calls",
+                context.getString(R.string.notif_channel_incoming_video),
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
-                description = "Full-screen alerts and ringtones for incoming video calls"
+                description = context.getString(R.string.notif_channel_incoming_video_desc)
                 enableVibration(true)
                 vibrationPattern = longArrayOf(0, 1000, 1000, 1000, 1000)
                 val ringtoneUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
@@ -78,30 +78,30 @@ object OpenChatNotificationManager {
             // 2. Channel for Ongoing Calls (Low Importance foreground status)
             val activeCallChannel = NotificationChannel(
                 Constants.CHANNEL_ACTIVE_CALLS,
-                "Active Call Status",
+                context.getString(R.string.notif_channel_active_call),
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
-                description = "Ongoing active call notification and duration status"
+                description = context.getString(R.string.notif_channel_active_call_desc)
                 setShowBadge(false)
             }
 
             // 3. Channel for Missed Calls
             val missedCallChannel = NotificationChannel(
                 Constants.CHANNEL_MISSED_CALLS,
-                "Missed Calls",
+                context.getString(R.string.notif_channel_missed_calls),
                 NotificationManager.IMPORTANCE_DEFAULT
             ).apply {
-                description = "Alerts for missed audio calls"
+                description = context.getString(R.string.notif_channel_missed_calls_desc)
                 setShowBadge(true)
             }
 
             // 4. Channel for Direct Messages (High Importance, Popup Heads-Up & Notification Sound)
             val messageChannel = NotificationChannel(
                 Constants.CHANNEL_MESSAGES,
-                "Chat Messages",
+                context.getString(R.string.notif_channel_messages),
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
-                description = "Heads-up popups and sounds for text, voice, and media messages"
+                description = context.getString(R.string.notif_channel_messages_desc)
                 enableVibration(true)
                 vibrationPattern = longArrayOf(0, 200, 100, 200)
                 val msgSoundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
@@ -116,20 +116,20 @@ object OpenChatNotificationManager {
             // 5. Channel for Social & Friend Updates
             val friendsChannel = NotificationChannel(
                 Constants.CHANNEL_FRIENDS,
-                "Friend Updates",
+                context.getString(R.string.notif_channel_friend_updates),
                 NotificationManager.IMPORTANCE_DEFAULT
             ).apply {
-                description = "Alerts for friend updates"
+                description = context.getString(R.string.notif_channel_friend_updates_desc)
                 setShowBadge(true)
             }
 
             // 5a. Channel A: "Friend Requests" (High Importance, Accept & Cancel Actions)
             val friendRequestsChannel = NotificationChannel(
                 Constants.CHANNEL_FRIEND_REQUESTS,
-                "Friend Requests",
+                context.getString(R.string.notif_channel_friend_requests),
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
-                description = "Alerts for incoming friend requests with instant Accept and Cancel options"
+                description = context.getString(R.string.notif_channel_friend_requests_desc)
                 enableVibration(true)
                 setShowBadge(true)
             }
@@ -137,10 +137,10 @@ object OpenChatNotificationManager {
             // 5b. Channel B: "Friend Accepted" (High Importance, Say Hi Action)
             val friendAcceptedChannel = NotificationChannel(
                 Constants.CHANNEL_FRIEND_ACCEPTED,
-                "Friend Accepted",
+                context.getString(R.string.notif_channel_friend_accepted),
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
-                description = "Alerts when someone accepts your friend request with Say Hi shortcut"
+                description = context.getString(R.string.notif_channel_friend_accepted_desc)
                 enableVibration(true)
                 setShowBadge(true)
             }
@@ -148,19 +148,19 @@ object OpenChatNotificationManager {
             // 6. Channel for Network Stability Alerts
             val networkChannel = NotificationChannel(
                 Constants.CHANNEL_NETWORK,
-                "Connection & Network Status",
+                context.getString(R.string.notif_channel_connection),
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
-                description = "Alerts when network connection is unstable or lost"
+                description = context.getString(R.string.notif_channel_connection_desc)
             }
 
             // 2b. Channel for Ongoing Video Calls (Low Importance foreground status)
             val activeVideoCallChannel = NotificationChannel(
                 Constants.CHANNEL_ACTIVE_VIDEO_CALLS,
-                "Ongoing Video Calls",
+                context.getString(R.string.notif_channel_ongoing_video),
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
-                description = "Ongoing active video call status and controls"
+                description = context.getString(R.string.notif_channel_ongoing_video_desc)
                 setShowBadge(false)
             }
 
@@ -260,8 +260,8 @@ object OpenChatNotificationManager {
         val ringtoneUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
 
         val builder = NotificationCompat.Builder(context, Constants.CHANNEL_INCOMING_CALLS)
-            .setContentTitle("Incoming Voice Call")
-            .setContentText("$callerName is calling...")
+            .setContentTitle(context.getString(R.string.call_incoming_title))
+            .setContentText(context.getString(R.string.notif_incoming_voice_body, callerName))
             .setSmallIcon(android.R.drawable.stat_sys_phone_call)
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_CALL)
@@ -283,8 +283,16 @@ object OpenChatNotificationManager {
                 )
             )
         } else {
-            builder.addAction(android.R.drawable.ic_menu_call, "Answer", acceptPendingIntent)
-            builder.addAction(android.R.drawable.ic_menu_close_clear_cancel, "Decline", declinePendingIntent)
+            builder.addAction(
+                android.R.drawable.ic_menu_call,
+                context.getString(R.string.call_answer_action),
+                acceptPendingIntent
+            )
+            builder.addAction(
+                android.R.drawable.ic_menu_close_clear_cancel,
+                context.getString(R.string.friends_decline_button),
+                declinePendingIntent
+            )
         }
 
         manager.notify(Constants.NOTIFICATION_ID_CALL, builder.build())
@@ -320,8 +328,8 @@ object OpenChatNotificationManager {
         )
 
         val notification = NotificationCompat.Builder(context, Constants.CHANNEL_MISSED_CALLS)
-            .setContentTitle("Missed Call")
-            .setContentText("You missed a voice call from $callerName")
+            .setContentTitle(context.getString(R.string.notif_missed_call_title))
+            .setContentText(context.getString(R.string.notif_missed_call_body, callerName))
             .setSmallIcon(android.R.drawable.stat_notify_missed_call)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setCategory(NotificationCompat.CATEGORY_MISSED_CALL)
@@ -409,9 +417,9 @@ object OpenChatNotificationManager {
         val ringtoneUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
 
         val builder = NotificationCompat.Builder(context, Constants.CHANNEL_INCOMING_VIDEO_CALLS)
-            .setContentTitle("Incoming Video Call")
-            .setContentText("$callerName is video calling...")
-            .setSmallIcon(com.example.R.drawable.ic_video_24)
+            .setContentTitle(context.getString(R.string.call_video_incoming_title))
+            .setContentText(context.getString(R.string.notif_incoming_video_body, callerName))
+            .setSmallIcon(R.drawable.ic_video_24)
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_CALL)
             .setSound(ringtoneUri)
@@ -431,8 +439,16 @@ object OpenChatNotificationManager {
                 )
             )
         } else {
-            builder.addAction(com.example.R.drawable.ic_video_24, "Accept", acceptPendingIntent)
-            builder.addAction(android.R.drawable.ic_menu_close_clear_cancel, "Decline", declinePendingIntent)
+            builder.addAction(
+                R.drawable.ic_video_24,
+                context.getString(R.string.friends_accept_button),
+                acceptPendingIntent
+            )
+            builder.addAction(
+                android.R.drawable.ic_menu_close_clear_cancel,
+                context.getString(R.string.friends_decline_button),
+                declinePendingIntent
+            )
         }
 
         manager.notify(Constants.NOTIFICATION_ID_VIDEO_CALL, builder.build())
@@ -469,9 +485,12 @@ object OpenChatNotificationManager {
         val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
 
         val displayBody = when (messageType) {
-            "audio" -> "🎧 Voice message"
-            "image" -> "📸 Photo"
-            "file" -> "📎 Attachment: ${content.ifBlank { "File" }}"
+            "audio" -> context.getString(R.string.notif_voice_preview)
+            "image" -> context.getString(R.string.notif_photo_preview)
+            "file" -> context.getString(
+                R.string.notif_attachment_preview,
+                content.ifBlank { context.getString(R.string.common_file_cap) }
+            )
             else -> content
         }
 
@@ -494,7 +513,7 @@ object OpenChatNotificationManager {
 
         // 1. Direct Reply RemoteInput for inline replies from notification shade
         val replyInput = androidx.core.app.RemoteInput.Builder(NotificationReplyReceiver.KEY_TEXT_REPLY)
-            .setLabel("Reply to $senderName...")
+            .setLabel(context.getString(R.string.notif_reply_hint, senderName))
             .build()
 
         val replyIntent = Intent(context, NotificationReplyReceiver::class.java).apply {
@@ -513,7 +532,7 @@ object OpenChatNotificationManager {
 
         val replyAction = NotificationCompat.Action.Builder(
             android.R.drawable.ic_menu_send,
-            "Reply",
+            context.getString(R.string.notif_reply_action),
             replyPendingIntent
         ).addRemoteInput(replyInput)
             .setAllowGeneratedReplies(true)
@@ -596,15 +615,23 @@ object OpenChatNotificationManager {
         )
 
         val notification = NotificationCompat.Builder(context, Constants.CHANNEL_FRIEND_REQUESTS)
-            .setContentTitle("Friend Request")
-            .setContentText("$senderName sent you a friend request")
+            .setContentTitle(context.getString(R.string.notif_friend_request_title))
+            .setContentText(context.getString(R.string.notif_friend_request_body, senderName))
             .setSmallIcon(android.R.drawable.stat_notify_more)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_SOCIAL)
             .setContentIntent(contentPendingIntent)
             .setAutoCancel(true)
-            .addAction(android.R.drawable.ic_input_add, "Accept", acceptPendingIntent)
-            .addAction(android.R.drawable.ic_delete, "Cancel", cancelPendingIntent)
+            .addAction(
+                android.R.drawable.ic_input_add,
+                context.getString(R.string.friends_accept_button),
+                acceptPendingIntent
+            )
+            .addAction(
+                android.R.drawable.ic_delete,
+                context.getString(R.string.common_cancel),
+                cancelPendingIntent
+            )
             .build()
 
         manager.notify(notifId, notification)
@@ -663,14 +690,18 @@ object OpenChatNotificationManager {
         )
 
         val notification = NotificationCompat.Builder(context, Constants.CHANNEL_FRIEND_ACCEPTED)
-            .setContentTitle("Friend Request Accepted")
-            .setContentText("$friendName accepted your friend request")
+            .setContentTitle(context.getString(R.string.notif_friend_accepted_title))
+            .setContentText(context.getString(R.string.notif_friend_accepted_body, friendName))
             .setSmallIcon(android.R.drawable.stat_notify_more)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_SOCIAL)
             .setContentIntent(contentPendingIntent)
             .setAutoCancel(true)
-            .addAction(android.R.drawable.ic_menu_send, "Say Hi", sayHiPendingIntent)
+            .addAction(
+                android.R.drawable.ic_menu_send,
+                context.getString(R.string.notif_say_hi),
+                sayHiPendingIntent
+            )
             .build()
 
         manager.notify(notifId, notification)
@@ -703,9 +734,9 @@ object OpenChatNotificationManager {
         )
 
         val notification = NotificationCompat.Builder(context, Constants.CHANNEL_NETWORK)
-            .setContentTitle("OpenChat")
+            .setContentTitle(context.getString(R.string.app_name))
             .setContentText(status)
-            .setSmallIcon(com.example.R.drawable.ic_chat_24)
+            .setSmallIcon(R.drawable.ic_chat_24)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setCategory(NotificationCompat.CATEGORY_STATUS)
             .setContentIntent(pendingIntent)

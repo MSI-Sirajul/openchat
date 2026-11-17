@@ -2,15 +2,14 @@ package com.msi.openchat.core.backend.inbox
 
 import android.content.Context
 import android.util.Log
+import com.example.R
 import com.msi.openchat.data.local.dao.ConversationDao
 import com.msi.openchat.data.local.dao.MessageDao
-import com.msi.openchat.data.local.entity.ConversationEntity
 import com.msi.openchat.data.local.entity.MessageEntity
 import com.msi.openchat.data.model.Message
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -138,7 +137,7 @@ class ConversationInboxProcessor(
                 val newUnread = if (isFromOther && message.status != "read") conv.unreadCount + 1 else conv.unreadCount
                 conversationDao.updateLastMessageWithUnread(
                     conversationId = conversationId,
-                    lastText = message.content ?: "New message",
+                    lastText = message.content ?: context.getString(R.string.notif_new_message),
                     lastAt = message.createdAt ?: "",
                     lastSenderId = message.senderId,
                     unreadCount = newUnread

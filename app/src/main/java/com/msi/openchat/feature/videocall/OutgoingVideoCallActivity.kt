@@ -19,6 +19,7 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePadding
 import androidx.lifecycle.lifecycleScope
+import com.example.R
 import com.example.databinding.ActivityOutgoingVideoCallBinding
 import com.msi.openchat.service.call.CallSessionCoordinator
 import kotlinx.coroutines.flow.collectLatest
@@ -29,11 +30,10 @@ import kotlinx.coroutines.launch
  * Displays "Calling..." with animated pulsing ring and transitions to ActiveVideoCallActivity on connect.
  */
 class OutgoingVideoCallActivity : AppCompatActivity() {
-    private val tag = "OpenChat_OutgoingVideo"
 
     private lateinit var binding: ActivityOutgoingVideoCallBinding
     private var peerId: String = ""
-    private var peerName: String = "OpenChat Contact"
+    private var peerName: String = ""
     private var pulseAnimator: ObjectAnimator? = null
     private var hasNavigatedToActive = false
     private var hasStartedCall = false
@@ -49,7 +49,7 @@ class OutgoingVideoCallActivity : AppCompatActivity() {
         if (camGranted && micGranted) {
             beginOutgoingVideoCall()
         } else {
-            Toast.makeText(this, "Camera and microphone permissions are required for video calls", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, getString(R.string.call_video_permissions_required), Toast.LENGTH_SHORT).show()
             finish()
         }
     }
@@ -61,11 +61,11 @@ class OutgoingVideoCallActivity : AppCompatActivity() {
         fun start(context: Context, peerId: String, peerName: String) {
             // Guard: Mutual exclusion check against audio calls & active video calls
             if (CallSessionCoordinator.isActive()) {
-                Toast.makeText(context, "Cannot start video call: a voice call is active", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, context.getString(R.string.call_video_blocked_by_voice_colon), Toast.LENGTH_SHORT).show()
                 return
             }
             if (VideoCallManager.isCallActive()) {
-                Toast.makeText(context, "A video call is already in progress", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, context.getString(R.string.call_video_already_active), Toast.LENGTH_SHORT).show()
                 return
             }
 
@@ -81,7 +81,7 @@ class OutgoingVideoCallActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         if (CallSessionCoordinator.isActive()) {
-            Toast.makeText(this, "Cannot start video call while voice call is active", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, getString(R.string.call_video_blocked_by_voice), Toast.LENGTH_SHORT).show()
             finish()
             return
         }
@@ -93,7 +93,7 @@ class OutgoingVideoCallActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         peerId = intent.getStringExtra(EXTRA_PEER_ID).orEmpty()
-        peerName = intent.getStringExtra(EXTRA_PEER_NAME) ?: "OpenChat Contact"
+        peerName = intent.getStringExtra(EXTRA_PEER_NAME) ?: getString(R.string.home_openchat_contact)
 
         if (peerId.isBlank()) {
             finish()
@@ -107,13 +107,13 @@ class OutgoingVideoCallActivity : AppCompatActivity() {
         binding.textContactInitial.text = peerName.take(1).uppercase()
 
         binding.btnCancel.setOnClickListener {
-            VideoCallManager.endCall("Cancelled by caller")
+            VideoCallManager.endCall(getString(R.string.call_cancelled_by_caller))
             finish()
         }
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                VideoCallManager.endCall("Cancelled by caller")
+                VideoCallManager.endCall(getString(R.string.call_cancelled_by_caller))
                 finish()
             }
         })

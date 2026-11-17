@@ -1,5 +1,7 @@
 package com.msi.openchat.data.model
 
+import com.example.R
+import com.msi.openchat.core.di.ServiceLocator
 import com.squareup.moshi.Json
 import com.squareup.moshi.JsonClass
 
@@ -43,7 +45,7 @@ data class Profile(
         !name.isNullOrBlank() -> name
         displayName.isNotBlank() -> displayName
         !username.isNullOrBlank() -> username
-        else -> "User"
+        else -> ServiceLocator.getString(R.string.common_user)
     }
 
     fun getResolvedAvatar(): String? = avatar?.takeIf { it.isNotBlank() } ?: avatarUrl?.takeIf { it.isNotBlank() }

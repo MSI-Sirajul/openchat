@@ -14,6 +14,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.MainActivity
+import com.example.R
 import com.example.databinding.FragmentPermissionOnboardingBinding
 import kotlinx.coroutines.launch
 
@@ -34,7 +35,7 @@ class PermissionOnboardingFragment : Fragment() {
             if (!isGranted) {
                 Toast.makeText(
                     requireContext(),
-                    "Permission denied. You can grant it later contextually or in App Settings.",
+                    getString(R.string.permissions_denied_toast),
                     Toast.LENGTH_SHORT
                 ).show()
             }
@@ -86,7 +87,7 @@ class PermissionOnboardingFragment : Fragment() {
             if (item.isGranted) {
                 Toast.makeText(
                     requireContext(),
-                    "${item.title} is already enabled.",
+                    getString(R.string.permissions_already_enabled_toast, item.title),
                     Toast.LENGTH_SHORT
                 ).show()
             } else {

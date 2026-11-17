@@ -38,14 +38,14 @@ class CallFragment : Fragment() {
         } else {
             Toast.makeText(
                 requireContext(),
-                "Microphone permission is required for voice calls",
+                getString(R.string.call_mic_permission_required),
                 Toast.LENGTH_SHORT
             ).show()
         }
     }
 
     private var contactId: String = ""
-    private var contactName: String = "Voice Call"
+    private var contactName: String = ""
     private var callId: String? = null
     private var isIncoming: Boolean = false
     private var isAlreadyAnswered: Boolean = false
@@ -72,7 +72,7 @@ class CallFragment : Fragment() {
         super.onCreate(savedInstanceState)
         arguments?.let {
             contactId = it.getString(ARG_CONTACT_ID, "")
-            contactName = it.getString(ARG_CONTACT_NAME, "Voice Call")
+            contactName = it.getString(ARG_CONTACT_NAME, getString(R.string.call_voice_label))
             callId = it.getString(ARG_CALL_ID)?.takeIf { id -> id.isNotBlank() }
             isIncoming = it.getBoolean(ARG_IS_INCOMING, false)
             isAlreadyAnswered = it.getBoolean(ARG_IS_ALREADY_ANSWERED, false)
@@ -169,7 +169,7 @@ class CallFragment : Fragment() {
         if (state.durationSeconds > 0) {
             val min = state.durationSeconds / 60
             val sec = state.durationSeconds % 60
-            binding.textCallStatus.text = "%02d:%02d".format(min, sec)
+            binding.textCallStatus.text = getString(R.string.common_duration_mm_ss, min, sec)
             binding.textCallStatus.setTextColor(Color.parseColor("#5DD69A"))
         } else {
             binding.textCallStatus.text = state.callStatus

@@ -7,6 +7,7 @@ import android.widget.TextView
 import coil.load
 import coil.transform.CircleCropTransformation
 import com.example.R
+import com.msi.openchat.core.di.ServiceLocator
 import com.msi.openchat.data.model.Profile
 
 /**
@@ -42,7 +43,8 @@ object AvatarHelper {
      * Maintained for backwards-compatibility if needed.
      */
     fun extractInitial(displayName: String?): String {
-        return displayName?.trim()?.take(1)?.uppercase()?.ifBlank { "U" } ?: "U"
+        val fallback = ServiceLocator.getString(R.string.common_avatar_placeholder_letter)
+        return displayName?.trim()?.take(1)?.uppercase()?.ifBlank { fallback } ?: fallback
     }
 
     /**
@@ -115,7 +117,7 @@ object AvatarHelper {
         letterTextView: TextView? = null,
         profile: Profile?
     ) {
-        val name = profile?.getResolvedName() ?: profile?.displayName ?: profile?.username ?: "User"
+        val name = profile?.getResolvedName() ?: profile?.displayName ?: profile?.username ?: ServiceLocator.getString(R.string.common_user)
         loadAvatar(imageView, letterTextView, resolveAvatarUrl(profile), name)
     }
 }

@@ -85,7 +85,7 @@ class VideoCallActivity : AppCompatActivity(), SensorEventListener {
     private var isIncoming = false
     private var autoAccept = false
     private var targetPeerId = ""
-    private var targetPeerName = "OpenChat Contact"
+    private var targetPeerName = ""
     private var targetCallId = ""
 
     private var hasHandledCallStart = false
@@ -106,7 +106,7 @@ class VideoCallActivity : AppCompatActivity(), SensorEventListener {
         } else {
             Toast.makeText(
                 this,
-                "Camera and Microphone permissions are required for video calls",
+                getString(R.string.call_video_permissions_required_caps),
                 Toast.LENGTH_LONG
             ).show()
             if (isIncoming && targetCallId.isNotBlank()) {
@@ -228,7 +228,7 @@ class VideoCallActivity : AppCompatActivity(), SensorEventListener {
             ?: currentState.peerId
         targetPeerName = sourceIntent?.getStringExtra(EXTRA_PEER_NAME)
             ?.takeIf { it.isNotBlank() }
-            ?: currentState.peerName.ifBlank { "OpenChat Contact" }
+            ?: currentState.peerName.ifBlank { getString(R.string.home_openchat_contact) }
         if (autoAccept) {
             isIncoming = true
         }
@@ -277,7 +277,7 @@ class VideoCallActivity : AppCompatActivity(), SensorEventListener {
                     return
                 }
                 releaseRenderers()
-                withVideoService { it.endCall("Call cancelled") }
+                withVideoService { it.endCall(getString(R.string.call_cancelled)) }
                 finish()
             }
         })
@@ -409,14 +409,16 @@ class VideoCallActivity : AppCompatActivity(), SensorEventListener {
 
         binding.btnEndCall.setOnClickListener {
             releaseRenderers()
-            videoService?.endCall("Call ended by user") ?: VideoCallManager.endCall("Call ended by user")
+            val reason = getString(R.string.call_ended_by_user)
+            videoService?.endCall(reason) ?: VideoCallManager.endCall(reason)
             finish()
         }
 
         // Outgoing cancel button
         binding.btnCancelOutgoing.setOnClickListener {
             releaseRenderers()
-            videoService?.endCall("Cancelled by caller") ?: VideoCallManager.endCall("Cancelled by caller")
+            val reason = getString(R.string.call_cancelled_by_caller)
+            videoService?.endCall(reason) ?: VideoCallManager.endCall(reason)
             finish()
         }
 
@@ -553,7 +555,7 @@ class VideoCallActivity : AppCompatActivity(), SensorEventListener {
         binding.layoutOutgoingOverlay.visibility = View.GONE
         binding.layoutBottomControls.visibility = View.VISIBLE
         binding.layoutRemotePlaceholder.visibility = View.VISIBLE
-        binding.textPlaceholderStatus.text = "Connecting video..."
+        binding.textPlaceholderStatus.text = getString(R.string.call_video_connecting)
         binding.textRemoteAvatarInitial.text = targetPeerName.take(1).uppercase()
         binding.textPeerName.text = targetPeerName
 
@@ -644,7 +646,7 @@ class VideoCallActivity : AppCompatActivity(), SensorEventListener {
                     binding.cardLocalPreview.visibility = View.VISIBLE
                 }
                 binding.layoutRemotePlaceholder.visibility = View.VISIBLE
-                binding.textPlaceholderStatus.text = "Connecting video..."
+                binding.textPlaceholderStatus.text = getString(R.string.call_video_connecting)
                 binding.textRemoteAvatarInitial.text = state.peerName.ifBlank { targetPeerName }.take(1).uppercase()
             }
             is VideoCallStatus.Connected -> {
@@ -659,7 +661,7 @@ class VideoCallActivity : AppCompatActivity(), SensorEventListener {
                     binding.layoutRemotePlaceholder.visibility = View.GONE
                 } else {
                     binding.layoutRemotePlaceholder.visibility = View.VISIBLE
-                    binding.textPlaceholderStatus.text = "Waiting for remote video..."
+                    binding.textPlaceholderStatus.text = getString(R.string.call_video_waiting_remote)
                     binding.textRemoteAvatarInitial.text = state.peerName.ifBlank { targetPeerName }.take(1).uppercase()
                 }
             }

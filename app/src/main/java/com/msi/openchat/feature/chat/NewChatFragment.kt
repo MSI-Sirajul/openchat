@@ -13,6 +13,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.MainActivity
+import com.example.R
 import com.example.databinding.FragmentNewChatBinding
 import com.msi.openchat.core.di.ServiceLocator
 import com.msi.openchat.core.ui.adapter.FriendAdapter
@@ -83,7 +84,7 @@ class NewChatFragment : Fragment() {
             if (friend != null) {
                 val currentUid = ServiceLocator.sessionManager.getUserId().orEmpty()
                 val convId = if (currentUid < friend.id) "direct_${currentUid}_${friend.id}" else "direct_${friend.id}_${currentUid}"
-                val name = friend.displayName.ifBlank { friend.username ?: "Friend" }
+                val name = friend.displayName.ifBlank { friend.username ?: getString(R.string.common_friend) }
 
                 // Pop NewChatFragment from backstack then navigate to chat
                 parentFragmentManager.popBackStack()
@@ -136,7 +137,11 @@ class NewChatFragment : Fragment() {
 
         friendAdapter.submitList(filtered)
         val count = allFriends.size
-        binding.textContactCount.text = if (count == 1) "1 contact" else "$count contacts"
+        binding.textContactCount.text = if (count == 1) {
+            getString(R.string.new_chat_contact_count_one)
+        } else {
+            getString(R.string.new_chat_contact_count_many, count)
+        }
 
         val isEmpty = filtered.isEmpty()
         binding.layoutEmptyContacts.visibility = if (isEmpty) View.VISIBLE else View.GONE

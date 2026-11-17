@@ -10,7 +10,7 @@
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Set 4-Digit Passcode"
+        android:text="@string/settings_set_pin_dialog_title"
         android:textColor="@color/color_primary_text"
         android:textSize="18sp"
         android:fontFamily="sans-serif-bold" />
@@ -19,7 +19,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="4dp"
-        android:text="Choose a secure 4-digit PIN to lock your OpenChat app."
+        android:text="@string/settings_set_pin_dialog_desc"
         android:textColor="@color/color_secondary_text"
         android:textSize="13sp" />
 
@@ -28,7 +28,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="16dp"
-        android:hint="Enter 4-Digit PIN"
+        android:hint="@string/settings_enter_pin_hint"
         app:endIconMode="password_toggle"
         app:boxCornerRadiusTopStart="12dp"
         app:boxCornerRadiusTopEnd="12dp"
@@ -51,7 +51,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="12dp"
-        android:hint="Confirm 4-Digit PIN"
+        android:hint="@string/settings_confirm_pin_hint"
         app:endIconMode="password_toggle"
         app:boxCornerRadiusTopStart="12dp"
         app:boxCornerRadiusTopEnd="12dp"

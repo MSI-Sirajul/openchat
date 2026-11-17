@@ -4,6 +4,8 @@ import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import com.example.R
+import com.msi.openchat.core.di.ServiceLocator
 import com.msi.openchat.data.model.Conversation
 import com.msi.openchat.data.model.Profile
 
@@ -72,7 +74,7 @@ data class ConversationEntity(
         otherUser = if (otherUserId.isNotBlank()) {
             Profile(
                 id = otherUserId,
-                displayName = otherUserName ?: "User",
+                displayName = otherUserName ?: ServiceLocator.getString(R.string.common_user),
                 avatarUrl = otherUserAvatar
             )
         } else null,

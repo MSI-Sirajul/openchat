@@ -1,11 +1,13 @@
 package com.msi.openchat.feature.videocall
 
 import android.util.Log
+import com.example.R
 import com.google.firebase.database.ChildEventListener
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.ValueEventListener
 import com.msi.openchat.core.common.Resource
+import com.msi.openchat.core.di.ServiceLocator
 import com.msi.openchat.core.security.SessionManager
 import com.msi.openchat.data.model.CallSession
 import com.msi.openchat.data.model.CallSignalingMessage
@@ -43,7 +45,7 @@ class VideoCallSignaling(
         receiverName: String
     ): Resource<CallSession> = withContext(Dispatchers.IO) {
         val callerId = sessionManager.getUserId() ?: FirebaseManager.auth.currentUser?.uid
-            ?: return@withContext Resource.Error("User not authenticated")
+            ?: return@withContext Resource.Error(ServiceLocator.getString(R.string.common_user_not_authenticated))
 
         try {
             val pushKey = videoCallsRef.push().key ?: UUID.randomUUID().toString()
@@ -51,11 +53,12 @@ class VideoCallSignaling(
             val nowTime = System.currentTimeMillis().toString()
 
             val callerProfile = try {
-                val p = com.msi.openchat.core.di.ServiceLocator.userRepository.getCurrentUserProfile()
+                val p = ServiceLocator.userRepository.getCurrentUserProfile()
                 if (p is Resource.Success) p.data else null
             } catch (_: Exception) { null }
 
-            val callerName = callerProfile?.displayName?.ifBlank { callerProfile.username } ?: "OpenChat User"
+            val callerName = callerProfile?.displayName?.ifBlank { callerProfile.username }
+                ?: ServiceLocator.getString(R.string.home_openchat_user)
 
             val callData = HashMap<String, Any?>()
             callData["id"] = callId
@@ -96,13 +99,13 @@ class VideoCallSignaling(
                             )
                         )
                     } else {
-                        continuation.resume(Resource.Error(task.exception?.message ?: "Failed to create video call room"))
+                        continuation.resume(Resource.Error(task.exception?.message ?: ServiceLocator.getString(R.string.call_video_room_failed)))
                     }
                 }
             }
         } catch (e: Exception) {
             Log.e(tag, "createVideoCall error: ${e.message}", e)
-            Resource.Error(e.message ?: "Failed to initiate video call", e)
+            Resource.Error(e.message ?: ServiceLocator.getString(R.string.call_video_initiate_video_failed), e)
         }
     }
 
@@ -120,7 +123,7 @@ class VideoCallSignaling(
         }
 
         val senderId = sessionManager.getUserId() ?: FirebaseManager.auth.currentUser?.uid
-            ?: return@withContext Resource.Error("User not authenticated")
+            ?: return@withContext Resource.Error(ServiceLocator.getString(R.string.common_user_not_authenticated))
 
         try {
             val msgId = videoCallSignalingRef.child(callId).push().key ?: UUID.randomUUID().toString()
@@ -139,13 +142,13 @@ class VideoCallSignaling(
                         if (task.isSuccessful) {
                             continuation.resume(Resource.Success(Unit))
                         } else {
-                            continuation.resume(Resource.Error(task.exception?.message ?: "Failed to send signaling"))
+                            continuation.resume(Resource.Error(task.exception?.message ?: ServiceLocator.getString(R.string.call_video_signaling_failed)))
                         }
                     }
             }
         } catch (e: Exception) {
             Log.e(tag, "sendSignaling error: ${e.message}", e)
-            Resource.Error(e.message ?: "Signaling transmission failed", e)
+            Resource.Error(e.message ?: ServiceLocator.getString(R.string.call_video_signaling_tx_failed), e)
         }
     }
 
@@ -279,11 +282,11 @@ class VideoCallSignaling(
             suspendCancellableCoroutine<Resource<Unit>> { continuation ->
                 videoCallsRef.child(callId).updateChildren(updates).addOnCompleteListener { task ->
                     if (task.isSuccessful) continuation.resume(Resource.Success(Unit))
-                    else continuation.resume(Resource.Error(task.exception?.message ?: "Failed to update video call status"))
+                    else continuation.resume(Resource.Error(task.exception?.message ?: ServiceLocator.getString(R.string.call_video_status_update_failed)))
                 }
             }
         } catch (e: Exception) {
-            Resource.Error(e.message ?: "Failed to update status", e)
+            Resource.Error(e.message ?: ServiceLocator.getString(R.string.call_video_status_failed), e)
         }
     }
 
@@ -302,7 +305,7 @@ class VideoCallSignaling(
      * Auto decline with "busy" reason when user is already in another call
      */
     suspend fun notifyBusy(callId: String, callerId: String) {
-        updateCallStatus(callId, "busy", "Receiver is busy on another call")
+        updateCallStatus(callId, "busy", ServiceLocator.getString(R.string.call_receiver_busy))
         sendSignaling(callId, callerId, "bye", "{\"reason\":\"busy\"}")
     }
 
@@ -310,7 +313,7 @@ class VideoCallSignaling(
      * Notify decline
      */
     suspend fun notifyDecline(callId: String, callerId: String) {
-        updateCallStatus(callId, "declined", "Call declined by user")
+        updateCallStatus(callId, "declined", ServiceLocator.getString(R.string.call_declined_by_user_alt))
         sendSignaling(callId, callerId, "bye", "{\"reason\":\"declined\"}")
     }
 }

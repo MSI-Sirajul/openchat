@@ -2,6 +2,7 @@ package com.msi.openchat.feature.friends
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.R
 import com.msi.openchat.core.common.Resource
 import com.msi.openchat.core.di.ServiceLocator
 import com.msi.openchat.data.model.Profile
@@ -87,7 +88,7 @@ class AddFriendViewModel(
                     _uiState.value = _uiState.value.copy(
                         searchResults = updatedResults,
                         sentRequestUserIds = updatedSet,
-                        successMessage = "Friend request sent to ${targetProfile.displayName}"
+                        successMessage = ServiceLocator.getString(R.string.friends_request_sent_to, targetProfile.displayName)
                     )
                 }
                 is Resource.Error -> {

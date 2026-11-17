@@ -1,12 +1,10 @@
 package com.msi.openchat.core.backend.outbox
 
 import android.content.Context
-import android.net.Uri
 import android.util.Log
 import com.msi.openchat.core.common.Constants
 import com.msi.openchat.data.local.dao.MessageDao
 import com.msi.openchat.data.local.entity.MessageEntity
-import com.msi.openchat.data.model.Message
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -309,20 +307,6 @@ class ConversationOutboxQueue(
                 )
                 return
             }
-        }
-    }
-
-    private fun resolveFile(path: String): File? {
-        return try {
-            if (path.startsWith("file://")) {
-                File(Uri.parse(path).path.orEmpty())
-            } else if (path.startsWith("/")) {
-                File(path)
-            } else {
-                File(path)
-            }
-        } catch (_: Exception) {
-            null
         }
     }
 

@@ -15,7 +15,6 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.databinding.FragmentAddFriendBinding
 import com.msi.openchat.core.ui.adapter.UserSearchAdapter
-import com.msi.openchat.core.ui.adapter.UserSearchItem
 import kotlinx.coroutines.launch
 
 class AddFriendFragment : Fragment() {

@@ -4,16 +4,21 @@ import android.app.Activity
 import android.content.Context
 import android.content.SharedPreferences
 import android.os.Build
+import androidx.annotation.StringRes
 import androidx.appcompat.app.AppCompatDelegate
 import com.example.R
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-enum class AppThemeMode(val storageKey: String, val displayName: String, val description: String) {
-    SYSTEM("system", "System Default", "Follows device dark/light theme and wallpaper dynamic color"),
-    LIGHT("light", "Light Theme", "Optimized crisp palette with high-contrast text and clean bubbles"),
-    DARK("dark", "Dark Theme", "Deep dark palette optimized for low-light comfort")
+enum class AppThemeMode(
+    val storageKey: String,
+    @StringRes val displayNameRes: Int,
+    @StringRes val descriptionRes: Int
+) {
+    SYSTEM("system", R.string.settings_theme_system, R.string.settings_theme_system_desc),
+    LIGHT("light", R.string.settings_theme_light, R.string.settings_theme_light_desc),
+    DARK("dark", R.string.settings_theme_dark, R.string.settings_theme_dark_desc)
 }
 
 /**

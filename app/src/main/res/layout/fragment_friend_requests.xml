@@ -77,7 +77,7 @@
                     android:layout_gravity="center"
                     android:src="@drawable/ic_group_24"
                     app:tint="@color/color_primary"
-                    android:contentDescription="Friend requests" />
+                    android:contentDescription="@string/friends_requests_cd" />
             </com.google.android.material.card.MaterialCardView>
 
             <TextView

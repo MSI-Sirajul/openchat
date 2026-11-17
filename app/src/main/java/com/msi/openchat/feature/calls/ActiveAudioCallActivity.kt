@@ -42,7 +42,7 @@ class ActiveAudioCallActivity : AppCompatActivity() {
     private lateinit var binding: ActivityActiveAudioCallBinding
     private var callId: String = ""
     private var contactId: String = ""
-    private var contactName: String = "Voice Call"
+    private var contactName: String = ""
     private var isIncoming: Boolean = false
 
     private lateinit var callViewModel: CallViewModel
@@ -77,7 +77,7 @@ class ActiveAudioCallActivity : AppCompatActivity() {
                 callViewModel.onPermissionGranted()
             }
         } else {
-            Toast.makeText(this, "Microphone permission is required for voice calls", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, getString(R.string.call_mic_permission_required), Toast.LENGTH_SHORT).show()
             if (::callViewModel.isInitialized) {
                 callViewModel.endCall()
             }
@@ -111,7 +111,7 @@ class ActiveAudioCallActivity : AppCompatActivity() {
             context: Context,
             callId: String = CallSessionCoordinator.currentCallId.value.orEmpty(),
             contactId: String = CallSessionCoordinator.contactId.value,
-            contactName: String = CallSessionCoordinator.contactName.value.ifBlank { "Voice Call" },
+            contactName: String = CallSessionCoordinator.contactName.value.ifBlank { context.getString(R.string.call_voice_label) },
             isIncoming: Boolean = false
         ): Intent {
             return createIntent(context, callId, contactId, contactName, isIncoming)
@@ -126,7 +126,7 @@ class ActiveAudioCallActivity : AppCompatActivity() {
         contactId = intent.getStringExtra(EXTRA_CONTACT_ID).orEmpty().ifBlank { CallSessionCoordinator.contactId.value }
         contactName = intent.getStringExtra(EXTRA_CONTACT_NAME)
             ?.takeIf { it.isNotBlank() }
-            ?: CallSessionCoordinator.contactName.value.ifBlank { "Voice Call" }
+            ?: CallSessionCoordinator.contactName.value.ifBlank { getString(R.string.call_voice_label) }
         isIncoming = intent.getBooleanExtra(EXTRA_IS_INCOMING, false)
 
         if (callId.isBlank() ||
@@ -221,7 +221,7 @@ class ActiveAudioCallActivity : AppCompatActivity() {
                 if (state.durationSeconds > 0 || state.connectionState == WebRtcCallState.CONNECTED) {
                     val mins = state.durationSeconds / 60
                     val secs = state.durationSeconds % 60
-                    binding.textCallTimer.text = String.format("%02d:%02d", mins, secs)
+                    binding.textCallTimer.text = getString(R.string.common_duration_mm_ss, mins, secs)
                 } else {
                     binding.textCallTimer.text = state.callStatus
                 }

@@ -14,7 +14,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
-import coil.load
 import com.example.MainActivity
 import com.example.R
 import com.example.databinding.FragmentProfileBinding
@@ -158,12 +157,12 @@ class ProfileFragment : Fragment() {
     }
 
     private fun renderProfileData(profile: Profile, state: ProfileUiState) {
-        val name = profile.displayName.ifBlank { profile.username ?: "User" }
+        val name = profile.displayName.ifBlank { profile.username ?: getString(R.string.common_user) }
         val username = profile.username.orEmpty()
-        val bio = profile.bio?.takeIf { it.isNotBlank() } ?: "Hey there! I am using OpenChat."
-        val phone = profile.phoneNumber?.takeIf { it.isNotBlank() } ?: "Not provided"
+        val bio = profile.bio?.takeIf { it.isNotBlank() } ?: getString(R.string.profile_default_bio)
+        val phone = profile.phoneNumber?.takeIf { it.isNotBlank() } ?: getString(R.string.profile_not_provided)
         val email = profile.email?.takeIf { it.isNotBlank() }
-            ?: (ServiceLocator.sessionManager.getUserEmail() ?: "Not provided")
+            ?: (ServiceLocator.sessionManager.getUserEmail() ?: getString(R.string.profile_not_provided))
 
         // 1. Avatar rendering: local preview if pending, otherwise remote avatarUrl with default icon fallback
         if (state.pendingAvatarUri != null) {
@@ -184,7 +183,7 @@ class ProfileFragment : Fragment() {
         // Presence indicator
         val isOnline = PresenceHelper.isUserOnline(profile)
         binding.dotProfileOnline.visibility = if (isOnline && !state.isSelf) View.VISIBLE else View.GONE
-        binding.textProfileStatus.text = if (isOnline) "Online" else PresenceHelper.formatPresenceStatus(profile)
+        binding.textProfileStatus.text = if (isOnline) getString(R.string.chat_status_online) else PresenceHelper.formatPresenceStatus(profile)
 
         // 2. Read-only locked email
         binding.textProfileEmail.text = email
@@ -198,7 +197,7 @@ class ProfileFragment : Fragment() {
                 // Toolbar & Edit controls
                 binding.btnProfileSave.visibility = View.VISIBLE
                 binding.badgeEditAvatar.visibility = View.VISIBLE
-                binding.btnProfileEdit.contentDescription = "Cancel editing"
+                binding.btnProfileEdit.contentDescription = getString(R.string.profile_cancel_editing_cd)
 
                 // Switch top header to edit text fields
                 binding.layoutHeaderViewMode.visibility = View.GONE
@@ -227,13 +226,13 @@ class ProfileFragment : Fragment() {
                 // View mode for current user
                 binding.btnProfileSave.visibility = View.GONE
                 binding.badgeEditAvatar.visibility = View.GONE
-                binding.btnProfileEdit.contentDescription = "Edit profile"
+                binding.btnProfileEdit.contentDescription = getString(R.string.profile_edit_profile_cd)
 
                 // Top header view
                 binding.layoutHeaderViewMode.visibility = View.VISIBLE
                 binding.layoutHeaderEditMode.visibility = View.GONE
                 binding.textProfileName.text = name
-                binding.textProfileUsername.text = if (username.isNotBlank()) "@$username" else ""
+                binding.textProfileUsername.text = if (username.isNotBlank()) getString(R.string.common_handle_format, username) else ""
 
                 // Details view
                 binding.textProfileBio.visibility = View.VISIBLE
@@ -254,7 +253,7 @@ class ProfileFragment : Fragment() {
             binding.layoutHeaderViewMode.visibility = View.VISIBLE
             binding.layoutHeaderEditMode.visibility = View.GONE
             binding.textProfileName.text = name
-            binding.textProfileUsername.text = if (username.isNotBlank()) "@$username" else ""
+            binding.textProfileUsername.text = if (username.isNotBlank()) getString(R.string.common_handle_format, username) else ""
 
             binding.textProfileBio.visibility = View.VISIBLE
             binding.tilEditBio.visibility = View.GONE
