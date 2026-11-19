@@ -23,6 +23,8 @@ import androidx.lifecycle.lifecycleScope
 import com.example.R
 import com.example.databinding.ActivityIncomingVideoCallBinding
 import com.msi.openchat.core.service.AppServiceManager
+import com.msi.openchat.service.call.CallSessionCoordinator
+import com.msi.openchat.service.call.CallSessionGuard
 import com.msi.openchat.service.notification.OpenChatNotificationManager
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -76,8 +78,10 @@ class IncomingVideoCallActivity : AppCompatActivity() {
         callerId = intent.getStringExtra(EXTRA_CALLER_ID).orEmpty()
         callerName = intent.getStringExtra(EXTRA_CALLER_NAME) ?: getString(R.string.home_openchat_caller)
 
-        if (callId.isBlank() || callId.startsWith("aud_") ||
-            com.msi.openchat.service.call.CallSessionCoordinator.isActive()
+        if (callId.isBlank() ||
+            CallSessionGuard.isAudioCallId(callId) ||
+            CallSessionGuard.isAudioCallActive() ||
+            CallSessionCoordinator.isActive()
         ) {
             finish()
             return
@@ -228,7 +232,9 @@ class IncomingVideoCallActivity : AppCompatActivity() {
             try { if (it.isHeld) it.release() } catch (_: Exception) {}
             wakeLock = null
         }
-        finish()
+        if (!isFinishing) {
+            finish()
+        }
     }
 
     override fun onDestroy() {

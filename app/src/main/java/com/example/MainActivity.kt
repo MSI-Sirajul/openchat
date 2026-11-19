@@ -16,6 +16,9 @@ import com.google.android.material.color.DynamicColors
 import com.msi.openchat.core.di.ServiceLocator
 import com.msi.openchat.core.permission.PermissionManager
 import com.msi.openchat.feature.auth.AuthFragment
+import com.msi.openchat.feature.calls.ActiveAudioCallActivity
+import com.msi.openchat.feature.calls.CallUiState
+import com.msi.openchat.feature.calls.IncomingAudioCallActivity
 import com.msi.openchat.feature.chat.ChatFragment
 import com.msi.openchat.feature.friends.AddFriendFragment
 import com.msi.openchat.feature.friends.FriendRequestsFragment
@@ -24,14 +27,30 @@ import com.msi.openchat.feature.permission.PermissionOnboardingFragment
 import com.msi.openchat.feature.profile.ProfileFragment
 import com.msi.openchat.feature.security.AppLockFragment
 import com.msi.openchat.feature.settings.SettingsFragment
+import com.msi.openchat.feature.videocall.ActiveVideoCallActivity
+import com.msi.openchat.feature.videocall.IncomingVideoCallActivity
+import com.msi.openchat.feature.videocall.OutgoingVideoCallActivity
+import com.msi.openchat.feature.videocall.VideoCallActivity
+import com.msi.openchat.feature.videocall.VideoCallManager
+import com.msi.openchat.feature.videocall.VideoCallStatus
+import com.msi.openchat.feature.videocall.VideoCallUiState
+import com.msi.openchat.service.call.CallSessionCoordinator
+import com.msi.openchat.service.call.WebRtcCallState
 import com.msi.openchat.service.notification.OpenChatNotificationManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
+
+    private val fragmentLifecycleCallbacks = object : androidx.fragment.app.FragmentManager.FragmentLifecycleCallbacks() {
+        override fun onFragmentResumed(fm: androidx.fragment.app.FragmentManager, f: androidx.fragment.app.Fragment) {
+            refreshActiveCallBanner()
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // Ensure saved theme mode is applied before inflating views
@@ -57,6 +76,14 @@ class MainActivity : AppCompatActivity() {
 
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+
+        binding.layoutActiveCallBanner.setOnClickListener {
+            openActiveCallScreen()
+        }
+        supportFragmentManager.registerFragmentLifecycleCallbacks(fragmentLifecycleCallbacks, false)
+        supportFragmentManager.addOnBackStackChangedListener {
+            refreshActiveCallBanner()
+        }
 
         // Sync status bar color and icon appearance with title bar surface color
         syncStatusBarColor()
@@ -96,6 +123,7 @@ class MainActivity : AppCompatActivity() {
 
         observeNetwork()
         observeAuthState()
+        observeActiveCall()
 
         if (savedInstanceState == null) {
             setupInitialFragment()
@@ -125,6 +153,7 @@ class MainActivity : AppCompatActivity() {
                         }
                         else -> Unit
                     }
+                    refreshActiveCallBanner()
                 }
             }
         }
@@ -145,6 +174,161 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
             }
+        }
+    }
+
+    private fun observeActiveCall() {
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                combine(
+                    CallSessionCoordinator.uiState,
+                    VideoCallManager.uiState
+                ) { audioState, videoState ->
+                    audioState to videoState
+                }.collect { (audioState, videoState) ->
+                    renderActiveCallBanner(audioState, videoState)
+                }
+            }
+        }
+    }
+
+    private fun refreshActiveCallBanner() {
+        if (!::binding.isInitialized) return
+        renderActiveCallBanner(CallSessionCoordinator.uiState.value, VideoCallManager.uiState.value)
+    }
+
+    internal fun renderActiveCallBanner(
+        audioState: CallUiState = CallSessionCoordinator.uiState.value,
+        videoState: VideoCallUiState = VideoCallManager.uiState.value
+    ) {
+        val currentFragment = supportFragmentManager.findFragmentById(R.id.fragment_container)
+        if (!ServiceLocator.sessionManager.isAuthenticated() ||
+            currentFragment is AuthFragment ||
+            currentFragment is AppLockFragment
+        ) {
+            binding.layoutActiveCallBanner.visibility = View.GONE
+            return
+        }
+
+        val isAudioActive = audioState.isCallActive &&
+            audioState.callId.isNotBlank() &&
+            audioState.connectionState != WebRtcCallState.ENDED
+        if (isAudioActive) {
+            val peerName = audioState.contactName
+                .ifBlank { CallSessionCoordinator.contactName.value }
+                .ifBlank { getString(R.string.common_contact) }
+            val isReconnecting = audioState.connectionState == WebRtcCallState.RECONNECTING ||
+                audioState.connectionState == WebRtcCallState.DISCONNECTED
+            val durationText = if (audioState.durationSeconds > 0 ||
+                audioState.connectionState == WebRtcCallState.CONNECTED
+            ) {
+                val mins = audioState.durationSeconds / 60
+                val secs = audioState.durationSeconds % 60
+                getString(R.string.common_duration_mm_ss, mins, secs)
+            } else {
+                audioState.callStatus.ifBlank { getString(R.string.common_connecting) }
+            }
+
+            binding.layoutActiveCallBanner.visibility = View.VISIBLE
+            binding.layoutActiveCallBanner.setBackgroundColor(
+                ContextCompat.getColor(
+                    this,
+                    if (isReconnecting) R.color.color_active_call_banner_reconnecting_bg
+                    else R.color.color_active_call_banner_bg
+                )
+            )
+            binding.imgActiveCallIcon.setImageResource(R.drawable.ic_call_24)
+            binding.textActiveCallTitle.text = getString(R.string.active_call_voice_label, peerName)
+            binding.textActiveCallSubtitle.text = getString(R.string.active_call_tap_to_return)
+            binding.textActiveCallDuration.text = durationText
+            return
+        }
+
+        val videoStatus = videoState.status
+        val isVideoActive = videoStatus !is VideoCallStatus.Idle && videoStatus !is VideoCallStatus.Ended
+        if (isVideoActive) {
+            val peerName = videoState.peerName.ifBlank { getString(R.string.common_contact) }
+            val isReconnecting = videoStatus is VideoCallStatus.Reconnecting || videoState.isReconnecting
+            val durationText = when {
+                videoStatus is VideoCallStatus.Connected -> videoState.formattedDuration
+                isReconnecting -> getString(R.string.common_reconnecting_ellipsis)
+                videoStatus is VideoCallStatus.OutgoingCalling -> getString(R.string.call_calling_ellipsis)
+                videoStatus is VideoCallStatus.IncomingRinging -> getString(R.string.call_ringing_ellipsis)
+                else -> getString(R.string.common_connecting)
+            }
+
+            binding.layoutActiveCallBanner.visibility = View.VISIBLE
+            binding.layoutActiveCallBanner.setBackgroundColor(
+                ContextCompat.getColor(
+                    this,
+                    if (isReconnecting) R.color.color_active_call_banner_reconnecting_bg
+                    else R.color.color_active_call_banner_bg
+                )
+            )
+            binding.imgActiveCallIcon.setImageResource(R.drawable.ic_video_24)
+            binding.textActiveCallTitle.text = getString(R.string.active_call_video_label, peerName)
+            binding.textActiveCallSubtitle.text = getString(R.string.active_call_tap_to_return)
+            binding.textActiveCallDuration.text = durationText
+            return
+        }
+
+        binding.layoutActiveCallBanner.visibility = View.GONE
+    }
+
+    internal fun openActiveCallScreen(
+        audioState: CallUiState = CallSessionCoordinator.uiState.value,
+        videoState: VideoCallUiState = VideoCallManager.uiState.value
+    ) {
+        val isAudioActive = audioState.isCallActive &&
+            audioState.callId.isNotBlank() &&
+            audioState.connectionState != WebRtcCallState.ENDED
+        if (isAudioActive) {
+            val peerId = audioState.contactId.ifBlank { CallSessionCoordinator.contactId.value }
+            val peerName = audioState.contactName
+                .ifBlank { CallSessionCoordinator.contactName.value }
+                .ifBlank { getString(R.string.common_contact) }
+            val targetIntent = if (audioState.isIncomingWaiting) {
+                IncomingAudioCallActivity.createIntent(
+                    context = this,
+                    callId = audioState.callId,
+                    callerId = peerId,
+                    callerName = peerName
+                )
+            } else {
+                ActiveAudioCallActivity.createResumeIntent(
+                    context = this,
+                    callId = audioState.callId,
+                    contactId = peerId,
+                    contactName = peerName,
+                    isIncoming = !audioState.isCaller
+                )
+            }
+            startActivity(targetIntent)
+            return
+        }
+
+        val videoStatus = videoState.status
+        if (videoStatus !is VideoCallStatus.Idle && videoStatus !is VideoCallStatus.Ended) {
+            val peerName = videoState.peerName.ifBlank { getString(R.string.common_contact) }
+            val targetIntent = when (videoStatus) {
+                is VideoCallStatus.IncomingRinging -> IncomingVideoCallActivity.createIntent(
+                    context = this,
+                    callId = videoState.callId.ifBlank { videoStatus.callId },
+                    callerId = videoState.peerId.ifBlank { videoStatus.callerId },
+                    callerName = peerName
+                )
+                is VideoCallStatus.OutgoingCalling -> OutgoingVideoCallActivity.createResumeIntent(
+                    context = this,
+                    peerId = videoState.peerId.ifBlank { videoStatus.receiverId },
+                    peerName = peerName
+                )
+                else -> if (VideoCallManager.resumeActivityClassName == VideoCallActivity::class.java.name) {
+                    VideoCallActivity.createResumeIntent(this)
+                } else {
+                    ActiveVideoCallActivity.createResumeIntent(this)
+                }
+            }
+            startActivity(targetIntent)
         }
     }
 
@@ -369,6 +553,12 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         syncStatusBarColor()
+        refreshActiveCallBanner()
+    }
+
+    override fun onDestroy() {
+        supportFragmentManager.unregisterFragmentLifecycleCallbacks(fragmentLifecycleCallbacks)
+        super.onDestroy()
     }
 
     override fun onStop() {

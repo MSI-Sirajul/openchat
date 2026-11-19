@@ -271,7 +271,9 @@ class IncomingAudioCallActivity : AppCompatActivity() {
             try { if (it.isHeld) it.release() } catch (_: Exception) {}
             wakeLock = null
         }
-        finish()
+        if (!isFinishing) {
+            finish()
+        }
     }
 
     override fun onDestroy() {

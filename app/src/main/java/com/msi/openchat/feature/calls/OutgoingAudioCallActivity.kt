@@ -27,6 +27,8 @@ import com.msi.openchat.core.di.ServiceLocator
 import com.msi.openchat.feature.videocall.VideoCallManager
 import com.msi.openchat.service.call.CallSessionCoordinator
 import com.msi.openchat.service.call.CallSessionGuard
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -253,14 +255,22 @@ class OutgoingAudioCallActivity : AppCompatActivity() {
         timeoutJob?.cancel()
         if (callId.isNotBlank()) {
             CallSessionGuard.unregisterCall(callId)
-            lifecycleScope.launch {
-                ServiceLocator.callRepository.updateCallStatus(
-                    callId = callId,
-                    status = "ended",
-                    endReason = getString(R.string.call_cancelled_by_caller)
-                )
-                ServiceLocator.callRepository.sendSignaling(callId, contactId, "bye", "{\"reason\":\"cancelled\"}")
+            if (CallSessionCoordinator.currentCallId.value == callId && CallSessionCoordinator.isActive()) {
+                CallSessionCoordinator.endCall()
+            } else {
+                val cancelledReason = getString(R.string.call_cancelled_by_caller)
+                CoroutineScope(Dispatchers.IO).launch {
+                    try {
+                        ServiceLocator.callRepository.updateCallStatus(
+                            callId = callId,
+                            status = "ended",
+                            endReason = cancelledReason
+                        )
+                        ServiceLocator.callRepository.sendSignaling(callId, contactId, "bye", "{\"reason\":\"cancelled\"}")
+                    } catch (_: Exception) {}
+                }
             }
+            com.msi.openchat.service.call.OpenChatCallService.stopCallService(applicationContext)
         }
         finish()
     }

@@ -51,6 +51,12 @@
     <color name="color_voice_seek_active">#00A884</color>
     <color name="color_sender_name">#53BDEB</color>
 
+    <!-- Active Call Status Banner Tokens (Dark Theme) -->
+    <color name="color_active_call_banner_bg">#0D5E3A</color>
+    <color name="color_active_call_banner_reconnecting_bg">#A66200</color>
+    <color name="color_active_call_banner_text">#FFFFFF</color>
+    <color name="color_active_call_banner_chip_bg">#26FFFFFF</color>
+
     <!-- Generic palette aliases -->
     <color name="white">#FFFFFFFF</color>
 </resources>

@@ -112,9 +112,11 @@ class ActiveAudioCallActivity : AppCompatActivity() {
             callId: String = CallSessionCoordinator.currentCallId.value.orEmpty(),
             contactId: String = CallSessionCoordinator.contactId.value,
             contactName: String = CallSessionCoordinator.contactName.value.ifBlank { context.getString(R.string.call_voice_label) },
-            isIncoming: Boolean = false
+            isIncoming: Boolean = !CallSessionCoordinator.uiState.value.isCaller
         ): Intent {
-            return createIntent(context, callId, contactId, contactName, isIncoming)
+            return createIntent(context, callId, contactId, contactName, isIncoming).apply {
+                addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
+            }
         }
     }
 

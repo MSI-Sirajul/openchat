@@ -173,7 +173,9 @@ class VideoCallActivity : AppCompatActivity(), SensorEventListener {
 
         fun createResumeIntent(context: Context): Intent {
             return Intent(context, VideoCallActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or
+                    Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                    Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
             }
         }
     }

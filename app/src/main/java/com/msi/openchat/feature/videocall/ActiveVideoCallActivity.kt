@@ -34,6 +34,7 @@ import androidx.lifecycle.lifecycleScope
 import com.example.R
 import com.example.databinding.ActivityActiveVideoCallBinding
 import com.msi.openchat.service.call.CallSessionCoordinator
+import com.msi.openchat.service.call.CallSessionGuard
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
@@ -129,7 +130,9 @@ class ActiveVideoCallActivity : AppCompatActivity(), SensorEventListener {
 
         fun createResumeIntent(context: Context): Intent {
             return Intent(context, ActiveVideoCallActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or
+                    Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                    Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
             }
         }
     }
@@ -151,7 +154,10 @@ class ActiveVideoCallActivity : AppCompatActivity(), SensorEventListener {
         isIncoming = intent.getBooleanExtra(EXTRA_IS_INCOMING, false) ||
             intent.getBooleanExtra("autoAccept", false)
 
-        if (callId.startsWith("aud_") || CallSessionCoordinator.isActive()) {
+        if (CallSessionGuard.isAudioCallId(callId) ||
+            CallSessionGuard.isAudioCallActive() ||
+            CallSessionCoordinator.isActive()
+        ) {
             finish()
             return
         }

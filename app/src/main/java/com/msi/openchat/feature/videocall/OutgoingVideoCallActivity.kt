@@ -22,6 +22,7 @@ import androidx.lifecycle.lifecycleScope
 import com.example.R
 import com.example.databinding.ActivityOutgoingVideoCallBinding
 import com.msi.openchat.service.call.CallSessionCoordinator
+import com.msi.openchat.service.call.CallSessionGuard
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
@@ -60,7 +61,7 @@ class OutgoingVideoCallActivity : AppCompatActivity() {
 
         fun start(context: Context, peerId: String, peerName: String) {
             // Guard: Mutual exclusion check against audio calls & active video calls
-            if (CallSessionCoordinator.isActive()) {
+            if (CallSessionGuard.isAudioCallActive() || CallSessionCoordinator.isActive()) {
                 Toast.makeText(context, context.getString(R.string.call_video_blocked_by_voice_colon), Toast.LENGTH_SHORT).show()
                 return
             }
@@ -76,11 +77,21 @@ class OutgoingVideoCallActivity : AppCompatActivity() {
             }
             context.startActivity(intent)
         }
+
+        fun createResumeIntent(context: Context, peerId: String, peerName: String): Intent {
+            return Intent(context, OutgoingVideoCallActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or
+                    Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                    Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+                putExtra(EXTRA_PEER_ID, peerId)
+                putExtra(EXTRA_PEER_NAME, peerName)
+            }
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        if (CallSessionCoordinator.isActive()) {
+        if (CallSessionGuard.isAudioCallActive() || CallSessionCoordinator.isActive()) {
             Toast.makeText(this, getString(R.string.call_video_blocked_by_voice), Toast.LENGTH_SHORT).show()
             finish()
             return

@@ -51,12 +51,19 @@ object CallSessionCoordinator {
         contactName: String
     ) {
         Log.i(TAG, "Registering OpenChatCallService for callId=$callId, peer=$contactName")
+        val isReattachingSameActiveCall =
+            _currentCallId.value == callId &&
+                _uiState.value.isCallActive &&
+                _callState.value != WebRtcCallState.ENDED &&
+                _callState.value != WebRtcCallState.IDLE
         CallSessionGuard.registerAudioCall(callId)
         activeServiceRef = WeakReference(service)
         _currentCallId.value = callId
         _contactId.value = contactId
         _contactName.value = contactName
-        _callState.value = WebRtcCallState.CONNECTING
+        if (!isReattachingSameActiveCall) {
+            _callState.value = WebRtcCallState.CONNECTING
+        }
     }
 
     fun updateUiState(state: CallUiState) {

@@ -13,6 +13,8 @@ import com.example.R
 import com.msi.openchat.core.common.Resource
 import com.msi.openchat.core.di.ServiceLocator
 import com.msi.openchat.data.model.CallSignalingMessage
+import com.msi.openchat.service.call.CallSessionCoordinator
+import com.msi.openchat.service.call.CallSessionGuard
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -391,7 +393,7 @@ object VideoCallManager {
      * Start an outgoing video call to receiver
      */
     fun startOutgoingCall(context: Context, receiverId: String, receiverName: String) {
-        if (com.msi.openchat.service.call.CallSessionCoordinator.isActive()) {
+        if (CallSessionGuard.isAudioCallActive() || CallSessionCoordinator.isActive()) {
             Log.w(TAG, "Blocked startOutgoingCall: an audio call is active")
             return
         }
@@ -402,6 +404,7 @@ object VideoCallManager {
         resetStateJob?.cancel()
         isDisposing.set(false)
         initialize(context)
+        CallSessionGuard.registerVideoCall("video_pending_$receiverId")
         acquireWakeLock(context)
         setCommunicationAudioMode(speakerOn = true)
         VideoCallService.startService(context, receiverName)
@@ -418,6 +421,7 @@ object VideoCallManager {
             if (res is Resource.Success && res.data != null) {
                 val session = res.data
                 val callId = session.id
+                CallSessionGuard.registerVideoCall(callId)
                 _uiState.value = _uiState.value.copy(
                     callId = callId,
                     status = VideoCallStatus.OutgoingCalling(callId, receiverId, receiverName)
@@ -441,11 +445,11 @@ object VideoCallManager {
      * Receive and answer an incoming video call
      */
     fun acceptIncomingCall(context: Context, callId: String, callerId: String, callerName: String) {
-        if (callId.isBlank() || callId.startsWith("aud_")) {
+        if (callId.isBlank() || CallSessionGuard.isAudioCallId(callId)) {
             Log.w(TAG, "Blocked acceptIncomingCall for invalid/audio callId=$callId")
             return
         }
-        if (com.msi.openchat.service.call.CallSessionCoordinator.isActive()) {
+        if (CallSessionGuard.isAudioCallActive() || CallSessionCoordinator.isActive()) {
             Log.w(TAG, "Blocked acceptIncomingCall: an audio call is active")
             return
         }
@@ -456,6 +460,7 @@ object VideoCallManager {
         resetStateJob?.cancel()
         isDisposing.set(false)
         initialize(context)
+        CallSessionGuard.registerVideoCall(callId)
         acquireWakeLock(context)
         setCommunicationAudioMode(speakerOn = true)
         VideoCallService.startService(context, callerName)
@@ -485,7 +490,7 @@ object VideoCallManager {
      * Decline incoming video call
      */
     fun declineIncomingCall(context: Context, callId: String, callerId: String) {
-        if (callId.isBlank() || callId.startsWith("aud_")) return
+        if (callId.isBlank() || CallSessionGuard.isAudioCallId(callId)) return
         initialize(context)
         managerScope.launch {
             signaling?.notifyDecline(callId, callerId)
@@ -1097,6 +1102,10 @@ object VideoCallManager {
         } catch (_: Exception) {}
 
         releaseWakeLock()
+
+        if (CallSessionGuard.isVideoCallActive()) {
+            CallSessionGuard.unregisterCall(null)
+        }
 
         _uiState.value = _uiState.value.copy(
             status = VideoCallStatus.Ended(effectiveReason),

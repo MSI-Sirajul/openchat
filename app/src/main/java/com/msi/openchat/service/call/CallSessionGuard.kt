@@ -81,4 +81,12 @@ object CallSessionGuard {
         if (isVideoCall(callId, callType)) return false
         return true
     }
+
+    /**
+     * Deterministically tests if a callId belongs specifically to the audio namespace.
+     */
+    fun isAudioCallId(callId: String?): Boolean {
+        if (callId.isNullOrBlank()) return false
+        return callId.startsWith("audio_") || callId.startsWith("aud_")
+    }
 }

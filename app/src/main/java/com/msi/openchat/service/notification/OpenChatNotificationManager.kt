@@ -353,7 +353,7 @@ object OpenChatNotificationManager {
         callerName: String
     ) {
         // Safety guard: If call is actually audio, divert immediately to audio notification
-        if (callId.startsWith("audio_") && !callId.startsWith("video_")) {
+        if (com.msi.openchat.service.call.CallSessionGuard.isAudioCallId(callId) && !callId.startsWith("video_")) {
             Log.w(TAG, "Diverting audio call from showIncomingVideoCallNotification to showIncomingCallNotification: $callId")
             showIncomingCallNotification(context, callId, callerId, callerName)
             return

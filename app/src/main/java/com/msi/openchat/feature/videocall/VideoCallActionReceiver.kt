@@ -6,6 +6,7 @@ import android.content.Intent
 import android.util.Log
 import com.example.R
 import com.msi.openchat.core.service.AppServiceManager
+import com.msi.openchat.service.call.CallSessionGuard
 import com.msi.openchat.service.notification.OpenChatNotificationManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -45,7 +46,7 @@ class VideoCallActionReceiver : BroadcastReceiver() {
 
         when (action) {
             ACTION_DECLINE_VIDEO_CALL -> {
-                if (callId.startsWith("aud_")) {
+                if (CallSessionGuard.isAudioCallId(callId)) {
                     Log.w(tag, "Video receiver ignored audio callId=$callId")
                     return
                 }
@@ -70,7 +71,7 @@ class VideoCallActionReceiver : BroadcastReceiver() {
             }
 
             ACTION_ACCEPT_VIDEO_CALL -> {
-                if (callId.startsWith("aud_")) {
+                if (CallSessionGuard.isAudioCallId(callId)) {
                     Log.w(tag, "Video receiver ignored audio accept callId=$callId")
                     return
                 }

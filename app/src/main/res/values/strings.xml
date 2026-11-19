@@ -498,6 +498,10 @@
     <string name="call_video_notif_title">Video Call: %1$s</string>
     <string name="call_video_notif_flip_short">Flip Cam</string>
     <string name="call_signaling_send_failed">Signaling send failed</string>
+    <string name="active_call_voice_label">Voice Call • %1$s</string>
+    <string name="active_call_video_label">Video Call • %1$s</string>
+    <string name="active_call_tap_to_return">Tap to return to call</string>
+    <string name="active_call_banner_cd">Active call status bar, tap to return to call</string>
 
     <!-- Notifications & Background Sync -->
     <string name="notif_channel_incoming_voice">Incoming Voice Calls</string>

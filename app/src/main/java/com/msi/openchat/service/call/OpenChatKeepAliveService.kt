@@ -288,7 +288,9 @@ class OpenChatKeepAliveService : Service() {
                         return
                     }
 
-                    if (CallSessionGuard.activeCallId.value == callId) {
+                    if (CallSessionGuard.activeCallId.value == callId ||
+                        com.msi.openchat.feature.videocall.VideoCallManager.uiState.value.callId == callId
+                    ) {
                         return
                     }
 

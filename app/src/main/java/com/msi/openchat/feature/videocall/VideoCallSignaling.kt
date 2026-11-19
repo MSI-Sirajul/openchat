@@ -12,6 +12,7 @@ import com.msi.openchat.core.security.SessionManager
 import com.msi.openchat.data.model.CallSession
 import com.msi.openchat.data.model.CallSignalingMessage
 import com.msi.openchat.data.remote.firebase.FirebaseManager
+import com.msi.openchat.service.call.CallSessionGuard
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -118,7 +119,7 @@ class VideoCallSignaling(
         type: String,
         payload: String
     ): Resource<Unit> = withContext(Dispatchers.IO) {
-        if (callId.isBlank() || callId.startsWith("aud_")) {
+        if (callId.isBlank() || CallSessionGuard.isAudioCallId(callId)) {
             return@withContext Resource.Error("Invalid video callId: $callId")
         }
 
@@ -156,7 +157,7 @@ class VideoCallSignaling(
      * Stream incoming video signaling messages (SDP offer, answer, ICE candidates) for this call
      */
     fun listenSignaling(callId: String, currentUserId: String): Flow<CallSignalingMessage> = callbackFlow {
-        if (callId.isBlank() || callId.startsWith("aud_")) {
+        if (callId.isBlank() || CallSessionGuard.isAudioCallId(callId)) {
             close()
             return@callbackFlow
         }
@@ -202,7 +203,7 @@ class VideoCallSignaling(
      * Observe video call session status changes under /videoCalls/{callId}
      */
     fun listenCallSession(callId: String): Flow<CallSession?> = callbackFlow {
-        if (callId.isBlank() || callId.startsWith("aud_")) {
+        if (callId.isBlank() || CallSessionGuard.isAudioCallId(callId)) {
             close()
             return@callbackFlow
         }
@@ -251,7 +252,7 @@ class VideoCallSignaling(
         endReason: String? = null,
         durationSeconds: Int = 0
     ): Resource<Unit> = withContext(Dispatchers.IO) {
-        if (callId.isBlank() || callId.startsWith("aud_")) {
+        if (callId.isBlank() || CallSessionGuard.isAudioCallId(callId)) {
             return@withContext Resource.Error("Ignoring non-video callId: $callId")
         }
 

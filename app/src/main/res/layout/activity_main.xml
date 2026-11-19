@@ -34,6 +34,73 @@
                 android:fontFamily="sans-serif-medium" />
         </FrameLayout>
 
+        <!-- Global In-App Active Call Status Bar (Audio & Video) -->
+        <LinearLayout
+            android:id="@+id/layout_active_call_banner"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:minHeight="48dp"
+            android:background="@color/color_active_call_banner_bg"
+            android:clickable="true"
+            android:focusable="true"
+            android:foreground="?attr/selectableItemBackground"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingHorizontal="16dp"
+            android:paddingVertical="8dp"
+            android:contentDescription="@string/active_call_banner_cd"
+            android:tag="active_call_status_banner"
+            android:visibility="gone">
+
+            <ImageView
+                android:id="@+id/img_active_call_icon"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:contentDescription="@string/call_history_status_cd"
+                android:src="@drawable/ic_call_24"
+                app:tint="@color/color_active_call_banner_text" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="12dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/text_active_call_title"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:fontFamily="sans-serif-medium"
+                    android:maxLines="1"
+                    android:textColor="@color/color_active_call_banner_text"
+                    android:textSize="14sp" />
+
+                <TextView
+                    android:id="@+id/text_active_call_subtitle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:alpha="0.9"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:text="@string/active_call_tap_to_return"
+                    android:textColor="@color/color_active_call_banner_text"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/text_active_call_duration"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_active_call_chip"
+                android:fontFamily="sans-serif-medium"
+                android:paddingHorizontal="10dp"
+                android:paddingVertical="4dp"
+                android:textColor="@color/color_active_call_banner_text"
+                android:textSize="12sp" />
+        </LinearLayout>
+
         <!-- Main Fragment Container -->
         <androidx.fragment.app.FragmentContainerView
             android:id="@+id/fragment_container"
