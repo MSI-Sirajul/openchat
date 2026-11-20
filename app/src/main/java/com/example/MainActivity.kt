@@ -58,6 +58,9 @@ class MainActivity : AppCompatActivity() {
 
         super.onCreate(savedInstanceState)
 
+        // Configure Firebase App Check with launch intent before any UI, ViewModels, or Firebase operations
+        com.msi.openchat.core.ai.configureAppCheck(this, intent)
+
         // When activity is recreated (e.g. theme change), apply smooth fade transition
         if (savedInstanceState != null) {
             if (Build.VERSION.SDK_INT >= 34) {
@@ -517,6 +520,22 @@ class MainActivity : AppCompatActivity() {
             )
             replace(R.id.fragment_container, SettingsFragment.newInstance())
             addToBackStack("settings")
+        }
+    }
+
+    fun navigateToGeminiAssistant(initialPrompt: String? = null) {
+        supportFragmentManager.commit {
+            setCustomAnimations(
+                R.anim.slide_in_right,
+                R.anim.slide_out_left,
+                R.anim.slide_in_left,
+                R.anim.slide_out_right
+            )
+            replace(
+                R.id.fragment_container,
+                com.msi.openchat.feature.ai.GeminiAssistantFragment.newInstance(initialPrompt)
+            )
+            addToBackStack("gemini_assistant")
         }
     }
 

@@ -1,0 +1,323 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/color_background">
+
+    <!-- Top Flat Toolbar -->
+    <com.google.android.material.appbar.MaterialToolbar
+        android:id="@+id/toolbar_gemini"
+        android:layout_width="match_parent"
+        android:layout_height="64dp"
+        android:background="@color/color_toolbar_background"
+        app:navigationIcon="@drawable/ic_arrow_back_24"
+        app:navigationIconTint="@color/color_toolbar_icon"
+        app:navigationContentDescription="@string/common_back"
+        app:elevation="0dp"
+        app:contentInsetStart="0dp"
+        app:contentInsetStartWithNavigation="0dp"
+        app:contentInsetEnd="4dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <FrameLayout
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:background="@drawable/bg_avatar_circle"
+                android:backgroundTint="@color/color_avatar_bg">
+
+                <ImageView
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/ic_sparkles_24"
+                    android:contentDescription="@null"
+                    app:tint="@color/color_primary" />
+            </FrameLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="12dp"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/gemini_assistant_title"
+                    android:textColor="@color/color_toolbar_title"
+                    android:textSize="16sp"
+                    android:fontFamily="sans-serif-bold"
+                    android:maxLines="1"
+                    android:ellipsize="end" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/gemini_assistant_subtitle"
+                    android:textColor="@color/color_toolbar_subtitle"
+                    android:textSize="12sp"
+                    android:maxLines="1"
+                    android:ellipsize="end" />
+            </LinearLayout>
+
+            <ImageButton
+                android:id="@+id/btn_gemini_reset"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:src="@drawable/ic_refresh_24"
+                android:contentDescription="@string/gemini_reset_cd"
+                app:tint="@color/color_toolbar_icon" />
+        </LinearLayout>
+    </com.google.android.material.appbar.MaterialToolbar>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="@color/color_divider" />
+
+    <!-- Main Conversation Area -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/recycler_gemini_messages"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clipToPadding="false"
+            android:paddingHorizontal="12dp"
+            android:paddingVertical="12dp"
+            android:overScrollMode="ifContentScrolls" />
+
+        <!-- Welcome / Empty State -->
+        <ScrollView
+            android:id="@+id/layout_gemini_empty"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:fillViewport="true">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:padding="24dp">
+
+                <com.google.android.material.card.MaterialCardView
+                    android:layout_width="68dp"
+                    android:layout_height="68dp"
+                    app:cardCornerRadius="34dp"
+                    app:cardElevation="0dp"
+                    app:cardBackgroundColor="@color/color_avatar_bg">
+
+                    <ImageView
+                        android:layout_width="34dp"
+                        android:layout_height="34dp"
+                        android:layout_gravity="center"
+                        android:src="@drawable/ic_sparkles_24"
+                        android:contentDescription="@null"
+                        app:tint="@color/color_primary" />
+                </com.google.android.material.card.MaterialCardView>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:text="@string/gemini_empty_heading"
+                    android:textColor="@color/color_primary_text"
+                    android:textSize="19sp"
+                    android:fontFamily="sans-serif-bold"
+                    android:gravity="center" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:text="@string/gemini_empty_body"
+                    android:textColor="@color/color_secondary_text"
+                    android:textSize="14sp"
+                    android:gravity="center" />
+
+                <com.google.android.material.chip.ChipGroup
+                    android:id="@+id/chip_group_gemini_suggestions"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="20dp"
+                    app:chipSpacingHorizontal="8dp"
+                    app:chipSpacingVertical="8dp">
+
+                    <com.google.android.material.chip.Chip
+                        android:id="@+id/chip_suggest_draft"
+                        style="@style/Widget.Material3.Chip.Assist"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/gemini_suggestion_draft" />
+
+                    <com.google.android.material.chip.Chip
+                        android:id="@+id/chip_suggest_translate"
+                        style="@style/Widget.Material3.Chip.Assist"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/gemini_suggestion_translate" />
+
+                    <com.google.android.material.chip.Chip
+                        android:id="@+id/chip_suggest_summarize"
+                        style="@style/Widget.Material3.Chip.Assist"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/gemini_suggestion_summarize" />
+
+                    <com.google.android.material.chip.Chip
+                        android:id="@+id/chip_suggest_brainstorm"
+                        style="@style/Widget.Material3.Chip.Assist"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/gemini_suggestion_brainstorm" />
+                </com.google.android.material.chip.ChipGroup>
+            </LinearLayout>
+        </ScrollView>
+    </FrameLayout>
+
+    <!-- Error Banner (Transparent surface for real Firebase AI / App Check errors) -->
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/card_gemini_error"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="12dp"
+        android:layout_marginBottom="8dp"
+        app:cardCornerRadius="12dp"
+        app:cardElevation="0dp"
+        app:strokeWidth="1dp"
+        app:strokeColor="@color/color_error"
+        app:cardBackgroundColor="@color/color_surface"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingHorizontal="12dp"
+            android:paddingVertical="8dp">
+
+            <TextView
+                android:id="@+id/text_gemini_error"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:textColor="@color/color_error"
+                android:textSize="13sp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_gemini_retry"
+                style="@style/Widget.Material3.Button.TextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:minHeight="48dp"
+                android:text="@string/gemini_retry" />
+        </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
+
+    <!-- Pending Multimodal Image Preview Strip -->
+    <LinearLayout
+        android:id="@+id/layout_gemini_image_preview"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="@color/color_surface_variant"
+        android:paddingHorizontal="12dp"
+        android:paddingVertical="8dp"
+        android:visibility="gone">
+
+        <com.google.android.material.imageview.ShapeableImageView
+            android:id="@+id/img_gemini_pending"
+            android:layout_width="52dp"
+            android:layout_height="52dp"
+            android:scaleType="centerCrop"
+            app:shapeAppearanceOverlay="@style/ShapeAppearance.Material3.Corner.Small"
+            android:contentDescription="@string/gemini_attached_image_cd" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="12dp"
+            android:text="@string/gemini_image_attached_label"
+            android:textColor="@color/color_primary_text"
+            android:textSize="13sp" />
+
+        <ImageButton
+            android:id="@+id/btn_gemini_remove_image"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_close_24"
+            android:contentDescription="@string/gemini_remove_image_cd"
+            app:tint="@color/color_secondary_text" />
+    </LinearLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="@color/color_divider" />
+
+    <!-- Bottom Prompt Composer Bar -->
+    <LinearLayout
+        android:id="@+id/layout_gemini_composer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/color_composer_background"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="6dp"
+        android:paddingVertical="6dp">
+
+        <ImageButton
+            android:id="@+id/btn_gemini_attach_image"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_image_24"
+            android:contentDescription="@string/gemini_attach_image_cd"
+            app:tint="@color/color_composer_icon" />
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/et_gemini_prompt"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:background="@drawable/bg_composer_input"
+            android:hint="@string/gemini_prompt_hint"
+            android:textColorHint="@color/color_composer_hint"
+            android:textColor="@color/color_composer_text"
+            android:textSize="15sp"
+            android:paddingHorizontal="14dp"
+            android:paddingVertical="10dp"
+            android:maxLines="5"
+            android:minHeight="48dp"
+            android:inputType="textMultiLine|textCapSentences" />
+
+        <ImageButton
+            android:id="@+id/btn_gemini_send"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_marginStart="6dp"
+            android:background="@drawable/bg_composer_action_btn"
+            android:src="@drawable/ic_send_24"
+            android:contentDescription="@string/gemini_send_cd"
+            app:tint="@color/color_composer_action_icon" />
+    </LinearLayout>
+
+</LinearLayout>

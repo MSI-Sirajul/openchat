@@ -259,14 +259,30 @@ class ChatFragment : Fragment() {
         binding.btnChatMore.setOnClickListener { v ->
             val popup = PopupMenu(requireContext(), v)
             popup.menu.add(0, 1, 0, getString(R.string.chat_menu_view_profile))
-            popup.menu.add(0, 2, 1, getString(R.string.chat_menu_search))
-            popup.menu.add(0, 3, 2, getString(R.string.chat_menu_media_docs))
-            popup.menu.add(0, 4, 3, getString(R.string.chat_menu_mute_notifications))
-            popup.menu.add(0, 5, 4, getString(R.string.chat_menu_clear_chat))
+            popup.menu.add(0, 6, 1, getString(R.string.chat_menu_ai_smart_replies))
+            popup.menu.add(0, 7, 2, getString(R.string.chat_menu_ai_summarize))
+            popup.menu.add(0, 8, 3, getString(R.string.chat_menu_ai_assistant))
+            popup.menu.add(0, 2, 4, getString(R.string.chat_menu_search))
+            popup.menu.add(0, 3, 5, getString(R.string.chat_menu_media_docs))
+            popup.menu.add(0, 4, 6, getString(R.string.chat_menu_mute_notifications))
+            popup.menu.add(0, 5, 7, getString(R.string.chat_menu_clear_chat))
             popup.setOnMenuItemClickListener { item ->
                 when (item.itemId) {
                     1 -> {
                         (activity as? MainActivity)?.navigateToProfile(contactId)
+                        true
+                    }
+                    6 -> {
+                        chatViewModel.generateSmartReplies()
+                        true
+                    }
+                    7 -> {
+                        Toast.makeText(requireContext(), getString(R.string.chat_ai_loading_summary), Toast.LENGTH_SHORT).show()
+                        chatViewModel.summarizeConversation()
+                        true
+                    }
+                    8 -> {
+                        (activity as? MainActivity)?.navigateToGeminiAssistant()
                         true
                     }
                     2 -> {
@@ -411,6 +427,46 @@ class ChatFragment : Fragment() {
                 true
             }
             popup.show()
+        }
+
+        binding.btnChatAi.setOnClickListener { v ->
+            val popup = PopupMenu(requireContext(), v)
+            popup.menu.add(0, 1, 0, getString(R.string.chat_menu_ai_smart_replies))
+            popup.menu.add(0, 2, 1, getString(R.string.chat_menu_ai_polish_draft))
+            popup.menu.add(0, 3, 2, getString(R.string.chat_menu_ai_summarize))
+            popup.menu.add(0, 4, 3, getString(R.string.chat_menu_ai_assistant))
+            popup.setOnMenuItemClickListener { item ->
+                when (item.itemId) {
+                    1 -> {
+                        chatViewModel.generateSmartReplies()
+                        true
+                    }
+                    2 -> {
+                        val draft = binding.etMessageInput.text?.toString().orEmpty()
+                        if (draft.isBlank()) {
+                            Toast.makeText(requireContext(), getString(R.string.chat_ai_draft_empty), Toast.LENGTH_SHORT).show()
+                        } else {
+                            chatViewModel.polishDraft(draft)
+                        }
+                        true
+                    }
+                    3 -> {
+                        Toast.makeText(requireContext(), getString(R.string.chat_ai_loading_summary), Toast.LENGTH_SHORT).show()
+                        chatViewModel.summarizeConversation()
+                        true
+                    }
+                    4 -> {
+                        (activity as? MainActivity)?.navigateToGeminiAssistant()
+                        true
+                    }
+                    else -> false
+                }
+            }
+            popup.show()
+        }
+
+        binding.btnDismissSmartReplies.setOnClickListener {
+            chatViewModel.dismissSmartReplies()
         }
     }
 
@@ -795,6 +851,57 @@ class ChatFragment : Fragment() {
         } else {
             binding.layoutRecordingBar.visibility = View.GONE
             binding.layoutInputBar.visibility = View.VISIBLE
+        }
+
+        // AI Smart Replies strip
+        if (state.isGeneratingSmartReplies || state.smartReplies.isNotEmpty()) {
+            binding.layoutAiSmartReplies.visibility = View.VISIBLE
+            if (state.isGeneratingSmartReplies) {
+                binding.progressAiSmartReplies.visibility = View.VISIBLE
+                binding.textAiSmartRepliesStatus.visibility = View.VISIBLE
+                binding.scrollAiSmartReplies.visibility = View.GONE
+            } else {
+                binding.progressAiSmartReplies.visibility = View.GONE
+                binding.textAiSmartRepliesStatus.visibility = View.GONE
+                binding.scrollAiSmartReplies.visibility = View.VISIBLE
+                binding.chipGroupSmartReplies.removeAllViews()
+                for (reply in state.smartReplies) {
+                    val chip = com.google.android.material.chip.Chip(requireContext()).apply {
+                        text = reply
+                        isClickable = true
+                        setOnClickListener {
+                            binding.etMessageInput.setText(reply)
+                            binding.etMessageInput.setSelection(reply.length)
+                            chatViewModel.dismissSmartReplies()
+                        }
+                    }
+                    binding.chipGroupSmartReplies.addView(chip)
+                }
+            }
+        } else {
+            binding.layoutAiSmartReplies.visibility = View.GONE
+        }
+
+        // Polished draft result
+        state.polishedDraftResult?.let { rewritten ->
+            binding.etMessageInput.setText(rewritten)
+            binding.etMessageInput.setSelection(rewritten.length)
+            chatViewModel.clearPolishedDraft()
+        }
+
+        // Conversation summary dialog
+        state.chatSummary?.let { summary ->
+            chatViewModel.clearChatSummary()
+            com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
+                .setTitle(getString(R.string.chat_ai_summary_title))
+                .setMessage(summary)
+                .setPositiveButton(getString(R.string.chat_ai_close), null)
+                .setNeutralButton(getString(R.string.chat_ai_copy)) { _, _ ->
+                    val clipboard = requireContext().getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                    clipboard.setPrimaryClip(android.content.ClipData.newPlainText("Summary", summary))
+                    Toast.makeText(requireContext(), getString(R.string.chat_ai_copied), Toast.LENGTH_SHORT).show()
+                }
+                .show()
         }
 
         // Error message

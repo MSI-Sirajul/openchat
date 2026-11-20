@@ -280,6 +280,10 @@ class HomeFragment : Fragment() {
             (activity as? MainActivity)?.navigateToProfile(currentUid)
         }
 
+        binding.btnHomeGemini.setOnClickListener {
+            (activity as? MainActivity)?.navigateToGeminiAssistant()
+        }
+
         binding.btnHomeSearch.setOnClickListener {
             val isCurrentlyVisible = binding.layoutSearchBox.visibility == View.VISIBLE
             binding.layoutSearchBox.visibility = if (isCurrentlyVisible) View.GONE else View.VISIBLE

@@ -312,6 +312,71 @@
                 app:iconTint="@color/color_composer_action_icon" />
         </LinearLayout>
 
+        <!-- AI Smart Replies Suggestion Bar -->
+        <LinearLayout
+            android:id="@+id/layout_ai_smart_replies"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@color/color_surface"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="12dp"
+            android:paddingEnd="4dp"
+            android:paddingVertical="4dp"
+            android:visibility="gone">
+
+            <ImageView
+                android:layout_width="18dp"
+                android:layout_height="18dp"
+                android:src="@drawable/ic_sparkles_24"
+                android:contentDescription="@null"
+                app:tint="@color/color_primary" />
+
+            <ProgressBar
+                android:id="@+id/progress_ai_smart_replies"
+                style="?android:attr/progressBarStyleSmall"
+                android:layout_width="18dp"
+                android:layout_height="18dp"
+                android:layout_marginStart="8dp"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/text_ai_smart_replies_status"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="8dp"
+                android:text="@string/chat_ai_loading_replies"
+                android:textColor="@color/color_secondary_text"
+                android:textSize="13sp"
+                android:visibility="gone" />
+
+            <HorizontalScrollView
+                android:id="@+id/scroll_ai_smart_replies"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="8dp"
+                android:scrollbars="none">
+
+                <com.google.android.material.chip.ChipGroup
+                    android:id="@+id/chip_group_smart_replies"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    app:singleLine="true"
+                    app:chipSpacingHorizontal="6dp" />
+            </HorizontalScrollView>
+
+            <ImageButton
+                android:id="@+id/btn_dismiss_smart_replies"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:src="@drawable/ic_close_24"
+                android:contentDescription="@string/chat_ai_dismiss_cd"
+                app:tint="@color/color_secondary_text" />
+        </LinearLayout>
+
         <!-- Subtle Top Divider above composer -->
         <View
             android:layout_width="match_parent"
@@ -340,6 +405,16 @@
                 android:src="@drawable/ic_attach_file_24"
                 android:contentDescription="@string/chat_attach_file_cd"
                 app:tint="@color/color_composer_icon" />
+
+            <!-- Gemini AI Assist Button (48dp touch target) -->
+            <ImageButton
+                android:id="@+id/btn_chat_ai"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:src="@drawable/ic_sparkles_24"
+                android:contentDescription="@string/chat_ai_smart_replies_cd"
+                app:tint="@color/color_primary" />
 
             <!-- Rounded Pill Text Message Input -->
             <com.google.android.material.textfield.TextInputEditText

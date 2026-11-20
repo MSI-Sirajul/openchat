@@ -562,4 +562,38 @@
     <string name="permissions_media_desc">Select and send photos, videos, and documents from your device.</string>
     <string name="permissions_denied_toast">Permission denied. You can grant it later contextually or in App Settings.</string>
     <string name="permissions_already_enabled_toast">%1$s is already enabled.</string>
+
+    <!-- Gemini AI Assistant & Smart Chat Helpers -->
+    <string name="gemini_assistant_title">Gemini AI</string>
+    <string name="gemini_assistant_subtitle">Powered by Gemini 3.8 Flash</string>
+    <string name="gemini_open_cd">Open Gemini AI Assistant</string>
+    <string name="gemini_reset_cd">New Gemini conversation</string>
+    <string name="gemini_empty_heading">Ask Gemini anything</string>
+    <string name="gemini_empty_body">Draft messages, summarize chats, translate text, or analyze photos with Firebase AI Logic.</string>
+    <string name="gemini_suggestion_draft">Draft a friendly message</string>
+    <string name="gemini_suggestion_translate">Translate a message</string>
+    <string name="gemini_suggestion_summarize">Summarize notes</string>
+    <string name="gemini_suggestion_brainstorm">Brainstorm replies</string>
+    <string name="gemini_prompt_hint">Ask Gemini anything...</string>
+    <string name="gemini_attach_image_cd">Attach image for Gemini</string>
+    <string name="gemini_attached_image_cd">Attached image preview</string>
+    <string name="gemini_image_attached_label">Image attached for analysis</string>
+    <string name="gemini_remove_image_cd">Remove attached image</string>
+    <string name="gemini_send_cd">Send prompt to Gemini</string>
+    <string name="gemini_model_label">Gemini</string>
+    <string name="gemini_thinking">Thinking...</string>
+    <string name="gemini_retry">Retry</string>
+    <string name="chat_menu_ai_smart_replies">AI Smart Replies</string>
+    <string name="chat_menu_ai_summarize">Summarize Chat with Gemini</string>
+    <string name="chat_menu_ai_polish_draft">Polish Draft with Gemini</string>
+    <string name="chat_menu_ai_assistant">Open Gemini AI Assistant</string>
+    <string name="chat_ai_smart_replies_cd">Generate AI smart replies</string>
+    <string name="chat_ai_loading_replies">Generating smart replies...</string>
+    <string name="chat_ai_loading_summary">Summarizing conversation...</string>
+    <string name="chat_ai_summary_title">Conversation Summary</string>
+    <string name="chat_ai_close">Close</string>
+    <string name="chat_ai_copy">Copy</string>
+    <string name="chat_ai_copied">Summary copied to clipboard</string>
+    <string name="chat_ai_dismiss_cd">Dismiss smart replies</string>
+    <string name="chat_ai_draft_empty">Type a message draft first to polish it with Gemini.</string>
 </resources>

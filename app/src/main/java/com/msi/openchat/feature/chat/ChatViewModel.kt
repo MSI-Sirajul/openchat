@@ -41,7 +41,13 @@ data class ChatUiState(
     val recordingDurationSeconds: Int = 0,
     val currentlyPlayingMessageId: String? = null,
     val playbackProgress: Float = 0f,
-    val networkStatus: NetworkStatus = NetworkStatus()
+    val networkStatus: NetworkStatus = NetworkStatus(),
+    val smartReplies: List<String> = emptyList(),
+    val isGeneratingSmartReplies: Boolean = false,
+    val isSummarizingChat: Boolean = false,
+    val chatSummary: String? = null,
+    val isPolishingDraft: Boolean = false,
+    val polishedDraftResult: String? = null
 )
 
 class ChatViewModel(
@@ -610,6 +616,127 @@ class ChatViewModel(
                 else -> Unit
             }
         }
+    }
+
+    fun generateSmartReplies() {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(
+                isGeneratingSmartReplies = true,
+                smartReplies = emptyList()
+            )
+            try {
+                val currentUid = sessionManager.getUserId()
+                val recent = _uiState.value.messages
+                    .filter { it.type == "text" && !it.content.isNullOrBlank() }
+                    .takeLast(10)
+                    .map { msg ->
+                        val speaker = if (msg.senderId == currentUid) "Me" else _uiState.value.contactName
+                        "$speaker: ${msg.content.orEmpty()}"
+                    }
+                val suggestions = ServiceLocator.geminiAiRepository.generateSmartReplies(
+                    recentMessages = recent,
+                    contactName = _uiState.value.contactName
+                )
+                _uiState.value = _uiState.value.copy(
+                    smartReplies = suggestions,
+                    isGeneratingSmartReplies = false
+                )
+            } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+                android.util.Log.e("ChatViewModel", "Smart replies timed out", e)
+                _uiState.value = _uiState.value.copy(
+                    isGeneratingSmartReplies = false,
+                    errorMessage = "Smart reply generation timed out after 60 seconds."
+                )
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                android.util.Log.e("ChatViewModel", "Smart replies failed", e)
+                _uiState.value = _uiState.value.copy(
+                    isGeneratingSmartReplies = false,
+                    errorMessage = e.localizedMessage ?: "Failed to generate smart replies."
+                )
+            }
+        }
+    }
+
+    fun dismissSmartReplies() {
+        _uiState.value = _uiState.value.copy(
+            smartReplies = emptyList(),
+            isGeneratingSmartReplies = false
+        )
+    }
+
+    fun summarizeConversation() {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isSummarizingChat = true, chatSummary = null)
+            try {
+                val currentUid = sessionManager.getUserId()
+                val recent = _uiState.value.messages
+                    .filter { it.type == "text" && !it.content.isNullOrBlank() }
+                    .takeLast(30)
+                    .map { msg ->
+                        val speaker = if (msg.senderId == currentUid) "Me" else _uiState.value.contactName
+                        "$speaker: ${msg.content.orEmpty()}"
+                    }
+                val summary = ServiceLocator.geminiAiRepository.summarizeConversation(
+                    recentMessages = recent,
+                    contactName = _uiState.value.contactName
+                )
+                _uiState.value = _uiState.value.copy(
+                    isSummarizingChat = false,
+                    chatSummary = summary
+                )
+            } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+                android.util.Log.e("ChatViewModel", "Summary timed out", e)
+                _uiState.value = _uiState.value.copy(
+                    isSummarizingChat = false,
+                    errorMessage = "Conversation summary timed out after 60 seconds."
+                )
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                android.util.Log.e("ChatViewModel", "Summary failed", e)
+                _uiState.value = _uiState.value.copy(
+                    isSummarizingChat = false,
+                    errorMessage = e.localizedMessage ?: "Failed to summarize conversation."
+                )
+            }
+        }
+    }
+
+    fun clearChatSummary() {
+        _uiState.value = _uiState.value.copy(chatSummary = null)
+    }
+
+    fun polishDraft(draftText: String) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isPolishingDraft = true, polishedDraftResult = null)
+            try {
+                val polished = ServiceLocator.geminiAiRepository.polishDraft(draftText)
+                _uiState.value = _uiState.value.copy(
+                    isPolishingDraft = false,
+                    polishedDraftResult = polished
+                )
+            } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+                android.util.Log.e("ChatViewModel", "Draft polish timed out", e)
+                _uiState.value = _uiState.value.copy(
+                    isPolishingDraft = false,
+                    errorMessage = "Draft rewrite timed out after 60 seconds."
+                )
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                android.util.Log.e("ChatViewModel", "Draft polish failed", e)
+                _uiState.value = _uiState.value.copy(
+                    isPolishingDraft = false,
+                    errorMessage = e.localizedMessage ?: "Failed to polish draft."
+                )
+            }
+        }
+    }
+
+    fun clearPolishedDraft() {
+        _uiState.value = _uiState.value.copy(polishedDraftResult = null)
     }
 
     fun clearErrorMessage() {

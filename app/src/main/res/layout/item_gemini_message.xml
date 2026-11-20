@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:paddingVertical="4dp">
+
+    <!-- User Prompt Bubble (Right) -->
+    <LinearLayout
+        android:id="@+id/layout_gemini_user_bubble"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="end"
+        android:layout_marginStart="48dp"
+        android:background="@drawable/bg_bubble_outgoing"
+        android:orientation="vertical"
+        android:padding="12dp"
+        android:visibility="gone">
+
+        <com.google.android.material.imageview.ShapeableImageView
+            android:id="@+id/img_gemini_user_attachment"
+            android:layout_width="180dp"
+            android:layout_height="140dp"
+            android:layout_marginBottom="8dp"
+            android:scaleType="centerCrop"
+            app:shapeAppearanceOverlay="@style/ShapeAppearance.Material3.Corner.Small"
+            android:contentDescription="@string/gemini_attached_image_cd"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/text_gemini_user_msg"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="@color/color_bubble_outgoing_text"
+            android:textSize="15sp"
+            android:lineSpacingExtra="3dp" />
+    </LinearLayout>
+
+    <!-- Gemini Response Bubble (Left) -->
+    <LinearLayout
+        android:id="@+id/layout_gemini_model_bubble"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="start"
+        android:layout_marginEnd="36dp"
+        android:background="@drawable/bg_bubble_incoming"
+        android:orientation="vertical"
+        android:padding="12dp"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="4dp">
+
+            <ImageView
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:src="@drawable/ic_sparkles_24"
+                android:contentDescription="@null"
+                app:tint="@color/color_primary" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:text="@string/gemini_model_label"
+                android:textColor="@color/color_primary"
+                android:textSize="12sp"
+                android:fontFamily="sans-serif-bold" />
+
+            <ProgressBar
+                android:id="@+id/progress_gemini_streaming"
+                style="?android:attr/progressBarStyleSmall"
+                android:layout_width="14dp"
+                android:layout_height="14dp"
+                android:layout_marginStart="8dp"
+                android:visibility="gone" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/text_gemini_model_msg"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="@color/color_bubble_incoming_text"
+            android:textSize="15sp"
+            android:lineSpacingExtra="4dp"
+            android:textIsSelectable="true" />
+    </LinearLayout>
+
+</FrameLayout>
