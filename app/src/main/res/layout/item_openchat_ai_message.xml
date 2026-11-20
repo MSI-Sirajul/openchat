@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:paddingVertical="6dp">
+
+    <!-- User Prompt Bubble (Right) -->
+    <LinearLayout
+        android:id="@+id/layout_openchat_ai_user_bubble"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="end"
+        android:layout_marginStart="56dp"
+        android:background="@drawable/bg_openchat_ai_user_bubble"
+        android:orientation="vertical"
+        android:paddingHorizontal="16dp"
+        android:paddingVertical="12dp"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/text_openchat_ai_user_msg"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="@color/color_ai_user_bubble_text"
+            android:textSize="15sp"
+            android:lineSpacingExtra="3dp" />
+    </LinearLayout>
+
+    <!-- OpenChat AI Response Card Bubble (Left) -->
+    <LinearLayout
+        android:id="@+id/layout_openchat_ai_model_bubble"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="start"
+        android:layout_marginEnd="32dp"
+        android:background="@drawable/bg_openchat_ai_assistant_bubble"
+        android:orientation="vertical"
+        android:paddingHorizontal="14dp"
+        android:paddingVertical="12dp"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="6dp">
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_openchat_ai_badge"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingHorizontal="8dp"
+                android:paddingVertical="3dp">
+
+                <ImageView
+                    android:layout_width="13dp"
+                    android:layout_height="13dp"
+                    android:src="@drawable/ic_sparkles_24"
+                    android:contentDescription="@null"
+                    app:tint="@color/color_ai_pill_text" />
+
+                <TextView
+                    android:id="@+id/text_openchat_ai_model_badge"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="5dp"
+                    android:text="@string/openchat_ai_title"
+                    android:textColor="@color/color_ai_pill_text"
+                    android:textSize="11.5sp"
+                    android:fontFamily="sans-serif-bold" />
+            </LinearLayout>
+
+            <ProgressBar
+                android:id="@+id/progress_openchat_ai_streaming"
+                style="?android:attr/progressBarStyleSmall"
+                android:layout_width="14dp"
+                android:layout_height="14dp"
+                android:layout_marginStart="8dp"
+                android:indeterminateTint="@color/color_primary"
+                android:visibility="gone" />
+
+            <ImageButton
+                android:id="@+id/btn_openchat_ai_copy"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_marginStart="2dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:src="@drawable/ic_copy_24"
+                android:padding="14dp"
+                android:contentDescription="@string/openchat_ai_copy_cd"
+                app:tint="@color/color_secondary_text"
+                android:visibility="gone" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/text_openchat_ai_model_msg"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="@color/color_primary_text"
+            android:textSize="15sp"
+            android:lineSpacingExtra="4dp"
+            android:textIsSelectable="true" />
+    </LinearLayout>
+
+</FrameLayout>

@@ -548,46 +548,61 @@
     <string name="notif_keepalive_active">Syncing...</string>
 
     <!-- Permission Onboarding -->
-    <string name="permissions_onboarding_title">Permissions &amp; Privacy</string>
-    <string name="permissions_onboarding_subtitle">To provide real-time messaging, crystal-clear voice calls, and media sharing, OpenChat needs a few device permissions. You can grant them individually or skip for now.</string>
+    <string name="permissions_onboarding_title">App Permissions</string>
+    <string name="permissions_onboarding_subtitle">Allow access for voice &amp; video calls, media sharing, and notifications.</string>
+    <string name="permissions_btn_allow">Allow</string>
     <string name="permissions_btn_done">Done</string>
+    <string name="permissions_btn_continue">Continue</string>
     <string name="permissions_btn_skip">Skip</string>
     <string name="permissions_notifications_title">Notifications</string>
-    <string name="permissions_notifications_desc">Instant alerts for new incoming messages and voice calls.</string>
+    <string name="permissions_notifications_desc">Alerts for incoming messages and calls.</string>
     <string name="permissions_microphone_title">Microphone</string>
-    <string name="permissions_microphone_desc">Record voice messages and speak during crystal-clear audio calls.</string>
+    <string name="permissions_microphone_desc">Voice messages and audio/video calls.</string>
     <string name="permissions_camera_title">Camera</string>
-    <string name="permissions_camera_desc">Take pictures and record videos directly to share with friends.</string>
-    <string name="permissions_media_title">Storage &amp; Media</string>
-    <string name="permissions_media_desc">Select and send photos, videos, and documents from your device.</string>
-    <string name="permissions_denied_toast">Permission denied. You can grant it later contextually or in App Settings.</string>
-    <string name="permissions_already_enabled_toast">%1$s is already enabled.</string>
+    <string name="permissions_camera_desc">Capture photos and make video calls.</string>
+    <string name="permissions_media_title">Photos &amp; Media</string>
+    <string name="permissions_media_desc">Share photos and media in chats.</string>
+    <string name="permissions_denied_toast">Permission denied. Tap Allow again or Skip to continue.</string>
+    <string name="permissions_already_enabled_toast">%1$s is already allowed.</string>
+    <string name="permissions_open_settings_toast">Enable remaining permissions in App Settings.</string>
 
-    <!-- Gemini AI Assistant & Smart Chat Helpers -->
-    <string name="gemini_assistant_title">Gemini AI</string>
-    <string name="gemini_assistant_subtitle">Powered by Gemini 3.8 Flash</string>
-    <string name="gemini_open_cd">Open Gemini AI Assistant</string>
-    <string name="gemini_reset_cd">New Gemini conversation</string>
-    <string name="gemini_empty_heading">Ask Gemini anything</string>
-    <string name="gemini_empty_body">Draft messages, summarize chats, translate text, or analyze photos with Firebase AI Logic.</string>
-    <string name="gemini_suggestion_draft">Draft a friendly message</string>
-    <string name="gemini_suggestion_translate">Translate a message</string>
-    <string name="gemini_suggestion_summarize">Summarize notes</string>
-    <string name="gemini_suggestion_brainstorm">Brainstorm replies</string>
-    <string name="gemini_prompt_hint">Ask Gemini anything...</string>
-    <string name="gemini_attach_image_cd">Attach image for Gemini</string>
-    <string name="gemini_attached_image_cd">Attached image preview</string>
-    <string name="gemini_image_attached_label">Image attached for analysis</string>
-    <string name="gemini_remove_image_cd">Remove attached image</string>
-    <string name="gemini_send_cd">Send prompt to Gemini</string>
-    <string name="gemini_model_label">Gemini</string>
-    <string name="gemini_thinking">Thinking...</string>
-    <string name="gemini_retry">Retry</string>
-    <string name="chat_menu_ai_smart_replies">AI Smart Replies</string>
-    <string name="chat_menu_ai_summarize">Summarize Chat with Gemini</string>
-    <string name="chat_menu_ai_polish_draft">Polish Draft with Gemini</string>
-    <string name="chat_menu_ai_assistant">Open Gemini AI Assistant</string>
-    <string name="chat_ai_smart_replies_cd">Generate AI smart replies</string>
+    <!-- Settings OpenChat AI Toggle -->
+    <string name="settings_ai_header">AI Features</string>
+    <string name="settings_openchat_ai_title">OpenChat AI</string>
+    <string name="settings_openchat_ai_desc">Enable OpenChat AI assistant, smart replies, draft polish &amp; chat summaries</string>
+    <string name="settings_openchat_ai_enabled_toast">OpenChat AI enabled</string>
+    <string name="settings_openchat_ai_disabled_toast">OpenChat AI disabled</string>
+
+    <!-- OpenChat AI Assistant & Smart Chat Helpers -->
+    <string name="openchat_ai_title">OpenChat AI</string>
+    <string name="openchat_ai_subtitle_chat">DeepSeek Chat</string>
+    <string name="openchat_ai_subtitle_r1">DeepSeek R1 Reasoning</string>
+    <string name="openchat_ai_model_chat">DeepSeek</string>
+    <string name="openchat_ai_model_r1">DeepSeek R1</string>
+    <string name="openchat_ai_open_cd">Open OpenChat AI</string>
+    <string name="openchat_ai_reset_cd">New OpenChat AI conversation</string>
+    <string name="openchat_ai_empty_heading">Meet OpenChat AI</string>
+    <string name="openchat_ai_empty_body">Powered by DeepSeek. Craft thoughtful messages, translate instantly, or summarize discussions.</string>
+    <string name="openchat_ai_suggest_draft_title">Draft a Message</string>
+    <string name="openchat_ai_suggest_draft_desc">Polite note when running late</string>
+    <string name="openchat_ai_suggest_translate_title">Translate Text</string>
+    <string name="openchat_ai_suggest_translate_desc">Natural multilingual phrasing</string>
+    <string name="openchat_ai_suggest_summarize_title">Summarize Notes</string>
+    <string name="openchat_ai_suggest_summarize_desc">Turn text into 3 crisp bullets</string>
+    <string name="openchat_ai_suggest_brainstorm_title">Hangout Ideas</string>
+    <string name="openchat_ai_suggest_brainstorm_desc">Fresh plans for your group chat</string>
+    <string name="openchat_ai_prompt_hint">Ask OpenChat AI anything...</string>
+    <string name="openchat_ai_send_cd">Send prompt to OpenChat AI</string>
+    <string name="openchat_ai_copy_cd">Copy AI response</string>
+    <string name="openchat_ai_response_copied">Response copied</string>
+    <string name="openchat_ai_thinking">Thinking...</string>
+    <string name="openchat_ai_retry">Retry</string>
+    <string name="chat_menu_ai_smart_replies">OpenChat AI Smart Replies</string>
+    <string name="chat_menu_ai_summarize">Summarize Chat with OpenChat AI</string>
+    <string name="chat_menu_ai_polish_draft">Polish Draft with OpenChat AI</string>
+    <string name="chat_menu_ai_assistant">Open OpenChat AI</string>
+    <string name="chat_ai_smart_replies_cd">OpenChat AI tools</string>
+    <string name="chat_ai_badge_label">OpenChat AI</string>
     <string name="chat_ai_loading_replies">Generating smart replies...</string>
     <string name="chat_ai_loading_summary">Summarizing conversation...</string>
     <string name="chat_ai_summary_title">Conversation Summary</string>
@@ -595,5 +610,5 @@
     <string name="chat_ai_copy">Copy</string>
     <string name="chat_ai_copied">Summary copied to clipboard</string>
     <string name="chat_ai_dismiss_cd">Dismiss smart replies</string>
-    <string name="chat_ai_draft_empty">Type a message draft first to polish it with Gemini.</string>
+    <string name="chat_ai_draft_empty">Type a message draft first to polish it with OpenChat AI.</string>
 </resources>

@@ -1,0 +1,308 @@
+package com.msi.openchat.core.ai
+
+import com.example.BuildConfig
+import com.msi.openchat.core.di.ServiceLocator
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONArray
+import org.json.JSONObject
+import java.io.IOException
+import java.util.concurrent.TimeUnit
+
+data class OpenChatAiApiMessage(
+    val role: String,
+    val content: String
+)
+
+class OpenChatAiRepository(
+    private val client: OkHttpClient = OkHttpClient.Builder()
+        .connectTimeout(20, TimeUnit.SECONDS)
+        .readTimeout(60, TimeUnit.SECONDS)
+        .writeTimeout(20, TimeUnit.SECONDS)
+        .build(),
+    private val apiKeyProvider: () -> String = { BuildConfig.OPENROUTER_API_KEY }
+) {
+
+    fun sendChatMessageStream(
+        conversationHistory: List<OpenChatAiApiMessage>,
+        model: String = MODEL_DEEPSEEK_CHAT
+    ): Flow<String> = flow {
+        ensureOpenChatAiEnabled()
+        val apiKey = requireConfiguredApiKey()
+
+        val payload = buildChatPayload(
+            model = model,
+            messages = buildList {
+                add(OpenChatAiApiMessage(role = "system", content = ASSISTANT_SYSTEM_PROMPT))
+                addAll(conversationHistory)
+            },
+            stream = true
+        )
+
+        val request = buildOpenRouterRequest(apiKey, payload)
+        client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) {
+                val errBody = response.body?.string().orEmpty()
+                throw IllegalStateException(parseOpenRouterError(response.code, errBody))
+            }
+
+            val source = response.body?.source()
+                ?: throw IllegalStateException("OpenRouter returned an empty stream.")
+
+            while (!source.exhausted()) {
+                val line = source.readUtf8Line() ?: break
+                val trimmed = line.trim()
+                if (trimmed.isEmpty() || trimmed.startsWith(":")) continue
+                if (!trimmed.startsWith("data:")) continue
+
+                val data = trimmed.removePrefix("data:").trim()
+                if (data == "[DONE]") break
+
+                val chunkText = extractStreamDeltaText(data)
+                if (chunkText.isNotEmpty()) {
+                    emit(chunkText)
+                }
+            }
+        }
+    }.flowOn(Dispatchers.IO)
+
+    suspend fun generateSmartReplies(
+        recentMessages: List<String>,
+        contactName: String
+    ): List<String> {
+        ensureOpenChatAiEnabled()
+        val transcript = recentMessages.takeLast(10).joinToString("\n")
+        val userPrompt = buildString {
+            append("Generate exactly 3 short, natural reply suggestions for the user chatting with ")
+            append(contactName.ifBlank { "this contact" })
+            append(".\nReturn valid JSON only in the format {\"replies\": [\"...\", \"...\", \"...\"]} with each reply under 12 words.\n")
+            if (transcript.isNotBlank()) {
+                append("Recent messages:\n")
+                append(transcript)
+            } else {
+                append("No messages yet. Suggest 3 friendly conversation starters.")
+            }
+        }
+
+        val raw = executeChatCompletion(
+            model = MODEL_DEEPSEEK_CHAT,
+            messages = listOf(
+                OpenChatAiApiMessage(
+                    role = "system",
+                    content = "You generate concise JSON reply suggestions for OpenChat."
+                ),
+                OpenChatAiApiMessage(role = "user", content = userPrompt)
+            ),
+            expectJsonObject = true
+        )
+
+        val cleanedJson = stripMarkdownCodeFences(raw)
+        return try {
+            val json = JSONObject(cleanedJson)
+            val repliesArray = json.getJSONArray("replies")
+            buildList {
+                for (i in 0 until repliesArray.length()) {
+                    val item = repliesArray.optString(i).trim()
+                    if (item.isNotBlank()) add(item)
+                }
+            }.take(3)
+        } catch (_: Exception) {
+            raw.lines()
+                .map { it.trim().trimStart('-', '*', '1', '2', '3', '.', ' ', '"').trimEnd('"', ',') }
+                .filter { it.isNotBlank() }
+                .take(3)
+                .ifEmpty { throw IllegalStateException("OpenChat AI returned an unexpected smart reply format.") }
+        }
+    }
+
+    suspend fun summarizeConversation(
+        recentMessages: List<String>,
+        contactName: String
+    ): String {
+        ensureOpenChatAiEnabled()
+        if (recentMessages.isEmpty()) {
+            throw IllegalStateException("There are no messages in this conversation to summarize yet.")
+        }
+        val transcript = recentMessages.takeLast(30).joinToString("\n")
+        val prompt = "Summarize the key points and any action items from this conversation with " +
+            "${contactName.ifBlank { "the contact" }} in 3-5 brief bullet points:\n\n$transcript"
+
+        return executeChatCompletion(
+            model = MODEL_DEEPSEEK_CHAT,
+            messages = listOf(
+                OpenChatAiApiMessage(role = "system", content = ASSISTANT_SYSTEM_PROMPT),
+                OpenChatAiApiMessage(role = "user", content = prompt)
+            )
+        )
+    }
+
+    suspend fun polishDraft(draftText: String): String {
+        ensureOpenChatAiEnabled()
+        val cleaned = draftText.trim()
+        if (cleaned.isBlank()) {
+            throw IllegalArgumentException("Type a draft message first so OpenChat AI can polish it.")
+        }
+        val prompt = "Rewrite the following chat message to make it clear, natural, and polite while " +
+            "keeping the exact same meaning and length. Return only the rewritten message text:\n\n$cleaned"
+
+        return executeChatCompletion(
+            model = MODEL_DEEPSEEK_CHAT,
+            messages = listOf(
+                OpenChatAiApiMessage(role = "system", content = ASSISTANT_SYSTEM_PROMPT),
+                OpenChatAiApiMessage(role = "user", content = prompt)
+            )
+        )
+    }
+
+    private suspend fun executeChatCompletion(
+        model: String,
+        messages: List<OpenChatAiApiMessage>,
+        expectJsonObject: Boolean = false
+    ): String = withTimeout(AI_TIMEOUT_MS) {
+        withContext(Dispatchers.IO) {
+            val apiKey = requireConfiguredApiKey()
+            val payload = buildChatPayload(
+                model = model,
+                messages = messages,
+                stream = false,
+                expectJsonObject = expectJsonObject
+            )
+            val request = buildOpenRouterRequest(apiKey, payload)
+            try {
+                client.newCall(request).execute().use { response ->
+                    val body = response.body?.string().orEmpty()
+                    if (!response.isSuccessful) {
+                        throw IllegalStateException(parseOpenRouterError(response.code, body))
+                    }
+                    extractCompletionText(body)
+                        ?: throw IllegalStateException("OpenChat AI returned an empty response.")
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: IOException) {
+                throw IllegalStateException("Network error contacting OpenChat AI: ${e.localizedMessage ?: "check connection"}", e)
+            }
+        }
+    }
+
+    private fun buildChatPayload(
+        model: String,
+        messages: List<OpenChatAiApiMessage>,
+        stream: Boolean,
+        expectJsonObject: Boolean = false
+    ): String {
+        val msgArray = JSONArray()
+        for (msg in messages) {
+            msgArray.put(
+                JSONObject().apply {
+                    put("role", msg.role)
+                    put("content", msg.content)
+                }
+            )
+        }
+        return JSONObject().apply {
+            put("model", model)
+            put("messages", msgArray)
+            put("stream", stream)
+            if (expectJsonObject) {
+                put("response_format", JSONObject().apply { put("type", "json_object") })
+            }
+        }.toString()
+    }
+
+    private fun buildOpenRouterRequest(apiKey: String, jsonBody: String): Request {
+        return Request.Builder()
+            .url(OPENROUTER_CHAT_COMPLETIONS_URL)
+            .addHeader("Authorization", "Bearer $apiKey")
+            .addHeader("Content-Type", "application/json")
+            .addHeader("HTTP-Referer", OPENROUTER_REFERER)
+            .addHeader("X-Title", OPENROUTER_APP_TITLE)
+            .post(jsonBody.toRequestBody(JSON_MEDIA_TYPE))
+            .build()
+    }
+
+    internal fun requireConfiguredApiKey(): String {
+        val key = apiKeyProvider().trim()
+        if (key.isBlank() || key == PLACEHOLDER_API_KEY) {
+            throw IllegalStateException(
+                "OpenRouter API key is not configured. Add OPENROUTER_API_KEY in the AI Studio Secrets panel."
+            )
+        }
+        return key
+    }
+
+    private fun ensureOpenChatAiEnabled() {
+        if (!ServiceLocator.sessionManager.isOpenChatAiEnabled()) {
+            throw IllegalStateException("OpenChat AI is turned off. Enable it in Settings to use AI features.")
+        }
+    }
+
+    companion object {
+        const val OPENROUTER_CHAT_COMPLETIONS_URL = "https://openrouter.ai/api/v1/chat/completions"
+        const val MODEL_DEEPSEEK_CHAT = "deepseek/deepseek-chat"
+        const val MODEL_DEEPSEEK_R1 = "deepseek/deepseek-r1"
+        private const val PLACEHOLDER_API_KEY = "OPENROUTER_API_KEY_DEFAULT_VALUE"
+        private const val OPENROUTER_REFERER = "https://openchat.app"
+        private const val OPENROUTER_APP_TITLE = "OpenChat AI"
+        private const val AI_TIMEOUT_MS = 60_000L
+        private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
+
+        private const val ASSISTANT_SYSTEM_PROMPT =
+            "You are OpenChat AI, a helpful assistant built into the OpenChat messaging app. " +
+                "Provide clear, natural, concise responses ready for chat."
+
+        internal fun extractStreamDeltaText(dataJson: String): String {
+            return try {
+                val obj = JSONObject(dataJson)
+                val choices = obj.optJSONArray("choices") ?: return ""
+                if (choices.length() == 0) return ""
+                val delta = choices.getJSONObject(0).optJSONObject("delta") ?: return ""
+                val content = delta.opt("content")
+                if (content is String) content else ""
+            } catch (_: Exception) {
+                ""
+            }
+        }
+
+        internal fun extractCompletionText(responseJson: String): String? {
+            return try {
+                val obj = JSONObject(responseJson)
+                val choices = obj.optJSONArray("choices") ?: return null
+                if (choices.length() == 0) return null
+                val message = choices.getJSONObject(0).optJSONObject("message") ?: return null
+                message.optString("content").trim().takeIf { it.isNotEmpty() }
+            } catch (_: Exception) {
+                null
+            }
+        }
+
+        internal fun parseOpenRouterError(statusCode: Int, responseBody: String): String {
+            val detail = try {
+                val errObj = JSONObject(responseBody).optJSONObject("error")
+                errObj?.optString("message")?.takeIf { it.isNotBlank() }
+            } catch (_: Exception) {
+                null
+            }
+            return detail ?: "OpenChat AI request failed (HTTP $statusCode)."
+        }
+
+        private fun stripMarkdownCodeFences(raw: String): String {
+            val trimmed = raw.trim()
+            if (!trimmed.startsWith("```")) return trimmed
+            return trimmed
+                .removePrefix("```json")
+                .removePrefix("```")
+                .removeSuffix("```")
+                .trim()
+        }
+    }
+}

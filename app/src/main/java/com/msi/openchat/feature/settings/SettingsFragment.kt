@@ -49,6 +49,7 @@ class SettingsFragment : Fragment() {
 
         setupProfileSection()
         setupThemeSection()
+        setupAiSection()
         setupSecuritySection()
         setupStorageSection()
         setupLogoutSection()
@@ -91,6 +92,12 @@ class SettingsFragment : Fragment() {
             if (settingsViewModel.uiState.value.currentThemeMode != mode) {
                 settingsViewModel.selectThemeMode(mode, activity)
             }
+        }
+    }
+
+    private fun setupAiSection() {
+        binding.switchOpenchatAiEnabled.setOnClickListener {
+            settingsViewModel.onToggleOpenChatAi(binding.switchOpenchatAiEnabled.isChecked)
         }
     }
 
@@ -286,6 +293,9 @@ class SettingsFragment : Fragment() {
         }
         isUpdatingThemeRadio = false
 
+        // OpenChat AI switch state
+        binding.switchOpenchatAiEnabled.isChecked = state.isOpenChatAiEnabled
+
         // App Lock switch state
         binding.switchAppLock.isChecked = state.isAppLockEnabled
         binding.btnChangePin.visibility = if (state.isAppLockEnabled) View.VISIBLE else View.GONE
@@ -294,6 +304,7 @@ class SettingsFragment : Fragment() {
 
         state.message?.let { msg ->
             Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show()
+            settingsViewModel.clearMessage()
         }
 
         if (state.isLoggedOut) {

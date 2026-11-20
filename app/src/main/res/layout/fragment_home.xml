@@ -77,14 +77,14 @@
                     android:textSize="22sp"
                     android:fontFamily="sans-serif-black" />
 
-                <!-- Action Icons: Gemini AI, Search, Notifications/Requests, Settings -->
+                <!-- Action Icons: OpenChat AI, Search, Notifications/Requests, Settings -->
                 <ImageButton
-                    android:id="@+id/btn_home_gemini"
-                    android:layout_width="44dp"
-                    android:layout_height="44dp"
+                    android:id="@+id/btn_home_openchat_ai"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
                     android:background="?attr/selectableItemBackgroundBorderless"
                     android:src="@drawable/ic_sparkles_24"
-                    android:contentDescription="@string/gemini_open_cd"
+                    android:contentDescription="@string/openchat_ai_open_cd"
                     app:tint="@color/color_primary" />
 
                 <ImageButton

@@ -58,9 +58,6 @@ class MainActivity : AppCompatActivity() {
 
         super.onCreate(savedInstanceState)
 
-        // Configure Firebase App Check with launch intent before any UI, ViewModels, or Firebase operations
-        com.msi.openchat.core.ai.configureAppCheck(this, intent)
-
         // When activity is recreated (e.g. theme change), apply smooth fade transition
         if (savedInstanceState != null) {
             if (Build.VERSION.SDK_INT >= 34) {
@@ -523,7 +520,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    fun navigateToGeminiAssistant(initialPrompt: String? = null) {
+    fun navigateToOpenChatAi(initialPrompt: String? = null) {
         supportFragmentManager.commit {
             setCustomAnimations(
                 R.anim.slide_in_right,
@@ -533,9 +530,9 @@ class MainActivity : AppCompatActivity() {
             )
             replace(
                 R.id.fragment_container,
-                com.msi.openchat.feature.ai.GeminiAssistantFragment.newInstance(initialPrompt)
+                com.msi.openchat.feature.ai.OpenChatAiFragment.newInstance(initialPrompt)
             )
-            addToBackStack("gemini_assistant")
+            addToBackStack("openchat_ai")
         }
     }
 
@@ -591,11 +588,16 @@ class MainActivity : AppCompatActivity() {
 
     fun syncStatusBarColor() {
         val surfaceColor = ContextCompat.getColor(this, R.color.color_surface)
+        if (::binding.isInitialized) {
+            binding.rootCoordinator.setBackgroundColor(surfaceColor)
+        }
         window.addFlags(android.view.WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
         window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS)
+        @Suppress("DEPRECATION")
         window.statusBarColor = surfaceColor
+        @Suppress("DEPRECATION")
         window.navigationBarColor = surfaceColor
-        val isDark = resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK == android.content.res.Configuration.UI_MODE_NIGHT_YES
+        val isDark = ServiceLocator.themeManager.isDarkMode(this)
         androidx.core.view.WindowInsetsControllerCompat(window, window.decorView).apply {
             isAppearanceLightStatusBars = !isDark
             isAppearanceLightNavigationBars = !isDark

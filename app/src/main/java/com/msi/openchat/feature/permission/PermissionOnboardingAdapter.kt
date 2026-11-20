@@ -1,17 +1,16 @@
 package com.msi.openchat.feature.permission
 
 import android.view.LayoutInflater
+import android.view.View
 import android.view.ViewGroup
+import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
+import com.example.R
 import com.example.databinding.ItemPermissionOnboardingBinding
 import com.msi.openchat.core.permission.PermissionItemState
 
-/**
- * Minimal AOSP-style Adapter for Permission Onboarding list.
- * Flat classic rows: title + short description + checkbox with thin divider.
- */
 class PermissionOnboardingAdapter(
     private val onItemClick: (PermissionItemState) -> Unit
 ) : ListAdapter<PermissionItemState, PermissionOnboardingAdapter.PermissionViewHolder>(DiffCallback) {
@@ -26,24 +25,31 @@ class PermissionOnboardingAdapter(
     }
 
     override fun onBindViewHolder(holder: PermissionViewHolder, position: Int) {
-        holder.bind(getItem(position))
+        holder.bind(getItem(position), isLast = position == itemCount - 1)
     }
 
     inner class PermissionViewHolder(
         private val binding: ItemPermissionOnboardingBinding
     ) : RecyclerView.ViewHolder(binding.root) {
 
-        fun bind(item: PermissionItemState) {
+        fun bind(item: PermissionItemState, isLast: Boolean) {
+            val context = binding.root.context
             binding.textPermissionTitle.text = item.title
             binding.textPermissionDesc.text = item.description
 
-            // State is strictly driven by item.isGranted
-            binding.cbPermission.setOnCheckedChangeListener(null)
-            binding.cbPermission.isChecked = item.isGranted
-            binding.cbPermission.isClickable = false
-            binding.cbPermission.isFocusable = false
+            binding.imgPermissionIcon.setImageResource(item.iconRes)
+            val tintColor = ContextCompat.getColor(
+                context,
+                if (item.isGranted) R.color.color_status_online else R.color.color_primary
+            )
+            binding.imgPermissionIcon.setColorFilter(tintColor)
 
-            // Tapping anywhere on the row triggers the permission prompt
+            binding.imgPermissionGranted.visibility = if (item.isGranted) View.VISIBLE else View.GONE
+            binding.imgPermissionGranted.contentDescription =
+                context.getString(R.string.permissions_already_enabled_toast, item.title)
+
+            binding.dividerPermission.visibility = if (isLast) View.GONE else View.VISIBLE
+
             binding.layoutPermissionRow.setOnClickListener {
                 onItemClick(item)
             }

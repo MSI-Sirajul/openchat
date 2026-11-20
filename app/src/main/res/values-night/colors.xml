@@ -57,6 +57,18 @@
     <color name="color_active_call_banner_text">#FFFFFF</color>
     <color name="color_active_call_banner_chip_bg">#26FFFFFF</color>
 
+    <!-- OpenChat AI Semantic Dark Theme Tokens -->
+    <color name="color_on_primary">#071A26</color>
+    <color name="color_ai_hero_start">#1A3449</color>
+    <color name="color_ai_card_stroke">#2A3C4E</color>
+    <color name="color_ai_pill_bg">#1D3549</color>
+    <color name="color_ai_pill_text">#7AD0F8</color>
+    <color name="color_ai_pill_border">#2D506D</color>
+    <color name="color_ai_user_bubble_bg">#14618E</color>
+    <color name="color_ai_user_bubble_text">#F1F7FC</color>
+    <color name="color_ai_composer_shell_bg">#121D27</color>
+    <color name="color_ai_composer_shell_stroke">#2D4154</color>
+
     <!-- Generic palette aliases -->
     <color name="white">#FFFFFFFF</color>
 </resources>

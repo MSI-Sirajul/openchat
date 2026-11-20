@@ -198,7 +198,7 @@ object ServiceLocator {
         AudioPlayerHelper()
     }
 
-    val geminiAiRepository: com.msi.openchat.core.ai.GeminiAiRepository by lazy {
-        com.msi.openchat.core.ai.GeminiAiRepository()
+    val openChatAiRepository: com.msi.openchat.core.ai.OpenChatAiRepository by lazy {
+        com.msi.openchat.core.ai.OpenChatAiRepository()
     }
 }

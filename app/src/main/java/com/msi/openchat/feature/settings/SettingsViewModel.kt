@@ -33,6 +33,9 @@ data class SettingsUiState(
     // Theme & Appearance
     val currentThemeMode: com.msi.openchat.core.theme.AppThemeMode = com.msi.openchat.core.theme.AppThemeMode.SYSTEM,
 
+    // OpenChat AI
+    val isOpenChatAiEnabled: Boolean = true,
+
     val isLoading: Boolean = false,
     val isSaving: Boolean = false,
     val isLoggedOut: Boolean = false,
@@ -52,7 +55,8 @@ class SettingsViewModel(
         SettingsUiState(
             isAppLockEnabled = sessionManager.secureStorage.isAppLockEnabled(),
             isBiometricEnabled = sessionManager.secureStorage.isBiometricEnabled(),
-            currentThemeMode = themeManager.themeMode.value
+            currentThemeMode = themeManager.themeMode.value,
+            isOpenChatAiEnabled = sessionManager.isOpenChatAiEnabled()
         )
     )
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
@@ -60,6 +64,7 @@ class SettingsViewModel(
     init {
         loadCurrentProfile()
         observeTheme()
+        observeOpenChatAiPreference()
     }
 
     private fun observeTheme() {
@@ -70,8 +75,30 @@ class SettingsViewModel(
         }
     }
 
+    private fun observeOpenChatAiPreference() {
+        viewModelScope.launch {
+            sessionManager.openChatAiEnabled.collect { enabled ->
+                _uiState.value = _uiState.value.copy(isOpenChatAiEnabled = enabled)
+            }
+        }
+    }
+
     fun selectThemeMode(mode: com.msi.openchat.core.theme.AppThemeMode, activity: android.app.Activity? = null) {
         themeManager.setThemeMode(mode, activity)
+    }
+
+    fun onToggleOpenChatAi(enabled: Boolean) {
+        sessionManager.setOpenChatAiEnabled(enabled)
+        _uiState.value = _uiState.value.copy(
+            isOpenChatAiEnabled = enabled,
+            message = ServiceLocator.getString(
+                if (enabled) R.string.settings_openchat_ai_enabled_toast else R.string.settings_openchat_ai_disabled_toast
+            )
+        )
+    }
+
+    fun clearMessage() {
+        _uiState.value = _uiState.value.copy(message = null)
     }
 
     private fun loadCurrentProfile() {

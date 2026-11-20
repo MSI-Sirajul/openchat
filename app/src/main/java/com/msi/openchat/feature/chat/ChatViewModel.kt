@@ -633,7 +633,7 @@ class ChatViewModel(
                         val speaker = if (msg.senderId == currentUid) "Me" else _uiState.value.contactName
                         "$speaker: ${msg.content.orEmpty()}"
                     }
-                val suggestions = ServiceLocator.geminiAiRepository.generateSmartReplies(
+                val suggestions = ServiceLocator.openChatAiRepository.generateSmartReplies(
                     recentMessages = recent,
                     contactName = _uiState.value.contactName
                 )
@@ -678,7 +678,7 @@ class ChatViewModel(
                         val speaker = if (msg.senderId == currentUid) "Me" else _uiState.value.contactName
                         "$speaker: ${msg.content.orEmpty()}"
                     }
-                val summary = ServiceLocator.geminiAiRepository.summarizeConversation(
+                val summary = ServiceLocator.openChatAiRepository.summarizeConversation(
                     recentMessages = recent,
                     contactName = _uiState.value.contactName
                 )
@@ -712,7 +712,7 @@ class ChatViewModel(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isPolishingDraft = true, polishedDraftResult = null)
             try {
-                val polished = ServiceLocator.geminiAiRepository.polishDraft(draftText)
+                val polished = ServiceLocator.openChatAiRepository.polishDraft(draftText)
                 _uiState.value = _uiState.value.copy(
                     isPolishingDraft = false,
                     polishedDraftResult = polished

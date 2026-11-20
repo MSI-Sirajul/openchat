@@ -6,7 +6,6 @@
     android:layout_height="wrap_content"
     android:orientation="vertical">
 
-    <!-- Flat classic AOSP-style list row (No CardView, No Elevation) -->
     <LinearLayout
         android:id="@+id/layoutPermissionRow"
         android:layout_width="match_parent"
@@ -15,57 +14,70 @@
         android:clickable="true"
         android:focusable="true"
         android:gravity="center_vertical"
+        android:minHeight="56dp"
         android:orientation="horizontal"
-        android:paddingHorizontal="20dp"
-        android:paddingVertical="14dp">
+        android:paddingHorizontal="16dp"
+        android:paddingVertical="12dp">
+
+        <FrameLayout
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:background="@drawable/bg_avatar_circle"
+            android:backgroundTint="@color/color_surface_variant">
+
+            <ImageView
+                android:id="@+id/imgPermissionIcon"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:layout_gravity="center"
+                android:importantForAccessibility="no"
+                tools:src="@drawable/ic_mic_24"
+                app:tint="@color/color_primary" />
+        </FrameLayout>
 
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginEnd="16dp"
+            android:layout_marginStart="14dp"
+            android:layout_marginEnd="12dp"
             android:layout_weight="1"
             android:orientation="vertical">
 
-            <!-- Title -->
             <TextView
                 android:id="@+id/textPermissionTitle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:fontFamily="sans-serif-medium"
                 android:textColor="@color/color_primary_text"
-                android:textSize="16sp"
-                android:textStyle="normal"
+                android:textSize="15sp"
                 tools:text="Microphone" />
 
-            <!-- Short Description -->
             <TextView
                 android:id="@+id/textPermissionDesc"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="3dp"
-                android:lineSpacingExtra="2dp"
+                android:layout_marginTop="2dp"
                 android:textColor="@color/color_secondary_text"
-                android:textSize="13sp"
-                tools:text="Record voice messages and speak during audio calls." />
-
+                android:textSize="12sp"
+                tools:text="Voice messages and audio/video calls." />
         </LinearLayout>
 
-        <!-- AOSP Style Flat Checkbox -->
-        <com.google.android.material.checkbox.MaterialCheckBox
-            android:id="@+id/cbPermission"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:clickable="false"
-            android:focusable="false"
-            app:buttonTint="@color/color_primary" />
-
+        <ImageView
+            android:id="@+id/imgPermissionGranted"
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:contentDescription="@string/permissions_already_enabled_toast"
+            android:src="@drawable/ic_check_single_16"
+            android:visibility="gone"
+            app:tint="@color/color_status_online"
+            tools:visibility="visible" />
     </LinearLayout>
 
-    <!-- Thin Divider -->
     <View
         android:id="@+id/dividerPermission"
         android:layout_width="match_parent"
         android:layout_height="1dp"
-        android:layout_marginStart="20dp"
+        android:layout_marginStart="66dp"
         android:background="@color/color_divider" />
 
 </LinearLayout>

@@ -280,8 +280,8 @@ class HomeFragment : Fragment() {
             (activity as? MainActivity)?.navigateToProfile(currentUid)
         }
 
-        binding.btnHomeGemini.setOnClickListener {
-            (activity as? MainActivity)?.navigateToGeminiAssistant()
+        binding.btnHomeOpenchatAi.setOnClickListener {
+            (activity as? MainActivity)?.navigateToOpenChatAi()
         }
 
         binding.btnHomeSearch.setOnClickListener {
@@ -324,7 +324,13 @@ class HomeFragment : Fragment() {
     private fun observeState() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                viewModel.uiState.collect { state ->
+                launch {
+                    com.msi.openchat.core.di.ServiceLocator.sessionManager.openChatAiEnabled.collect { enabled ->
+                        binding.btnHomeOpenchatAi.visibility = if (enabled) View.VISIBLE else View.GONE
+                    }
+                }
+                launch {
+                    viewModel.uiState.collect { state ->
                     val query = state.searchQuery.trim().lowercase()
 
                     // Filtered Conversations
@@ -375,6 +381,7 @@ class HomeFragment : Fragment() {
                         binding.badgeRequestCount.visibility = View.VISIBLE
                     } else {
                         binding.badgeRequestCount.visibility = View.GONE
+                    }
                     }
                 }
             }

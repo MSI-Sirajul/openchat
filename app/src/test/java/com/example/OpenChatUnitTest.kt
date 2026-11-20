@@ -202,13 +202,14 @@ class OpenChatUnitTest {
         assertNotNull(itemBinding.root)
         assertNotNull(itemBinding.textPermissionTitle)
         assertNotNull(itemBinding.textPermissionDesc)
-        assertNotNull(itemBinding.cbPermission)
+        assertNotNull(itemBinding.imgPermissionIcon)
+        assertNotNull(itemBinding.imgPermissionGranted)
         assertNotNull(itemBinding.layoutPermissionRow)
 
         val fragmentBinding = com.example.databinding.FragmentPermissionOnboardingBinding.inflate(inflater)
         assertNotNull(fragmentBinding.root)
         assertNotNull(fragmentBinding.recyclerPermissions)
-        assertNotNull(fragmentBinding.btnDonePermissions)
+        assertNotNull(fragmentBinding.btnAllowPermissions)
         assertNotNull(fragmentBinding.btnSkipPermissions)
     }
 
@@ -641,5 +642,93 @@ class OpenChatUnitTest {
         // 2. Canceling edit mode discards the pending avatar
         viewModel.setEditMode(false)
         assertNull(viewModel.uiState.value.pendingAvatarUri)
+    }
+
+    @Test
+    fun testOpenChatAiOpenRouterDeepSeekAndSettingsToggle() = kotlinx.coroutines.runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        com.msi.openchat.core.di.ServiceLocator.initialize(context)
+        val sessionManager = com.msi.openchat.core.di.ServiceLocator.sessionManager
+
+        // Endpoint and DeepSeek model configuration
+        assertEquals(
+            "https://openrouter.ai/api/v1/chat/completions",
+            com.msi.openchat.core.ai.OpenChatAiRepository.OPENROUTER_CHAT_COMPLETIONS_URL
+        )
+        assertEquals(
+            "deepseek/deepseek-chat",
+            com.msi.openchat.core.ai.OpenChatAiRepository.MODEL_DEEPSEEK_CHAT
+        )
+        assertEquals(
+            "deepseek/deepseek-r1",
+            com.msi.openchat.core.ai.OpenChatAiRepository.MODEL_DEEPSEEK_R1
+        )
+
+        // Default should be enabled
+        sessionManager.setOpenChatAiEnabled(true)
+        assertTrue(sessionManager.isOpenChatAiEnabled())
+        assertTrue(sessionManager.openChatAiEnabled.value)
+
+        // Layouts inflate with OpenChat AI views
+        val themedContext = androidx.appcompat.view.ContextThemeWrapper(context, com.example.R.style.Theme_MyApplication)
+        val inflater = android.view.LayoutInflater.from(themedContext)
+        val settingsBinding = com.example.databinding.FragmentSettingsBinding.inflate(inflater)
+        assertNotNull(settingsBinding.switchOpenchatAiEnabled)
+
+        val aiScreenBinding = com.example.databinding.FragmentOpenchatAiBinding.inflate(inflater)
+        assertNotNull(aiScreenBinding.toolbarOpenchatAi)
+        assertNotNull(aiScreenBinding.btnOpenchatAiModelToggle)
+        assertNotNull(aiScreenBinding.etOpenchatAiPrompt)
+        assertNotNull(aiScreenBinding.btnOpenchatAiSend)
+
+        val aiItemBinding = com.example.databinding.ItemOpenchatAiMessageBinding.inflate(inflater)
+        assertNotNull(aiItemBinding.layoutOpenchatAiUserBubble)
+        assertNotNull(aiItemBinding.layoutOpenchatAiModelBubble)
+        assertNotNull(aiItemBinding.btnOpenchatAiCopy)
+
+        // ViewModel toggle updates session preference & repository blocks AI calls when off
+        val settingsViewModel = com.msi.openchat.feature.settings.SettingsViewModel()
+        assertTrue(settingsViewModel.uiState.value.isOpenChatAiEnabled)
+
+        settingsViewModel.onToggleOpenChatAi(false)
+        assertFalse(sessionManager.isOpenChatAiEnabled())
+        assertFalse(sessionManager.openChatAiEnabled.value)
+        assertFalse(settingsViewModel.uiState.value.isOpenChatAiEnabled)
+
+        val repo = com.msi.openchat.core.ai.OpenChatAiRepository(apiKeyProvider = { "test-key" })
+        var blocked = false
+        try {
+            repo.polishDraft("Hello")
+        } catch (e: IllegalStateException) {
+            blocked = e.message?.contains("turned off", ignoreCase = true) == true
+        }
+        assertTrue(blocked)
+
+        // Placeholder / empty key validation
+        val unconfiguredRepo = com.msi.openchat.core.ai.OpenChatAiRepository(
+            apiKeyProvider = { "OPENROUTER_API_KEY_DEFAULT_VALUE" }
+        )
+        var missingKeyError = false
+        try {
+            unconfiguredRepo.requireConfiguredApiKey()
+        } catch (e: IllegalStateException) {
+            missingKeyError = e.message?.contains("OPENROUTER_API_KEY", ignoreCase = false) == true
+        }
+        assertTrue(missingKeyError)
+
+        // OpenRouter SSE & completion JSON parsing
+        val delta = com.msi.openchat.core.ai.OpenChatAiRepository.extractStreamDeltaText(
+            """{"choices":[{"delta":{"content":"Hello from DeepSeek"}}]}"""
+        )
+        assertEquals("Hello from DeepSeek", delta)
+        val completion = com.msi.openchat.core.ai.OpenChatAiRepository.extractCompletionText(
+            """{"choices":[{"message":{"content":"Polished reply"}}]}"""
+        )
+        assertEquals("Polished reply", completion)
+
+        // Re-enable restores state
+        settingsViewModel.onToggleOpenChatAi(true)
+        assertTrue(sessionManager.isOpenChatAiEnabled())
+        assertTrue(settingsViewModel.uiState.value.isOpenChatAiEnabled)
     }
 }

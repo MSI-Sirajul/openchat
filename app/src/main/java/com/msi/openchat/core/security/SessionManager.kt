@@ -26,6 +26,9 @@ class SessionManager(val context: Context) {
     private val _isSessionValid = MutableStateFlow(isAuthenticated())
     val isSessionValid: StateFlow<Boolean> = _isSessionValid.asStateFlow()
 
+    private val _openChatAiEnabled = MutableStateFlow(prefs.getBoolean(KEY_OPENCHAT_AI_ENABLED, true))
+    val openChatAiEnabled: StateFlow<Boolean> = _openChatAiEnabled.asStateFlow()
+
     fun saveSession(accessToken: String, refreshToken: String?, userId: String, email: String?) {
         prefs.edit()
             .putString(Constants.KEY_ACCESS_TOKEN, accessToken)
@@ -159,5 +162,18 @@ class SessionManager(val context: Context) {
 
     fun setPermissionOnboardingCompleted(completed: Boolean) {
         prefs.edit().putBoolean(Constants.KEY_PERMISSION_ONBOARDING_COMPLETED, completed).apply()
+    }
+
+    fun isOpenChatAiEnabled(): Boolean {
+        return prefs.getBoolean(KEY_OPENCHAT_AI_ENABLED, true)
+    }
+
+    fun setOpenChatAiEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_OPENCHAT_AI_ENABLED, enabled).apply()
+        _openChatAiEnabled.value = enabled
+    }
+
+    companion object {
+        private const val KEY_OPENCHAT_AI_ENABLED = "openchat_ai_enabled"
     }
 }

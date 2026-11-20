@@ -1,12 +1,10 @@
 package com.msi.openchat.feature.ai
 
-import android.content.Context
-import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.google.firebase.ai.Chat
-import com.msi.openchat.core.ai.GeminiAiRepository
+import com.msi.openchat.core.ai.OpenChatAiApiMessage
+import com.msi.openchat.core.ai.OpenChatAiRepository
 import com.msi.openchat.core.di.ServiceLocator
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -18,54 +16,59 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 import java.util.UUID
 
-private const val TAG = "GeminiAssistantVM"
+private const val TAG = "OpenChatAiVM"
 private const val STREAM_TIMEOUT_MS = 60_000L
 
-sealed interface GeminiUiState {
-    data object Idle : GeminiUiState
-    data object Loading : GeminiUiState
-    data class Streaming(val text: String) : GeminiUiState
-    data class Success(val text: String) : GeminiUiState
-    data class Error(val message: String) : GeminiUiState
+sealed interface OpenChatAiUiState {
+    data object Idle : OpenChatAiUiState
+    data object Loading : OpenChatAiUiState
+    data class Streaming(val text: String) : OpenChatAiUiState
+    data class Success(val text: String) : OpenChatAiUiState
+    data class Error(val message: String) : OpenChatAiUiState
 }
 
-data class GeminiChatMessage(
+enum class DeepSeekModelOption(val modelId: String) {
+    CHAT(OpenChatAiRepository.MODEL_DEEPSEEK_CHAT),
+    REASONER(OpenChatAiRepository.MODEL_DEEPSEEK_R1)
+}
+
+data class OpenChatAiMessage(
     val id: String = UUID.randomUUID().toString(),
     val isUser: Boolean,
     val text: String,
-    val imageUri: String? = null,
+    val modelOption: DeepSeekModelOption = DeepSeekModelOption.CHAT,
     val isStreaming: Boolean = false
 )
 
-data class GeminiAssistantScreenState(
-    val messages: List<GeminiChatMessage> = emptyList(),
-    val inferenceState: GeminiUiState = GeminiUiState.Idle,
-    val selectedImageUri: Uri? = null,
+data class OpenChatAiScreenState(
+    val messages: List<OpenChatAiMessage> = emptyList(),
+    val selectedModel: DeepSeekModelOption = DeepSeekModelOption.CHAT,
+    val inferenceState: OpenChatAiUiState = OpenChatAiUiState.Idle,
     val lastFailedPrompt: String? = null
 )
 
-class GeminiAssistantViewModel(
-    private val aiRepository: GeminiAiRepository = ServiceLocator.geminiAiRepository
+class OpenChatAiViewModel(
+    private val aiRepository: OpenChatAiRepository = ServiceLocator.openChatAiRepository
 ) : ViewModel() {
 
-    private var activeChat: Chat? = null
     private var activeJob: Job? = null
 
-    private val _screenState = MutableStateFlow(GeminiAssistantScreenState())
-    val screenState: StateFlow<GeminiAssistantScreenState> = _screenState.asStateFlow()
+    private val _screenState = MutableStateFlow(OpenChatAiScreenState())
+    val screenState: StateFlow<OpenChatAiScreenState> = _screenState.asStateFlow()
 
-    fun attachImage(uri: Uri?) {
-        _screenState.value = _screenState.value.copy(selectedImageUri = uri)
-    }
-
-    fun clearAttachedImage() {
-        _screenState.value = _screenState.value.copy(selectedImageUri = null)
+    fun toggleModel() {
+        val next = if (_screenState.value.selectedModel == DeepSeekModelOption.CHAT) {
+            DeepSeekModelOption.REASONER
+        } else {
+            DeepSeekModelOption.CHAT
+        }
+        _screenState.value = _screenState.value.copy(selectedModel = next)
     }
 
     fun clearError() {
-        if (_screenState.value.inferenceState is GeminiUiState.Error) {
+        if (_screenState.value.inferenceState is OpenChatAiUiState.Error) {
             _screenState.value = _screenState.value.copy(
-                inferenceState = GeminiUiState.Idle,
+                inferenceState = OpenChatAiUiState.Idle,
                 lastFailedPrompt = null
             )
         }
@@ -73,65 +76,65 @@ class GeminiAssistantViewModel(
 
     fun resetConversation() {
         activeJob?.cancel()
-        activeChat = null
-        _screenState.value = GeminiAssistantScreenState()
+        _screenState.value = OpenChatAiScreenState(
+            selectedModel = _screenState.value.selectedModel
+        )
     }
 
-    fun sendPrompt(context: Context, rawPrompt: String) {
-        val attachedUri = _screenState.value.selectedImageUri
-        val promptText = rawPrompt.trim().ifBlank {
-            if (attachedUri != null) "Analyze this image and describe what you see." else ""
-        }
+    fun sendPrompt(rawPrompt: String) {
+        val promptText = rawPrompt.trim()
         if (promptText.isBlank()) return
 
         activeJob?.cancel()
-        val userMsg = GeminiChatMessage(
+        val selectedModel = _screenState.value.selectedModel
+        val priorHistory = _screenState.value.messages
+            .filter { !it.isStreaming && it.text.isNotBlank() }
+            .map { msg ->
+                OpenChatAiApiMessage(
+                    role = if (msg.isUser) "user" else "assistant",
+                    content = msg.text
+                )
+            }
+
+        val userMsg = OpenChatAiMessage(
             isUser = true,
             text = promptText,
-            imageUri = attachedUri?.toString()
+            modelOption = selectedModel
         )
         val assistantMsgId = UUID.randomUUID().toString()
-        val placeholderAssistantMsg = GeminiChatMessage(
+        val placeholderAssistantMsg = OpenChatAiMessage(
             id = assistantMsgId,
             isUser = false,
             text = "",
+            modelOption = selectedModel,
             isStreaming = true
         )
 
         _screenState.value = _screenState.value.copy(
             messages = _screenState.value.messages + userMsg + placeholderAssistantMsg,
-            inferenceState = GeminiUiState.Loading,
-            selectedImageUri = null,
+            inferenceState = OpenChatAiUiState.Loading,
             lastFailedPrompt = null
         )
 
         activeJob = viewModelScope.launch {
             val accumulated = StringBuilder()
             try {
-                val bitmap = if (attachedUri != null) {
-                    aiRepository.decodeScaledBitmap(context, attachedUri)
-                        ?: throw IllegalStateException("Could not load the selected image.")
-                } else {
-                    null
-                }
-
-                val chatSession = activeChat ?: aiRepository.startAssistantChat().also {
-                    activeChat = it
-                }
+                val requestHistory = priorHistory + OpenChatAiApiMessage(
+                    role = "user",
+                    content = promptText
+                )
 
                 withTimeout(STREAM_TIMEOUT_MS) {
                     aiRepository.sendChatMessageStream(
-                        chat = chatSession,
-                        prompt = promptText,
-                        attachedImage = bitmap
-                    ).collect { chunk ->
-                        val chunkText = chunk.text.orEmpty()
+                        conversationHistory = requestHistory,
+                        model = selectedModel.modelId
+                    ).collect { chunkText ->
                         if (chunkText.isNotEmpty()) {
                             accumulated.append(chunkText)
                             val currentText = accumulated.toString()
                             updateAssistantMessage(assistantMsgId, currentText, isStreaming = true)
                             _screenState.value = _screenState.value.copy(
-                                inferenceState = GeminiUiState.Streaming(currentText)
+                                inferenceState = OpenChatAiUiState.Streaming(currentText)
                             )
                         }
                     }
@@ -141,20 +144,20 @@ class GeminiAssistantViewModel(
                 if (finalText.isNotBlank()) {
                     updateAssistantMessage(assistantMsgId, finalText, isStreaming = false)
                     _screenState.value = _screenState.value.copy(
-                        inferenceState = GeminiUiState.Success(finalText)
+                        inferenceState = OpenChatAiUiState.Success(finalText)
                     )
                 } else {
                     removeMessage(assistantMsgId)
                     _screenState.value = _screenState.value.copy(
-                        inferenceState = GeminiUiState.Error("Gemini returned an empty response."),
+                        inferenceState = OpenChatAiUiState.Error("OpenChat AI returned an empty response."),
                         lastFailedPrompt = promptText
                     )
                 }
             } catch (e: TimeoutCancellationException) {
-                Log.e(TAG, "Gemini streaming timed out", e)
+                Log.e(TAG, "OpenChat AI streaming timed out", e)
                 removeEmptyStreamingPlaceholder(assistantMsgId, accumulated.toString())
                 _screenState.value = _screenState.value.copy(
-                    inferenceState = GeminiUiState.Error(
+                    inferenceState = OpenChatAiUiState.Error(
                         "Request timed out after 60 seconds. Please try again."
                     ),
                     lastFailedPrompt = promptText
@@ -162,11 +165,11 @@ class GeminiAssistantViewModel(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                Log.e(TAG, "Firebase AI generation failed", e)
+                Log.e(TAG, "OpenChat AI generation failed", e)
                 removeEmptyStreamingPlaceholder(assistantMsgId, accumulated.toString())
                 _screenState.value = _screenState.value.copy(
-                    inferenceState = GeminiUiState.Error(
-                        e.localizedMessage ?: "Failed to generate response from Gemini."
+                    inferenceState = OpenChatAiUiState.Error(
+                        e.localizedMessage ?: "Failed to generate response from OpenChat AI."
                     ),
                     lastFailedPrompt = promptText
                 )

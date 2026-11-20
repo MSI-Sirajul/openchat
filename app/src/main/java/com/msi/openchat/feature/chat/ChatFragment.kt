@@ -258,10 +258,13 @@ class ChatFragment : Fragment() {
 
         binding.btnChatMore.setOnClickListener { v ->
             val popup = PopupMenu(requireContext(), v)
+            val openChatAiEnabled = ServiceLocator.sessionManager.isOpenChatAiEnabled()
             popup.menu.add(0, 1, 0, getString(R.string.chat_menu_view_profile))
-            popup.menu.add(0, 6, 1, getString(R.string.chat_menu_ai_smart_replies))
-            popup.menu.add(0, 7, 2, getString(R.string.chat_menu_ai_summarize))
-            popup.menu.add(0, 8, 3, getString(R.string.chat_menu_ai_assistant))
+            if (openChatAiEnabled) {
+                popup.menu.add(0, 6, 1, getString(R.string.chat_menu_ai_smart_replies))
+                popup.menu.add(0, 7, 2, getString(R.string.chat_menu_ai_summarize))
+                popup.menu.add(0, 8, 3, getString(R.string.chat_menu_ai_assistant))
+            }
             popup.menu.add(0, 2, 4, getString(R.string.chat_menu_search))
             popup.menu.add(0, 3, 5, getString(R.string.chat_menu_media_docs))
             popup.menu.add(0, 4, 6, getString(R.string.chat_menu_mute_notifications))
@@ -282,7 +285,7 @@ class ChatFragment : Fragment() {
                         true
                     }
                     8 -> {
-                        (activity as? MainActivity)?.navigateToGeminiAssistant()
+                        (activity as? MainActivity)?.navigateToOpenChatAi()
                         true
                     }
                     2 -> {
@@ -456,7 +459,7 @@ class ChatFragment : Fragment() {
                         true
                     }
                     4 -> {
-                        (activity as? MainActivity)?.navigateToGeminiAssistant()
+                        (activity as? MainActivity)?.navigateToOpenChatAi()
                         true
                     }
                     else -> false
@@ -762,6 +765,14 @@ class ChatFragment : Fragment() {
     private fun observeViewModel() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                launch {
+                    ServiceLocator.sessionManager.openChatAiEnabled.collect { enabled ->
+                        binding.btnChatAi.visibility = if (enabled) View.VISIBLE else View.GONE
+                        if (!enabled) {
+                            chatViewModel.dismissSmartReplies()
+                        }
+                    }
+                }
                 launch {
                     chatViewModel.uiState.collect { state ->
                         renderState(state)
