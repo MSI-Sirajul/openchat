@@ -660,7 +660,7 @@ class OpenChatUnitTest {
             com.msi.openchat.core.ai.OpenChatAiRepository.MODEL_DEEPSEEK_CHAT
         )
         assertEquals(
-            "deepseek/deepseek-r1",
+            "deepseek/deepseek-r1-0528",
             com.msi.openchat.core.ai.OpenChatAiRepository.MODEL_DEEPSEEK_R1
         )
 
@@ -715,6 +715,40 @@ class OpenChatUnitTest {
             missingKeyError = e.message?.contains("OPENROUTER_API_KEY", ignoreCase = false) == true
         }
         assertTrue(missingKeyError)
+
+        // Bounded max_tokens payload, affordable token extraction, and model fallback chain
+        val payloadJson = org.json.JSONObject(
+            repo.buildChatPayload(
+                model = com.msi.openchat.core.ai.OpenChatAiRepository.MODEL_DEEPSEEK_CHAT,
+                messages = listOf(com.msi.openchat.core.ai.OpenChatAiApiMessage("user", "Hi")),
+                stream = false,
+                maxTokens = com.msi.openchat.core.ai.OpenChatAiRepository.SMART_REPLIES_MAX_TOKENS
+            )
+        )
+        assertEquals(256, payloadJson.getInt("max_tokens"))
+        assertEquals(
+            10854,
+            com.msi.openchat.core.ai.OpenChatAiRepository.extractAffordableMaxTokens(
+                "You requested up to 16384 tokens, but can only afford 10854."
+            )
+        )
+        assertTrue(
+            com.msi.openchat.core.ai.OpenChatAiRepository.isModelUnavailableError(
+                404,
+                "deepseek/deepseek-r1 is no longer available on OpenRouter: no provider serves this model anymore."
+            )
+        )
+        val candidates = com.msi.openchat.core.ai.OpenChatAiRepository.resolveCandidateModels(
+            com.msi.openchat.core.ai.OpenChatAiRepository.MODEL_DEEPSEEK_R1
+        )
+        assertEquals(
+            listOf(
+                "deepseek/deepseek-r1-0528",
+                "deepseek/deepseek-r1-0528:free",
+                "deepseek/deepseek-chat"
+            ),
+            candidates
+        )
 
         // OpenRouter SSE & completion JSON parsing
         val delta = com.msi.openchat.core.ai.OpenChatAiRepository.extractStreamDeltaText(
