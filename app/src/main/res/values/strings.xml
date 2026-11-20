@@ -544,8 +544,8 @@
     <string name="notif_friend_accepted_title">Friend Request Accepted</string>
     <string name="notif_friend_accepted_body">%1$s accepted your friend request</string>
     <string name="notif_say_hi">Say Hi</string>
-    <string name="notif_keepalive_connecting">Connecting to OpenChat...</string>
-    <string name="notif_keepalive_active">OpenChat active &amp; syncing</string>
+    <string name="notif_keepalive_connecting">Connecting...</string>
+    <string name="notif_keepalive_active">Syncing...</string>
 
     <!-- Permission Onboarding -->
     <string name="permissions_onboarding_title">Permissions &amp; Privacy</string>
